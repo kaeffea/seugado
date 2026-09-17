@@ -205,4 +205,25 @@ Bloco de fechamento de chat, com o que foi feito, o que ficou pendente e o promp
 
 ### TODO-PARAM
 Marcação obrigatória quando uma spec precisa de um parâmetro agronômico que ainda não tem
-fonte registrada. Bloqueia a implementação até ser resolvido num chat `[PESQUISA]`.
+fonte registrada. Bloqueia **default de produção** e operação com a cultivar afetada, até ser
+resolvido num chat `[PESQUISA]`. Não bloqueia função pura que recebe o parâmetro por argumento.
+
+### HIPOTESE-CALIBRAR
+Marcação para número que **nós escolhemos** — peso de função objetivo, limiar de alerta,
+tolerância de teste. Não é dado empírico, então não cai na regra de fonte rastreável; em
+troca, precisa nomear a ADR que vai calibrá-lo. Ex.: pesos `w1..w5` em `07` §2.
+
+### Kit de aceite
+Arquivo em `revisoes/KIT-ACEITE-<NNN>.md` com as checagens que comprovam que o código
+cumpre a spec: verificações estruturais, o caso canônico e ao menos um caso que a spec não
+mostra. **O Muse Code nunca o vê** — se visse, escreveria código para a checagem em vez de
+para o requisito (ADR-011).
+
+### Runbook
+Arquivo em `revisoes/RUNBOOK-<ID>.md` com a lista ordenada de comandos e verificações que o
+Claude Code executa. É o formato de toda ação que exige terminal: git, instalação de
+dependência, lint, tipos, testes.
+
+### Relatório de conformidade
+Saída do Claude Code em `revisoes/RELATORIO-<ID>.md`: veredicto, tabela de critérios com
+evidência, defeitos, e achados fora da implementação. Formato definido em `CLAUDE.md`.

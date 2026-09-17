@@ -72,8 +72,11 @@ maximizar:
   − w5 · desvio_da_rotina_preferida
 ```
 
-Pesos default sugeridos: `w1=1.0, w2=0.8, w3=0.3, w4=5.0, w5=0.2`.
-`w4` alto de propósito: violar resíduo degrada o pasto por temporadas, é o erro mais caro.
+Pesos iniciais: `w1=1.0, w2=0.8, w3=0.3, w4=5.0, w5=0.2` — **`HIPOTESE-CALIBRAR`**.
+Não são dado empírico e não estão sujeitos à regra 1 (ver `05`, "Escopo desta regra"):
+são escolha de projeto, a ser calibrada na ADR de pesos da função objetivo, prevista
+antes do F-009. `w4` alto de propósito: violar resíduo degrada o pasto por temporadas,
+é o erro mais caro.
 
 ---
 
@@ -120,17 +123,17 @@ Transparência aqui não é cortesia — é o que faz o produtor confiar no moto
 
 **Não implementar CP-SAT direto.** Três estágios, cada um entregável:
 
-### Estágio 1 — Heurística gulosa (fatia 7)
+### Estágio 1 — Heurística gulosa (F-009)
 Ordena por urgência: quem precisa sair já > quem está no ponto > quem pode esperar.
 Aloca ao melhor piquete apto disponível.
 Sem lookahead. **Já é infinitamente melhor que mapa NDVI.**
 Serve de baseline para medir os estágios seguintes.
 
-### Estágio 2 — Busca local (pós-MVP)
+### Estágio 2 — Busca local (F-020, pós-MVP)
 Parte da solução gulosa, aplica trocas (swap de destino, adiar/antecipar movimentação),
 aceita se melhora o objetivo. Simulated annealing se necessário.
 
-### Estágio 3 — CP-SAT com horizonte rolante (alvo final)
+### Estágio 3 — CP-SAT com horizonte rolante (F-021, alvo final)
 Otimiza 14–30 dias à frente, **executa só os primeiros dias, re-otimiza no dia seguinte**.
 
 Por que horizonte rolante e não otimizar a temporada inteira: a incerteza da previsão de

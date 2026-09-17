@@ -123,10 +123,12 @@ handoff como primeira mensagem. O Knowledge carrega o resto.
 
 ### A inversão que muda tudo
 
-> Conteúdo em projects é cacheado e **não conta contra seus limites quando reutilizado**.
-> Cada vez que você referencia aquele conteúdo, só as porções novas/não-cacheadas contam.
+> Conteúdo estável do Project é cacheado entre mensagens; reutilizá-lo é **mais barato** que
+> reenviar texto novo. Não é grátis — o cache reduz o custo da releitura, não o elimina, e o
+> detalhe da contabilidade nos planos de consumo não é público. Trate como desconto, não isenção.
 
-**Consequência:** Project Knowledge pesado é **barato**. Chat longo é **caro**.
+**Consequência prática, que não depende do detalhe acima:** documento no Knowledge é lido uma
+vez e reaproveitado; chat longo reprocessa o histórico **a cada turno**, e o histórico só cresce.
 A estratégia correta é **base de conhecimento densa + chats magros**, não o contrário.
 
 Por isso os documentos deste projeto são densos de propósito. Eles se pagam na primeira

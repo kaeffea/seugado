@@ -82,6 +82,20 @@ NOT the observed utilization rate (removed mass over pre-grazing mass). See ADR-
 - Raise `ValueError` if `area_ha <= 0`
 - Return `0.0` (not negative) if `massa_atual <= massa_residuo`
 
+## Testing — who does what
+<Copy this section verbatim into every spec. It removes the ambiguity about test ownership.>
+
+Write your own tests in `tests/core/`, as a smoke check that your code runs and behaves as
+described. Keep them short. You will NOT be given a test file to copy, and you must not
+wait for one.
+
+Your tests are not the verification of record. A separate agent, which never sees this spec's
+worked example, writes an independent conformance suite in `tests/conformance/` and decides
+whether the work is accepted. So do not write code that targets a specific assertion: satisfy
+the requirement, not the test.
+
+Do not create, modify or delete anything under `tests/conformance/`.
+
 ## Acceptance criteria
 <Binary and verifiable. The tester checks exactly these.>
 - [ ] `dias_ocupacao` exists with the exact signature above

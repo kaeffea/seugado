@@ -3,17 +3,18 @@
 **Atualizado em:** 17/09/2026
 **Fase:** Fundação — F-000 e F-001 concluídas; primeiro código de produção no repositório
 
-> Este é o único arquivo do Knowledge que muda com frequência.
-> Atualize ao fim de cada fatia. O Claude sempre entrega o bloco pronto para colar.
+> Este é o único arquivo do Knowledge que muda com frequência, e é por onde se começa.
+> O Arquiteto escreve este arquivo direto, no repositório e no Knowledge — você não cola nada.
 
 ---
 
 ## Situação
 
 O modelo de domínio existe, foi verificado por suíte independente e passa 157/157 testes.
-O repositório tem fundação: git, `pyproject.toml`, `.gitignore`, `CLAUDE.md` e ambiente
-declarado. Três ADRs novas (010, 011, 012) fecharam os quatro achados urgentes da revisão
-pós-F-001. O que trava o avanço não é código — são parâmetros agronômicos sem fonte.
+O repositório tem fundação (git, `pyproject.toml`, `CLAUDE.md`, ambiente declarado), está
+publicado no GitHub, e `ruff`, `mypy` e `pytest` estão todos limpos. Três ADRs novas
+(010, 011, 012) fecharam os quatro achados urgentes da revisão pós-F-001.
+**O que trava o avanço não é código — são parâmetros agronômicos sem fonte.**
 
 ---
 
@@ -39,19 +40,24 @@ Legenda: ⬜ não iniciada · 🟨 em andamento · 🔒 bloqueada · ✅ conclu�
 ## O que existe no repositório
 
 ```
-C:\code\seugado            git, main, commit inicial 73ff3af
+C:\code\seugado            git, main, publicado no GitHub (privado)
+├── README.md              mapa simples do projeto — ler primeiro
 ├── 00–12 *.md             base de conhecimento (fonte de verdade)
 ├── CLAUDE.md              instruções permanentes do Claude Code (papel, ambiente, relatório)
-├── pyproject.toml         Python 3.12; dev: pytest, ruff, mypy strict
-├── seugado/core/models.py 6 enums, 7 dataclasses frozen/slots — F-001 aprovada
+├── pyproject.toml         Python 3.12; dev: pytest, ruff, mypy strict; md fora do ruff
+├── uv.lock                versionado (ADR-012)
+├── seugado/core/models.py 6 enums, 7 dataclasses frozen/slots — F-001 aprovada, intocada
 ├── specs/                 SPEC-001-domain-model.md
-├── tests/core/            suíte do Muse Code
-├── tests/conformance/     suíte independente do Claude Code
-└── revisoes/              REV-001, RUNBOOK-REV-001, RELATORIO-REV-001
+├── tests/core/            suíte do Muse Code (fumaça)
+├── tests/conformance/      suíte independente do Claude Code (verificação de registro)
+└── revisoes/              REV-001, RUNBOOK e RELATORIO 001 e 002
 ```
 
+Commits: `73ff3af` fundação + F-001 · `d06880b` ADRs 010–012 · `354382b` uv.lock ·
+`3877064` dívida de lint zerada.
 Ambiente: `.venv` por `uv` no WSL Ubuntu. O Windows hospedeiro não tem Python.
 Versões medidas: Python 3.12.3, pytest 9.1.1, ruff 0.16.8, mypy 2.3.1.
+Estado das ferramentas: `ruff check`, `ruff format --check`, `mypy` e `pytest` limpos, 157/157.
 
 ---
 
@@ -73,7 +79,9 @@ Versões medidas: Python 3.12.3, pytest 9.1.1, ruff 0.16.8, mypy 2.3.1.
 
 | # | Item | Onde | Destino |
 |---|---|---|---|
-| DT1 | 5 apontamentos de `ruff` e 18 de `mypy`, todos em `tests/` | `tests/core/`, `tests/conformance/` | RUNBOOK-REV-002 |
+| ~~DT1~~ | ~~apontamentos de `ruff` e `mypy` em `tests/`~~ | — | ✅ resolvido em RELATORIO-REV-002 |
+| DT7 | O campo de instruções do Project descreve o fluxo antigo (entregar blocos para colar, pedir re-upload) | instruções do Project | usuário cola o `00` novo |
+| DT8 | `SPEC-001` contém arquivo de teste pronto, o que a ADR-011 passou a proibir | `specs/` | histórico; não reescrever |
 | DT2 | Contratos de `06` §3 divergem do modelo implementado (`Literal` vs enum, `list` vs `tuple`, frozen não declarado, `Movimentacao` ≡ `Manejo`?) | `06` §3 | ADR-013 |
 | DT3 | `Cultivar` exige todos os parâmetros; a recusa por `TODO-PARAM` precisa de dono | `core/` | ADR-014 |
 | DT4 | Convenções de enum e de entidade como chave de dict | `06` §7 (regras 11–12 já escritas) | ADR-015 confirma |
@@ -92,12 +100,24 @@ separados) e ADR-012 (fundação do repositório) na revisão pós-F-001.
 
 ## Ordem sugerida dos próximos chats
 
-1. `[ARQUITETURA] REV-001 parte 2` → ADR-013, 014, 015 (DT2, DT3, DT4)
-2. `[PESQUISA] Régua de Manejo Embrapa e alturas canônicas` → resolve B3 e DT6
-3. `[PESQUISA] Densidade do dossel e eficiência de pastejo` → resolve B1 e B7, desbloqueia F-002
-4. `[PESQUISA] RUE de gramíneas C4 tropicais` → resolve B2
-5. `[ARQUITETURA] Schema de eventos` → antes do F-004
-6. `[FATIA-002] Cálculos de forragem` → quando B1, B5 e B7 estiverem fechados
+Pesquisa vem antes de arquitetura por dois motivos: F-002 e F-003 estão travadas por
+parâmetro, não por decisão; e pesquisa roda em Sonnet, enquanto arquitetura consome a cota
+semanal de Opus — gasta-se o barato enquanto o caro espera.
+
+| # | Chat | Modelo | Resolve | Por que agora |
+|---|---|---|---|---|
+| 1 | `[PESQUISA] Régua de Manejo Embrapa (CT 125)` | Sonnet | B3, DT6 | Um documento público cobre 8 cultivares de uma vez e substitui a tabela de alturas inteira. Maior retorno por esforço |
+| 2 | `[PESQUISA] Densidade do dossel e eficiência de pastejo` | Sonnet | B1, B7 | Sem a densidade não existe ponte kg MS/ha ↔ cm, que é o cálculo central do F-002 |
+| 3 | `[PESQUISA] Peso por categoria animal e temperatura base` | Sonnet | B5, B4 | Fecha o último bloqueio do F-002 e prepara o F-007 |
+| 4 | `[PESQUISA] RUE de gramíneas C4 tropicais` | Sonnet | B2 | O mais difícil e o mais consequente: errar aqui enviesa toda estimativa de crescimento |
+| 5 | `[ARQUITETURA] REV-001 parte 2` | Opus | DT2, DT3, DT4 | Os contratos precisam estar certos **antes** de escrever a spec do F-002, que os consome |
+
+Depois: `[FATIA-002] Cálculos de forragem`, com todos os parâmetros e contratos fechados.
+
+Em paralelo, quando quiser: `[PESQUISA] Termos de uso do Earth Engine` (B6). Não bloqueia
+F-002 nem F-003, mas é a maior aposta não verificada do projeto — se o uso gratuito não valer
+para este caso, F-005 e F-006 mudam de rota. Fazer antes do F-005, não depois.
+E `[APRENDER] Manejo de pastagens` a qualquer momento: é didático, não produz artefato.
 
 ---
 
@@ -105,8 +125,11 @@ separados) e ADR-012 (fundação do repositório) na revisão pós-F-001.
 
 - Earth Engine permite uso não-comercial/acadêmico nos termos atuais? Se não, qual alternativa?
 - Fonte climática: INMET (estações, densidade irregular) ou reanálise (grade, menor resolução)?
-- Publicar o repositório no GitHub para o Project Knowledge sincronizar de lá em vez de
-  re-upload manual? (a integração existe e tem botão de Sync; falta decidir e autenticar)
+- Conectar o repositório do GitHub como fonte do Project Knowledge? Já está publicado. O
+  ganho é fonte única; o custo é apagar as 12 cópias do Knowledge para não duplicar contexto,
+  e verificar a leitura antes. **Recomendação atual: não conectar ainda** — o Arquiteto já
+  escreve as duas cópias sozinho, então a sincronização resolveria um problema que não existe
+  mais.
 - Existe fazenda-piloto acessível para validação futura? (não bloqueia MVP)
 
 ---
@@ -116,11 +139,15 @@ separados) e ADR-012 (fundação do repositório) na revisão pós-F-001.
 _(Cole aqui o handoff de cada chat encerrado, mais recente no topo.)_
 
 **17/09/2026 — [ARQUITETURA] Revisão pós-F-001**
-Feito: ADR-010, 011 e 012 aceitas e aplicadas. Correções em `02`, `03`, `05`, `06`, `08`,
-`09`, `10`, `12`. F-000 executada via RUNBOOK-REV-001: git, pyproject, ambiente medido,
-157/157 testes. `CLAUDE.md` criado como instrução permanente do Claude Code.
-Pendente: DT2, DT3 e DT4 → `[ARQUITETURA] REV-001 parte 2`. B7 novo. DT1 → RUNBOOK-REV-002.
-Próximo: `[ARQUITETURA] REV-001 parte 2 — contratos, carregador de cultivares e convenções`.
+Feito: ADR-010, 011 e 012 aceitas e aplicadas em `02`, `03`, `05`, `06`, `07`, `08`, `09`,
+`10`, `12`. F-000 e a dívida de lint executadas via RUNBOOK-REV-001 e 002: git, pyproject,
+uv.lock versionado, quatro ferramentas limpas, 157/157. `CLAUDE.md` e `README.md` criados.
+Repositório publicado no GitHub. Varredura de coerência feita: corrigidos `07` (fatias com
+número errado, pesos sem marcação), `02` (vocabulário novo do método), `08` (afirmação forte
+demais sobre cache de Knowledge), `09` (regra explícita de quem escreve teste).
+Pendente: DT2, DT3, DT4 → `[ARQUITETURA] REV-001 parte 2`, **depois** das quatro pesquisas.
+DT7: o usuário precisa colar o `00` novo no campo de instruções do Project.
+Próximo: `[PESQUISA] Régua de Manejo Embrapa (CT 125)`.
 
 **17/09/2026 — F-001 Modelo de domínio**
 Feito: `seugado/core/models.py` (6 enums, 7 dataclasses frozen/slots) aprovado; 13/13
