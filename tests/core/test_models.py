@@ -1,12 +1,23 @@
 import uuid
 from dataclasses import FrozenInstanceError
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 
 from seugado.core.models import (
-    CategoriaAnimal, Confianca, ComposicaoLote, Cultivar, Evento, Fazenda,
-    Lote, Manejo, OrigemEvento, Piquete, QualidadeBase, StatusManejo, TipoEvento,
+    CategoriaAnimal,
+    ComposicaoLote,
+    Confianca,
+    Cultivar,
+    Evento,
+    Fazenda,
+    Lote,
+    Manejo,
+    OrigemEvento,
+    Piquete,
+    QualidadeBase,
+    StatusManejo,
+    TipoEvento,
 )
 
 FAZENDA_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
@@ -28,7 +39,7 @@ def test_cultivar_carries_every_parameter_explicitly():
         qualidade_base=QualidadeBase.ALTA,
     )
     assert c.slug == "fixture-grass"
-    assert c.qualidade_base == "alta"          # StrEnum compares equal to its value
+    assert c.qualidade_base == "alta"  # StrEnum compares equal to its value
 
 
 def test_entities_are_frozen():
@@ -40,7 +51,7 @@ def test_entities_are_frozen():
         cultivar_id=CULTIVAR_ID,
     )
     with pytest.raises(FrozenInstanceError):
-        p.area_ha = 2.0
+        p.area_ha = 2.0  # type: ignore[misc]  # intentional: verifying frozen mutation raises at runtime
 
 
 def test_piquete_geometry_is_opaque_and_optional():
@@ -52,11 +63,18 @@ def test_piquete_geometry_is_opaque_and_optional():
         cultivar_id=CULTIVAR_ID,
         geometria_geojson={"type": "Polygon", "coordinates": []},
     )
+    assert p.geometria_geojson is not None
     assert p.geometria_geojson["type"] == "Polygon"
-    assert Piquete(
-        id=PIQUETE_ID, fazenda_id=FAZENDA_ID, nome="x",
-        area_ha=1.0, cultivar_id=CULTIVAR_ID,
-    ).geometria_geojson is None
+    assert (
+        Piquete(
+            id=PIQUETE_ID,
+            fazenda_id=FAZENDA_ID,
+            nome="x",
+            area_ha=1.0,
+            cultivar_id=CULTIVAR_ID,
+        ).geometria_geojson
+        is None
+    )
 
 
 def test_lote_holds_composition_as_tuple():
@@ -72,7 +90,7 @@ def test_lote_holds_composition_as_tuple():
     assert isinstance(lote.composicao, tuple)
     assert len(lote.composicao) == 2
     assert lote.indissoluvel is False
-    assert not hasattr(lote, "peso_vivo_total_kg")     # derived values live elsewhere
+    assert not hasattr(lote, "peso_vivo_total_kg")  # derived values live elsewhere
 
 
 def test_manejo_allows_first_entry_and_pending_execution():
@@ -97,8 +115,8 @@ def test_evento_payload_is_opaque():
         id=uuid.uuid4(),
         fazenda_id=FAZENDA_ID,
         tipo=TipoEvento.LEITURA_SATELITE,
-        ocorrido_em=datetime(2026, 3, 12, 9, 0, tzinfo=timezone.utc),
-        registrado_em=datetime(2026, 3, 12, 9, 5, tzinfo=timezone.utc),
+        ocorrido_em=datetime(2026, 3, 12, 9, 0, tzinfo=UTC),
+        registrado_em=datetime(2026, 3, 12, 9, 5, tzinfo=UTC),
         payload={"anything": [1, 2, 3]},
         origem=OrigemEvento.SATELITE,
     )

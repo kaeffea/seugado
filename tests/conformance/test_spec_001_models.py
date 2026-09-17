@@ -12,7 +12,7 @@ import enum
 import typing
 import uuid
 from dataclasses import FrozenInstanceError
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -137,10 +137,10 @@ def _classes() -> dict[str, ast.ClassDef]:
     return {n.name: n for n in TREE.body if isinstance(n, ast.ClassDef)}
 
 
-def _sample(name: str):
+def _sample(name: str) -> typing.Any:
     """Build one valid instance of each dataclass with arbitrary fixture values."""
     comp = models.ComposicaoLote(models.CategoriaAnimal.ADULTO, 1, 1.0)
-    builders = {
+    builders: dict[str, typing.Callable[[], typing.Any]] = {
         "Fazenda": lambda: models.Fazenda(U, "f", "America/Fortaleza", 1, 1, (0,)),
         "Cultivar": lambda: models.Cultivar(
             U, "s", "n", 1.0, 1.0, 1.0, 1.0, 1.0, models.QualidadeBase.ALTA
@@ -149,21 +149,32 @@ def _sample(name: str):
         "ComposicaoLote": lambda: comp,
         "Lote": lambda: models.Lote(U, U, "l", (comp,)),
         "Manejo": lambda: models.Manejo(
-            U, U, U, U, date(2026, 1, 1), 1, "m",
-            models.Confianca.ALTA, models.StatusManejo.RECOMENDADO,
+            U,
+            U,
+            U,
+            U,
+            date(2026, 1, 1),
+            1,
+            "m",
+            models.Confianca.ALTA,
+            models.StatusManejo.RECOMENDADO,
             models.OrigemEvento.SISTEMA,
         ),
         "Evento": lambda: models.Evento(
-            U, U, models.TipoEvento.LOTE_CRIADO,
-            datetime(2026, 1, 1, tzinfo=timezone.utc),
-            datetime(2026, 1, 1, tzinfo=timezone.utc),
-            {}, models.OrigemEvento.PRODUTOR,
+            U,
+            U,
+            models.TipoEvento.LOTE_CRIADO,
+            datetime(2026, 1, 1, tzinfo=UTC),
+            datetime(2026, 1, 1, tzinfo=UTC),
+            {},
+            models.OrigemEvento.PRODUTOR,
         ),
     }
     return builders[name]()
 
 
 # --- AC-1 / R1: imports -------------------------------------------------------
+
 
 def test_ac1_imports_only_stdlib_whitelist():
     imported = set()
@@ -172,6 +183,7 @@ def test_ac1_imports_only_stdlib_whitelist():
             imported |= {a.name.split(".")[0] for a in node.names}
         elif isinstance(node, ast.ImportFrom):
             assert node.level == 0, "relative import found"
+            assert node.module is not None
             imported.add(node.module.split(".")[0])
     assert imported <= ALLOWED_IMPORTS, imported - ALLOWED_IMPORTS
 
@@ -179,7 +191,8 @@ def test_ac1_imports_only_stdlib_whitelist():
 def test_ac1_imports_are_top_level_only():
     top = {id(n) for n in TREE.body if isinstance(n, (ast.Import, ast.ImportFrom))}
     nested = [
-        n for n in ast.walk(TREE)
+        n
+        for n in ast.walk(TREE)
         if isinstance(n, (ast.Import, ast.ImportFrom)) and id(n) not in top
     ]
     assert not nested
@@ -192,6 +205,7 @@ def test_r1_module_docstring_states_immutability_rationale():
 
 
 # --- AC-2 / R9: defined names and order ---------------------------------------
+
 
 def test_ac2_module_defines_exactly_the_thirteen_names():
     defined = []
@@ -222,6 +236,7 @@ def test_r9_declaration_order():
 
 # --- AC-3 / AC-4 / R2: enums --------------------------------------------------
 
+
 @pytest.mark.parametrize("name", list(ENUMS))
 def test_ac3_enum_is_strenum_with_exact_members(name):
     cls = getattr(models, name)
@@ -244,18 +259,19 @@ def test_ac4_tipo_evento_has_exactly_twelve_members():
 
 
 def test_r2_confianca_and_qualidade_base_are_distinct_types():
-    assert models.Confianca is not models.QualidadeBase
+    assert models.Confianca is not models.QualidadeBase  # type: ignore[comparison-overlap]  # runtime equality is the documented behaviour; see 06 §7 rule 11
     assert not issubclass(models.Confianca, models.QualidadeBase)
     assert not issubclass(models.QualidadeBase, models.Confianca)
 
 
 # --- AC-5: frozen + slots -----------------------------------------------------
 
+
 @pytest.mark.parametrize("name", list(DATACLASSES))
 def test_ac5_dataclass_is_frozen_and_slotted_at_runtime(name):
     cls = getattr(models, name)
     assert dataclasses.is_dataclass(cls)
-    assert cls.__dataclass_params__.frozen is True
+    assert typing.cast(typing.Any, cls).__dataclass_params__.frozen is True
     assert "__slots__" in cls.__dict__
     assert not hasattr(_sample(name), "__dict__")
 
@@ -267,12 +283,14 @@ def test_ac5_decorator_is_written_exactly_as_specified(name):
 
 
 def test_ac5_exactly_seven_dataclasses():
-    found = [n for n in vars(models).values()
-             if isinstance(n, type) and dataclasses.is_dataclass(n)]
+    found = [
+        n for n in vars(models).values() if isinstance(n, type) and dataclasses.is_dataclass(n)
+    ]
     assert len(found) == 7
 
 
 # --- AC-6 / R3..R8: fields ----------------------------------------------------
+
 
 @pytest.mark.parametrize("name", list(DATACLASSES))
 def test_ac6_every_class_body_statement_is_an_annotated_field(name):
@@ -288,6 +306,7 @@ def test_r3_r8_fields_match_spec_exactly(name):
     actual = []
     for s in node.body:
         if isinstance(s, ast.AnnAssign):
+            assert isinstance(s.target, ast.Name)
             default = NO_DEFAULT if s.value is None else ast.literal_eval(s.value)
             actual.append((s.target.id, ast.unparse(s.annotation), default))
     assert actual == DATACLASSES[name]
@@ -321,10 +340,19 @@ def test_r6_lote_has_no_derived_values():
     names = set(dir(models.Lote)) - set(dir(object))
     field_names = {f.name for f in dataclasses.fields(models.Lote)}
     dataclass_generated = {
-        "__dataclass_fields__", "__dataclass_params__", "__match_args__",
-        "__slots__", "__annotations__", "__module__", "__doc__",
-        "__firstlineno__", "__static_attributes__", "__weakref__",
-        "__replace__", "__getstate__", "__setstate__",
+        "__dataclass_fields__",
+        "__dataclass_params__",
+        "__match_args__",
+        "__slots__",
+        "__annotations__",
+        "__module__",
+        "__doc__",
+        "__firstlineno__",
+        "__static_attributes__",
+        "__weakref__",
+        "__replace__",
+        "__getstate__",
+        "__setstate__",
     }
     assert names - field_names - dataclass_generated == set()
 
@@ -337,10 +365,14 @@ def test_r7_manejo_docstring_says_read_model():
 
 # --- AC-7: no hand-written methods --------------------------------------------
 
+
 def test_ac7_no_methods_in_any_class():
     for cls in _classes().values():
-        funcs = [n.name for n in ast.walk(cls)
-                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda))]
+        funcs = [
+            n.name if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) else "<lambda>"
+            for n in ast.walk(cls)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda))
+        ]
         assert funcs == [], (cls.name, funcs)
 
 
@@ -367,9 +399,11 @@ def test_no_raise_statements_anywhere():
 
 # --- AC-8: no numeric literals ------------------------------------------------
 
+
 def test_ac8_no_numeric_literal_in_module():
     numeric = [
-        (n.lineno, n.value) for n in ast.walk(TREE)
+        (n.lineno, n.value)
+        for n in ast.walk(TREE)
         if isinstance(n, ast.Constant)
         and isinstance(n.value, (int, float, complex))
         and not isinstance(n.value, bool)
@@ -380,8 +414,10 @@ def test_ac8_no_numeric_literal_in_module():
 def test_ac8_no_digits_in_string_constants():
     # Guards against numbers smuggled in as strings (e.g. "90") or in docstrings.
     offenders = [
-        (n.lineno, n.value) for n in ast.walk(TREE)
-        if isinstance(n, ast.Constant) and isinstance(n.value, str)
+        (n.lineno, n.value)
+        for n in ast.walk(TREE)
+        if isinstance(n, ast.Constant)
+        and isinstance(n.value, str)
         and any(ch.isdigit() for ch in n.value)
     ]
     assert offenders == []
@@ -389,17 +425,20 @@ def test_ac8_no_digits_in_string_constants():
 
 # --- AC-9: no list/set fields -------------------------------------------------
 
+
 def test_ac9_no_field_typed_list_or_set():
     banned = {"list", "set", "List", "Set", "frozenset", "MutableSequence", "MutableSet"}
     for name in DATACLASSES:
         for s in _classes()[name].body:
             if isinstance(s, ast.AnnAssign):
+                assert isinstance(s.target, ast.Name)
                 names = {n.id for n in ast.walk(s.annotation) if isinstance(n, ast.Name)}
                 names |= {n.attr for n in ast.walk(s.annotation) if isinstance(n, ast.Attribute)}
                 assert not names & banned, (name, s.target.id)
 
 
 # --- AC-10: every field of every instance is frozen ---------------------------
+
 
 @pytest.mark.parametrize(
     ("name", "field"),
@@ -423,15 +462,20 @@ def test_ac10_deleting_a_field_raises(name):
 def test_ac10_new_attributes_cannot_be_added(name):
     obj = _sample(name)
     with pytest.raises((FrozenInstanceError, AttributeError, TypeError)):
-        obj.campo_inexistente = 1  # type: ignore[attr-defined]
+        obj.campo_inexistente = 1
 
 
 # --- AC-12 / AC-13: packaging -------------------------------------------------
 
+
 @pytest.mark.parametrize(
     "rel",
-    ["seugado/__init__.py", "seugado/core/__init__.py",
-     "tests/__init__.py", "tests/core/__init__.py"],
+    [
+        "seugado/__init__.py",
+        "seugado/core/__init__.py",
+        "tests/__init__.py",
+        "tests/core/__init__.py",
+    ],
 )
 def test_ac13_package_init_files_are_empty(rel):
     assert (ROOT / rel).read_text(encoding="utf-8").strip() == ""
@@ -442,6 +486,7 @@ def test_ac12_pyproject_has_no_dependencies_if_present():
     if not pyproject.exists():
         pytest.skip("pyproject.toml does not exist; criterion is vacuous")
     import tomllib
+
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
     assert not data.get("project", {}).get("dependencies")
 
@@ -456,6 +501,7 @@ def test_r5_models_does_not_touch_geometry():
 
 # --- Behaviour the spec allows, documented as findings ------------------------
 
+
 def test_behaviour_values_are_compared_by_value():
     assert _sample("Lote") == _sample("Lote")
     assert _sample("Piquete") == _sample("Piquete")
@@ -464,8 +510,8 @@ def test_behaviour_values_are_compared_by_value():
 def test_finding_strenum_members_of_distinct_types_compare_equal():
     # R2 says Confianca and QualidadeBase are different concepts, but StrEnum
     # equality is string equality, so the type distinction is lost on `==`.
-    assert models.Confianca.ALTA == models.QualidadeBase.ALTA
-    assert models.Confianca.ALTA == "alta"
+    assert models.Confianca.ALTA == models.QualidadeBase.ALTA  # type: ignore[comparison-overlap]  # runtime equality is the documented behaviour; see 06 §7 rule 11
+    assert models.Confianca.ALTA == "alta"  # type: ignore[comparison-overlap]  # runtime equality is the documented behaviour; see 06 §7 rule 11
 
 
 def test_finding_immutability_is_shallow_for_dict_fields():
@@ -490,15 +536,20 @@ def test_finding_types_are_not_enforced_so_lists_slip_in():
     # No validation by design: a list passes where tuple is annotated,
     # leaving a mutable collection inside a "frozen" entity.
     f = models.Fazenda(U, "f", "tz", 1, 1, [0, 1])  # type: ignore[arg-type]
+    assert isinstance(f.dias_preferenciais_manejo, list)
     f.dias_preferenciais_manejo.append(2)
     assert f.dias_preferenciais_manejo == [0, 1, 2]
 
 
 def test_finding_naive_datetimes_are_accepted():
     e = models.Evento(
-        U, U, models.TipoEvento.LOTE_CRIADO,
-        datetime(2026, 1, 1), datetime(2026, 1, 1),
-        {}, models.OrigemEvento.PRODUTOR,
+        U,
+        U,
+        models.TipoEvento.LOTE_CRIADO,
+        datetime(2026, 1, 1),
+        datetime(2026, 1, 1),
+        {},
+        models.OrigemEvento.PRODUTOR,
     )
     assert e.ocorrido_em.tzinfo is None
 
