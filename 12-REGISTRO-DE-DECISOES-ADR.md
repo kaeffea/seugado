@@ -276,6 +276,40 @@ permanece necessária.
 
 ---
 
+## ADR-013 — Layout do repositório: `docs/` e src-layout
+**Data:** 17/09/2026 · **Status:** aceita
+
+**Contexto.** A raiz acumulava 14 arquivos `.md` misturados com configuração e código, e o
+usuário relatou que não conseguia se orientar. O pacote ficava em `seugado/seugado/` — que é
+o padrão histórico do Python, não um erro, mas desconfortável de ler e sujeito a um bug
+conhecido: um processo iniciado na raiz importa a pasta local em vez do pacote instalado,
+e a diferença só aparece quando já há build ou empacotamento.
+
+**Decisão.**
+- Base de conhecimento (`00`–`12`) vai para `docs/`. Os nomes numerados não mudam, então
+  continuar dizendo "o `05`" segue funcionando.
+- Pacote vai para `src/seugado/` (**src-layout**). `pytest` resolve com `pythonpath = ["src"]`
+  e `mypy` com `mypy_path = "src"`.
+- Na raiz ficam apenas dois pontos de entrada — `README.md` (humano) e `CLAUDE.md` (agente) —
+  mais `pyproject.toml`, `uv.lock` e `.gitignore`.
+- `revisoes/` **não** é renomeada nem subdividida, apesar de guardar quatro tipos de arquivo
+  (`REV-`, `KIT-ACEITE-`, `RUNBOOK-`, `RELATORIO-`). O nome já está referenciado em
+  `CLAUDE.md`, `08`, `09`, nas ADRs 011 e 012 e em dois relatórios; o prefixo já agrupa os
+  arquivos na listagem alfabética. Renomear custaria uma varredura de referências para
+  comprar estética.
+- A pasta mãe **não** é renomeada: quebraria a pasta conectada e o remote do GitHub.
+
+**Alternativas.** (a) Manter tudo na raiz — o usuário não se orienta. (b) Renomear a pasta
+mãe para `seugado-app` — churn sem ganho. (c) Flat-layout mantendo `seugado/` na raiz —
+elimina `docs/` como ganho mas preserva o problema de import.
+
+**Consequências.** Movimentação feita com `git mv`, então `git log --follow` preserva o
+histórico. Nenhuma linha de código muda. Caminho de import (`from seugado.core...`)
+**não muda** — só a localização física. Risco: script ou documento com caminho absoluto
+antigo; o RUNBOOK-REV-003 verifica as quatro ferramentas depois da mudança.
+
+---
+
 ## Template para novas ADRs
 
 ```markdown

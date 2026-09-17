@@ -56,7 +56,7 @@ Regra: **cada módulo é trabalhável isoladamente.** Uma fatia deve tocar 1–2
 nunca todos. Isso é o que impede o contexto de crescer sem controle.
 
 ```
-seugado/
+src/seugado/
 ├── core/           # entidades e regras puras. SEM I/O, SEM rede, SEM banco.
 │   ├── models.py         # Piquete, Lote, Cultivar, Manejo, Evento
 │   ├── forragem.py       # massa↔altura, consumo, dias de ocupação
@@ -242,6 +242,9 @@ Elas entram em toda spec.
 - Repositório: `C:\code\seugado`, visto do WSL Ubuntu como `/mnt/c/code/seugado`.
   Versionado com git desde a fundação (commit `73ff3af`). Um commit por fatia,
   mensagem `F-NNN: <título>`. O diff do commit é o que o testador revisa.
+- Layout (ADR-013): `docs/` para a base de conhecimento, `src/seugado/` para o pacote
+  (src-layout), `tests/core/` e `tests/conformance/`, `specs/`, `revisoes/`.
+  Na raiz ficam só `README.md`, `CLAUDE.md` e os arquivos de configuração.
 - **O Windows hospedeiro não tem Python.** Todo comando roda no WSL, nunca no PowerShell.
 - `.venv` criada com `uv`. Instalar: `uv sync --group dev`.
 - `pyproject.toml` declara Python >= 3.12 e o grupo `dev`: pytest, ruff, mypy (`strict`).

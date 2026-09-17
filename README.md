@@ -57,43 +57,52 @@ defeitos no código e a suíte que veio junto com a spec deixou passar quase tod
 
 ```
 1. Você abre um chat aqui:  [FATIA-002] Cálculos de forragem
-2. O Arquiteto escreve:     specs/SPEC-002-*.md      → você cola no Muse Code
-                            revisoes/KIT-ACEITE-002  → o Muse NUNCA vê
-3. Muse Code               → escreve o código
-4. Você roda no terminal:   "execute revisoes/KIT-ACEITE-002.md"
-5. Claude Code             → testa e escreve revisoes/RELATORIO-002.md
-6. Você volta aqui, cola o relatório
-7. O Arquiteto atualiza os documentos e emite o handoff do próximo chat
+2. O Arquiteto escreve:     specs/SPEC-002-*.md         → o Muse Code lê este
+                            revisoes/KIT-ACEITE-002.md  → o Muse não deve abrir
+3. No Muse Code:            "leia specs/SPEC-002-*.md e implemente"
+4. No Claude Code:          "continue"
+                            (ele acha sozinho o que está pendente em revisoes/)
+5. Claude Code              → testa e escreve revisoes/RELATORIO-002.md
+6. Você volta aqui e diz    "relatório 002 gerado, leia"
+7. O Arquiteto atualiza os documentos e diz qual é o próximo chat
 ```
 
-As suas ações, no total: **colar a spec, rodar o terminal, colar o relatório.** Nada de
-redigir documento, nada de subir arquivo.
+As suas ações, no total: **apontar o Muse para a spec, dizer "continue" ao Claude Code,
+avisar aqui que o relatório saiu.** Mais alguns comandos de git. Nada de redigir documento,
+nada de subir arquivo.
 
 ## 5. Onde fica cada coisa
 
-```
-00-INSTRUCOES   o texto que vai no campo de instruções do Project (não é Knowledge)
-01-VISAO        o que o produto é e o que está fora de escopo
-02-GLOSSARIO    o nome certo de cada coisa. Em dúvida de vocabulário, é aqui
-03-DOMINIO      a agronomia, explicada para quem não é da área
-04-SENSORIAMENTO como o satélite vira número
-05-PARAMETROS   TODO número agronômico, com fonte. Nada entra em código sem estar aqui
-06-ARQUITETURA  stack, módulos, contratos, regras de código, ambiente
-07-MOTOR        o otimizador: formulação e restrições
-08-METODO       como os quatro participantes trabalham
-09-TEMPLATE     o molde de toda spec para o Muse
-10-ROTEIRO      as 22 fatias, na ordem
-11-ESTADO       ⬅ o que está feito, o que está travado, qual o próximo chat
-12-ADR          toda decisão fechada, com o porquê
+Na raiz ficam só dois arquivos para ler — este, para você, e o `CLAUDE.md`, para o Claude
+Code — mais a configuração. Todo o resto está em pasta.
 
-CLAUDE.md       instruções permanentes do Claude Code
-specs/          as specs já emitidas
-revisoes/       kits de aceite, runbooks e relatórios
-seugado/        o código
-tests/          core = testes do Muse · conformance = testes do Claude Code
+```
+docs/
+  00-INSTRUCOES    o texto que vai no campo de instruções do Project (não é Knowledge)
+  01-VISAO         o que o produto é e o que está fora de escopo
+  02-GLOSSARIO     o nome certo de cada coisa. Em dúvida de vocabulário, é aqui
+  03-DOMINIO       a agronomia, explicada para quem não é da área
+  04-SENSORIAMENTO como o satélite vira número
+  05-PARAMETROS    TODO número agronômico, com fonte. Nada entra em código sem estar aqui
+  06-ARQUITETURA   stack, módulos, contratos, regras de código, ambiente
+  07-MOTOR         o otimizador: formulação e restrições
+  08-METODO        como os quatro participantes trabalham
+  09-TEMPLATE      o molde de toda spec para o Muse
+  10-ROTEIRO       as 22 fatias, na ordem
+  11-ESTADO        ⬅ o que está feito, o que está travado, qual o próximo chat
+  12-ADR           toda decisão fechada, com o porquê
+
+src/seugado/       o código do app
+tests/             core = testes do Muse · conformance = testes do Claude Code
+specs/             as specs já emitidas
+revisoes/          kits de aceite, runbooks e relatórios
 ```
 
-**Comece sempre pelo `11-ESTADO-ATUAL.md`.** É o único que muda toda semana.
+`src/seugado/` em vez de `seugado/seugado/` é convenção de Python (*src-layout*): evita que
+um comando rodado na raiz importe a pasta local em vez do pacote. O caminho de import não
+muda — continua `from seugado.core...`.
+
+**Comece sempre pelo `docs/11-ESTADO-ATUAL.md`.** É o único que muda toda semana.
 
 ## 6. Duas regras que explicam quase todas as decisões
 

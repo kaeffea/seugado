@@ -31,6 +31,15 @@ Enough for someone who has never seen this project to understand the purpose.>
 - `lote` — a group of cattle managed as one unit. Keep this name in code.
 - `massa_forragem` — available forage dry matter, in kg DM per hectare.
 
+## Reading scope — read this file only
+<Copy this section verbatim into every spec. The coding agent has filesystem access to the
+repository, so the boundary has to be stated, not assumed.>
+
+This spec is self-contained. Read **only** this file and the files listed below under
+`Files to create or modify`. Do not open, read or modify anything under `revisoes/`,
+`docs/` or `tests/conformance/`. Touching any file outside the list is a spec violation
+and will be reported as such.
+
 ## Files to create or modify
 <Explicit list. The agent must not touch anything else.>
 - CREATE `seugado/core/forragem.py`

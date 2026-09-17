@@ -39,18 +39,20 @@ Legenda: ⬜ não iniciada · 🟨 em andamento · 🔒 bloqueada · ✅ conclu�
 
 ## O que existe no repositório
 
+Layout definido pela ADR-013 (aplicado pelo RUNBOOK-REV-003):
+
 ```
-C:\code\seugado            git, main, publicado no GitHub (privado)
-├── README.md              mapa simples do projeto — ler primeiro
-├── 00–12 *.md             base de conhecimento (fonte de verdade)
-├── CLAUDE.md              instruções permanentes do Claude Code (papel, ambiente, relatório)
-├── pyproject.toml         Python 3.12; dev: pytest, ruff, mypy strict; md fora do ruff
-├── uv.lock                versionado (ADR-012)
-├── seugado/core/models.py 6 enums, 7 dataclasses frozen/slots — F-001 aprovada, intocada
-├── specs/                 SPEC-001-domain-model.md
-├── tests/core/            suíte do Muse Code (fumaça)
-├── tests/conformance/      suíte independente do Claude Code (verificação de registro)
-└── revisoes/              REV-001, RUNBOOK e RELATORIO 001 e 002
+C:\code\seugado                git, main, publicado no GitHub (privado)
+├── README.md                  mapa simples do projeto — ler primeiro
+├── CLAUDE.md                  instruções permanentes do Claude Code
+├── pyproject.toml             Python 3.12; dev: pytest, ruff, mypy strict; md fora do ruff
+├── uv.lock                    versionado (ADR-012)
+├── docs/                      00–12, a base de conhecimento (fonte de verdade)
+├── src/seugado/core/models.py 6 enums, 7 dataclasses frozen/slots — F-001, intocada
+├── tests/core/                suíte do Muse Code (fumaça)
+├── tests/conformance/         suíte independente do Claude Code (verificação de registro)
+├── specs/                     SPEC-001-domain-model.md
+└── revisoes/                  REV-*, KIT-ACEITE-*, RUNBOOK-*, RELATORIO-*
 ```
 
 Commits: `73ff3af` fundação + F-001 · `d06880b` ADRs 010–012 · `354382b` uv.lock ·
@@ -82,9 +84,10 @@ Estado das ferramentas: `ruff check`, `ruff format --check`, `mypy` e `pytest` l
 | ~~DT1~~ | ~~apontamentos de `ruff` e `mypy` em `tests/`~~ | — | ✅ resolvido em RELATORIO-REV-002 |
 | DT7 | O campo de instruções do Project descreve o fluxo antigo (entregar blocos para colar, pedir re-upload) | instruções do Project | usuário cola o `00` novo |
 | DT8 | `SPEC-001` contém arquivo de teste pronto, o que a ADR-011 passou a proibir | `specs/` | histórico; não reescrever |
-| DT2 | Contratos de `06` §3 divergem do modelo implementado (`Literal` vs enum, `list` vs `tuple`, frozen não declarado, `Movimentacao` ≡ `Manejo`?) | `06` §3 | ADR-013 |
-| DT3 | `Cultivar` exige todos os parâmetros; a recusa por `TODO-PARAM` precisa de dono | `core/` | ADR-014 |
-| DT4 | Convenções de enum e de entidade como chave de dict | `06` §7 (regras 11–12 já escritas) | ADR-015 confirma |
+| DT2 | Contratos de `06` §3 divergem do modelo implementado (`Literal` vs enum, `list` vs `tuple`, frozen não declarado, `Movimentacao` ≡ `Manejo`?) | `06` §3 | ADR-014 |
+| DT3 | `Cultivar` exige todos os parâmetros; a recusa por `TODO-PARAM` precisa de dono | `core/` | ADR-015 |
+| DT4 | Convenções de enum e de entidade como chave de dict | `06` §7 (regras 11–12 já escritas) | ADR-016 confirma |
+| DT9 | O Muse Code lê os arquivos do repositório direto, então o kit de aceite **não está fisicamente escondido** dele. Mitigação atual: proibição explícita na spec (`09`, "Reading scope") + conferência de escopo por `git diff` no `CLAUDE.md` | método | avaliar no `[ARQUITETURA] REV-001 parte 2` se vale commitar o kit só depois do commit do Muse |
 | DT5 | Comentário `Monday first` ambíguo em `models.py` | `models.py` | próxima spec que tocar o arquivo |
 | DT6 | Tabela de alturas do `05` sem coluna de fonte | `05` | junto do `[PESQUISA]` do CT-125 |
 
@@ -110,7 +113,7 @@ semanal de Opus — gasta-se o barato enquanto o caro espera.
 | 2 | `[PESQUISA] Densidade do dossel e eficiência de pastejo` | Sonnet | B1, B7 | Sem a densidade não existe ponte kg MS/ha ↔ cm, que é o cálculo central do F-002 |
 | 3 | `[PESQUISA] Peso por categoria animal e temperatura base` | Sonnet | B5, B4 | Fecha o último bloqueio do F-002 e prepara o F-007 |
 | 4 | `[PESQUISA] RUE de gramíneas C4 tropicais` | Sonnet | B2 | O mais difícil e o mais consequente: errar aqui enviesa toda estimativa de crescimento |
-| 5 | `[ARQUITETURA] REV-001 parte 2` | Opus | DT2, DT3, DT4 | Os contratos precisam estar certos **antes** de escrever a spec do F-002, que os consome |
+| 5 | `[ARQUITETURA] REV-001 parte 2` | Opus | DT2, DT3, DT4, DT9 | Os contratos precisam estar certos **antes** de escrever a spec do F-002, que os consome |
 
 Depois: `[FATIA-002] Cálculos de forragem`, com todos os parâmetros e contratos fechados.
 

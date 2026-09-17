@@ -17,7 +17,7 @@ package = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = ["src"]
 addopts = "-q --strict-markers --strict-config"
 
 [tool.ruff]
@@ -36,7 +36,9 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "PL"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["seugado", "tests"]
+files = ["src", "tests"]
+mypy_path = "src"
+
 
 [[tool.mypy.overrides]]
 module = "tests.*"
