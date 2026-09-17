@@ -220,7 +220,34 @@ Elas entram em toda spec.
 7. **Sem novas dependências** fora das listadas em §1 sem ADR.
 8. **Toda função de cálculo agronômico tem teste** com valor esperado vindo de
    `05-PARAMETROS-CULTIVARES.md`.
-9. **Português nos textos ao usuário, inglês no código.** Nomes de variáveis, funções e
-   comentários em inglês? **Não** — aqui abrimos exceção: nomes de domínio ficam em
-   **português** (`massa_forragem`, `piquete`, `lote`) porque traduzir cria ambiguidade
-   (*paddock* vs *plot* vs *field*). Comentários e docstrings em inglês.
+9. **Nomes de domínio em português; comentários e docstrings em inglês.** `massa_forragem`,
+   `piquete`, `lote` ficam em português porque traduzir cria ambiguidade (*paddock* vs
+   *plot* vs *field*). Texto exibido ao produtor: português. Docstring e comentário: inglês.
+10. **`__init__.py` sempre vazio.** Nenhum re-export. Importação sempre do módulo concreto
+    (`from seugado.core.forragem import dias_ocupacao`). Dois caminhos de import para o
+    mesmo símbolo contradizem o princípio de nome canônico único e convidam import circular.
+11. **Nunca comparar membro de enum com outro tipo de enum.** `StrEnum` compara como string:
+    `Confianca.ALTA == QualidadeBase.ALTA` é `True` **em runtime**. O `mypy` em modo estrito
+    acusa (`comparison-overlap`), então a defesa estática existe — mas ela desaparece em
+    qualquer caminho não tipado. Comparar sempre dentro do mesmo enum; usar `.value` apenas
+    na fronteira (banco, JSON). Teste que verifica essa igualdade de propósito deve carregar
+    `# type: ignore[comparison-overlap]` com comentário explicando.
+12. **Entidade nunca é chave de dicionário.** Usar o `id`. `Piquete` com geometria levanta
+    `TypeError` porque `dict` não é hasheável.
+
+---
+
+## 8. Ambiente de desenvolvimento
+
+- Repositório: `C:\code\seugado`, visto do WSL Ubuntu como `/mnt/c/code/seugado`.
+  Versionado com git desde a fundação (commit `73ff3af`). Um commit por fatia,
+  mensagem `F-NNN: <título>`. O diff do commit é o que o testador revisa.
+- **O Windows hospedeiro não tem Python.** Todo comando roda no WSL, nunca no PowerShell.
+- `.venv` criada com `uv`. Instalar: `uv sync --group dev`.
+- `pyproject.toml` declara Python >= 3.12 e o grupo `dev`: pytest, ruff, mypy (`strict`).
+  Markdown está fora do escopo do ruff (`extend-exclude`), porque ele reformatava blocos
+  de código dentro dos documentos `00`–`12`.
+- `uv.lock` **é versionado**: isto é aplicação, não biblioteca, e o pipeline diário roda em
+  GitHub Actions — build reproduzível depende do lock estar no repositório.
+- Verificação padrão antes de entregar ao testador:
+  `uv run ruff check .` · `uv run mypy` · `uv run pytest`.

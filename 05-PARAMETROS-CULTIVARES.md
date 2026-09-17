@@ -5,6 +5,15 @@
 Se uma spec precisa de um parâmetro ausente, marcar `TODO-PARAM: <nome>` e resolver
 em chat `[PESQUISA]` antes de implementar. Valor plausível inventado é bug, não dado.
 
+**Escopo desta regra.** Vale para número **empírico**: parâmetro agronômico, zootécnico e
+constante de sensoriamento. Número que **nós escolhemos** — peso de função objetivo, limiar
+de alerta, tolerância de teste — não é dado empírico: marcar `HIPOTESE-CALIBRAR` e nomear a
+ADR que o calibrará (ex.: `07` §2, pesos `w1..w5`, antes do F-009).
+
+**Escopo do bloqueio.** `TODO-PARAM` bloqueia **default de produção** e operação com a
+cultivar afetada. Função pura que recebe o parâmetro como argumento pode ser implementada
+e testada com valor neutro declarado.
+
 Campo `confianca`:
 - `alta` — fonte primária Embrapa/artigo revisado, valor consistente entre fontes
 - `media` — fonte secundária confiável, ou divergência pequena entre fontes
@@ -73,6 +82,7 @@ máxima/mínima em contínuo. Publicação Embrapa é de acesso aberto.
 | `altura_saida_cm` Massai, Zuri, Tamani | regra de saída | 🟡 média | Cultivares menos frequentes |
 | `descanso_min/max_dias` por cultivar | limites de segurança | 🟡 média | Faixa geral 21–45 conhecida |
 | `taxa_senescencia` | balanço de massa | 🟡 média | Aproximação declarada aceita no MVP |
+| `eficiencia_pastejo` (ingestão ÷ massa acima do resíduo) | dias de ocupação | 🔴 crítica | ADR-010. A faixa 0,40–0,50 mede taxa de utilização |
 
 ### Como obter `densidade_kg_ha_por_cm` sem ir a campo
 
@@ -98,9 +108,10 @@ caso forem identificadas, já são dois pontos reais.
 | `consumo_pct_pv_min` | 2,0 % | alta | Faixa clássica |
 | `consumo_pct_pv_max` | 3,0 % | alta | Faixa clássica |
 | `consumo_pct_pv_default` | 2,4 % | média | Exemplo real: 11,62 kg MS/dia ÷ 479 kg = 2,42% |
-| `eficiencia_pastejo_min` | 0,40 | alta | Faixa real em fazenda |
-| `eficiencia_pastejo_max` | 0,50 | alta | Faixa real em fazenda |
-| `eficiencia_pastejo_default` | 0,44 | alta | Caso validado: 1.760 ÷ 4.000 = 44% |
+| `taxa_utilizacao_min` | 0,40 | alta | Faixa real em fazenda (grandeza descritiva) |
+| `taxa_utilizacao_max` | 0,50 | alta | Faixa real em fazenda (grandeza descritiva) |
+| `taxa_utilizacao_caso_canonico` | 0,44 | alta | 1.760 ÷ 4.000 |
+| `eficiencia_pastejo` | `TODO-PARAM` | ausente | Base distinta — ver ADR-010. Não usar 0,44 |
 | `ocupacao_min_dias` | 1 | alta | Faixa usual rotacionado |
 | `ocupacao_max_dias` | 3 | média | Faixa usual; casos reais usam até 4 |
 | `descanso_min_dias` (geral) | 21 | alta | Faixa geral da literatura |
@@ -167,12 +178,15 @@ entrada:
   peso_medio_kg: 479
   dias_ocupacao: 4
   dias_descanso: 28
+  eficiencia_pastejo: 1.0                 # neutralizado: a fonte relata desaparecimento
+                                          # como ingestão (ADR-010)
+  taxa_acumulo_kg_ms_ha_dia: 0.0          # neutralizado: caso sem crescimento
 
 saida_esperada:
   consumo_total_kg_ms_ha: 1760
   consumo_individual_kg_ms_dia: 11.62   # tolerância ±0.05
   consumo_pct_pv: 2.42                  # tolerância ±0.02
-  eficiencia_utilizacao: 0.44           # tolerância ±0.01
+  taxa_utilizacao: 0.44                 # tolerância ±0.01
 ```
 
 ---

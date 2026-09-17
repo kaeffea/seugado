@@ -35,7 +35,7 @@ Enough for someone who has never seen this project to understand the purpose.>
 <Explicit list. The agent must not touch anything else.>
 - CREATE `seugado/core/forragem.py`
 - CREATE `tests/core/test_forragem.py`
-- MODIFY `seugado/core/__init__.py` (export new functions only)
+- (never list `__init__.py`: packages stay empty — see `06` §7 rule 10)
 
 ## Requirements
 
@@ -62,6 +62,8 @@ days = available_kg / consumo_lote_dia
 Growth during occupation must be accounted for: total available forage is the initial
 mass plus accumulation over the occupation period. Solve iteratively (max 5 iterations,
 convergence tolerance 0.01 days) or analytically.
+`eficiencia_pastejo` is the ingested fraction of the mass ABOVE the residue height. It is
+NOT the observed utilization rate (removed mass over pre-grazing mass). See ADR-010.
 
 ### R2 — <next requirement>
 ...
@@ -71,7 +73,7 @@ convergence tolerance 0.01 days) or analytically.
 
 | Name | Value | Unit | Source |
 |---|---|---|---|
-| `EFICIENCIA_PASTEJO_DEFAULT` | 0.44 | — | Validated commercial farm case |
+| `UTILIZACAO_CASO_CANONICO` | 0.44 | — | Validated farm case; descriptive output only |
 | `UNIDADE_ANIMAL_KG` | 450 | kg | Industry standard |
 
 ## Validation rules
@@ -89,20 +91,22 @@ convergence tolerance 0.01 days) or analytically.
 - [ ] `pytest tests/core/test_forragem.py` passes with zero failures
 - [ ] No new dependency added to `pyproject.toml`
 
-## Test data
-<Concrete numbers with expected outputs. Non-negotiable.>
+## Worked example
+<One illustrative case with concrete numbers, in prose or as a docstring example.
+NOT a test file: the agent writes its own tests. The tester's numbers live in the
+acceptance kit, which the coding agent never sees.>
 
-```python
-# Canonical regression case — real commercial farm
-INPUT = dict(
-    massa_atual_kg_ms_ha=4000,
-    massa_residuo_kg_ms_ha=2240,
-    area_ha=5.81,
-    eficiencia_pastejo=1.0,   # this case reports gross consumption
-    consumo_lote_kg_ms_dia=11.62 * 220,
-)
-EXPECTED_DAYS = 4.0   # tolerance ±0.1
-```
+Canonical commercial-farm case: initial mass 4000 kg DM/ha, residue 2240 kg DM/ha,
+area 5.81 ha, accumulation rate 0.0 kg DM/ha/day, grazing efficiency 1.0 (this source case
+reports disappearance as intake), herd intake 11.62 * 220 kg DM/day → about 4.0 days.
+
+## Acceptance kit (tester only — NEVER paste into the coding agent)
+<Lives in `revisoes/KIT-ACEITE-<NNN>.md`, not in this spec. Must contain:>
+- All structural checks: forbidden imports, `frozen=True, slots=True`, absence of
+  `__post_init__` / custom `__hash__` / `__all__`, exact enum membership AND values,
+  no extra public functions, file length limit.
+- The canonical case with its tolerance.
+- **At least one numeric case that the spec does not show.**
 
 ## Out of scope
 <The most important section. Be explicit and generous here.>
@@ -144,3 +148,6 @@ EXPECTED_DAYS = 4.0   # tolerance ±0.1
 - [ ] Existe pelo menos um caso de teste com número esperado concreto
 - [ ] Nenhum contrato de `06-ARQUITETURA-E-STACK.md` §3 foi alterado
 - [ ] A spec faz sentido para quem nunca viu o projeto
+- [ ] A spec **não** contém arquivo de teste pronto (ADR-011)
+- [ ] O kit de aceite existe em `revisoes/KIT-ACEITE-<NNN>.md` e tem ≥1 caso oculto
+- [ ] Nenhum `__init__.py` na lista de arquivos a tocar

@@ -10,6 +10,11 @@ ponto que funciona — não num ponto quebrado.
 
 ## Fase 0 — Fundação (sem código de produto)
 
+### F-000 · Fundação do repositório ✅
+git, `pyproject.toml` (Python 3.12, pytest/ruff/mypy no grupo `dev`), `.gitignore`,
+`CLAUDE.md` e `uv.lock` versionado. Não é fatia do Muse Code — não há lógica de domínio.
+**Entrega:** diff verificável e critério "nenhuma dependência nova" auditável. Ver ADR-012.
+
 ### F-001 · Modelo de domínio
 Entidades puras: `Piquete`, `Lote`, `Cultivar`, `Manejo`, `Evento`.
 Dataclasses com type hints, sem persistência, sem I/O.
@@ -18,7 +23,7 @@ Dataclasses com type hints, sem persistência, sem I/O.
 ### F-002 · Cálculos de forragem
 `massa ↔ altura`, consumo do lote, dias de ocupação (com crescimento durante a ocupação).
 **Módulo:** `core/forragem.py` · **Entrega:** caso de regressão canônico passa.
-⚠️ Bloqueada por `TODO-PARAM: densidade_kg_ha_por_cm`.
+⚠️ Bloqueada por `TODO-PARAM: densidade_kg_ha_por_cm` e `TODO-PARAM: eficiencia_pastejo`.
 
 ### F-003 · Regras de manejo
 `apto_para_entrada?`, `precisa_sair?`, `urgencia`, `descanso_cumprido?`.
@@ -140,6 +145,7 @@ para colar em `05-PARAMETROS-CULTIVARES.md`.
 |---|---|---|
 | Régua de Manejo (CT 125, Embrapa) — alturas canônicas | F-003 | 🔴 |
 | `densidade_kg_ha_por_cm` por cultivar | F-002 | 🔴 |
+| `eficiencia_pastejo` (ingestão ÷ massa acima do resíduo) — ADR-010 | F-002 | 🔴 |
 | RUE de gramínea C4 tropical | F-006 | 🔴 |
 | `temperatura_base_c` de gramínea tropical | F-007 | 🟠 |
 | Pesos médios por categoria animal (bezerro!) | F-002 | 🟠 |

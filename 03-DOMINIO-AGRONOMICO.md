@@ -135,8 +135,10 @@ Exemplo da literatura: recria de 300 kg a 2,2% → 6,6 kg MS/dia.
 MS_disponivel (kg MS) = ( massa_atual − massa_residuo_alvo ) × area_ha × eficiencia_pastejo
 ```
 
-`eficiencia_pastejo` entre **0,40 e 0,50**. Sem esse fator, o sistema superestima a
-capacidade do piquete em mais que o dobro.
+`eficiencia_pastejo` é a fração da massa acima do resíduo que vira ingestão — **não** é a
+taxa de utilização observada (1.760 ÷ 4.000 = 0,44). Confundir as duas conta o fator duas
+vezes: 0,44 nesta fórmula faz o caso de §6.4 render 1,76 dia em vez de 4. Ver ADR-010.
+Valor atual: `TODO-PARAM`. Sem o fator, o sistema superestima a capacidade em mais que o dobro.
 
 ### 6.3. Dias de ocupação
 
@@ -167,10 +169,15 @@ Resolver iterativamente (2-3 iterações convergem) ou analiticamente.
 | Consumo total | 1.760 kg MS/ha |
 | Consumo individual | 1.760 × 5,81 ÷ 4 ÷ 220 = **11,62 kg MS/animal/dia** |
 | Consumo em % PV | 11,62 ÷ 479 × 100 = **2,42%** |
-| Eficiência de utilização | 1.760 ÷ 4.000 = **44%** |
+| Taxa de utilização | 1.760 ÷ 4.000 = **44%** |
 
 Use este caso como **teste de regressão** do motor de cálculo: dados os mesmos insumos,
 o sistema deve reproduzir estes números.
+
+⚠️ Este caso atribui **todo** o desaparecimento à ingestão (11,62 kg/animal/dia = 2,42% PV).
+Portanto ele valida consumo individual, % PV e taxa de utilização — **não** valida
+`eficiencia_pastejo`. No teste de regressão, fixar `eficiencia_pastejo = 1.0` e
+`taxa_acumulo = 0.0` explicitamente (ADR-010).
 
 ### 6.5. Unidade Animal
 

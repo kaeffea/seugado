@@ -171,6 +171,111 @@ organização atual da fazenda). Risco: propor movimentações que o produtor co
 
 ---
 
+## ADR-010 — Eficiência de pastejo e taxa de utilização são grandezas distintas
+**Data:** 17/09/2026 · **Status:** aceita
+
+**Contexto.** `05` registrava `eficiencia_pastejo_default = 0,44` derivado de 1.760 ÷ 4.000
+(massa removida sobre massa total pré-pastejo), enquanto `03` §6.2 aplica o fator sobre
+(massa_atual − massa_residuo). São bases diferentes. Aplicar 0,44 na fórmula do §6.2 faz o
+caso canônico render 1,76 dia em vez de 4 — o fator é contado duas vezes.
+
+**Decisão.** Duas grandezas, dois nomes, uma base cada:
+- `eficiencia_pastejo` — **entrada**, física. Fração da massa **acima do resíduo** que vira
+  ingestão. O complemento desaparece sem ser ingerido (pisoteio, fezes, rejeição,
+  senescência durante a ocupação). Valor: **TODO-PARAM**. A faixa 0,40–0,50 da literatura
+  mede taxa de utilização, não isto, e portanto não serve como default.
+- `taxa_utilizacao` — **saída**, descritiva. massa_removida ÷ massa_pré_pastejo. Caso
+  canônico: 0,44. Nunca entra em cálculo, só em relatório.
+
+A fórmula do `03` §6.2 mantém a forma atual. Leitura equivalente e mais clara:
+`taxa_desaparecimento_dia = consumo_lote_dia ÷ eficiencia_pastejo`.
+
+O caso canônico valida `consumo_individual` (11,62), `consumo_pct_pv` (2,42%) e
+`taxa_utilizacao` (0,44). **Não valida `eficiencia_pastejo`**: a fonte atribui todo o
+desaparecimento à ingestão. No teste de regressão, `eficiencia_pastejo = 1.0` e
+`taxa_acumulo = 0.0` são fixados explicitamente para neutralizar os dois fatores.
+
+**Escopo do bloqueio por TODO-PARAM.** `TODO-PARAM` bloqueia **default de produção** e
+operação com a cultivar afetada. Não bloqueia função pura que recebe o parâmetro como
+argumento. F-002 é implementável; o que não é permitido é constante default inventada.
+
+**Alternativas.** (a) Usar 0,44 como entrada — caso canônico falha por fator 0,44.
+(b) Remover o fator — reintroduz a superestimativa de >2x que `03` §11 item 2 proíbe.
+(c) Renomear para `eficiencia_colheita` — mais claro contra a literatura, mas altera nome
+no contrato `06` §3; rejeitado por churn, mitigado por nota no `02`.
+
+**Consequências.** F-002 ganha um TODO-PARAM novo, sem ficar mais bloqueado do que já
+estava (B1). Novo item de `[PESQUISA]`. `taxa_utilizacao` fica disponível desde o dia 1
+porque é derivada. Risco: alguém ler um paper onde "eficiência de pastejo" significa taxa
+de utilização e reimportar a confusão — daí a nota no `02`.
+
+---
+
+## ADR-011 — Spec e kit de aceite são artefatos separados
+**Data:** 17/09/2026 · **Status:** aceita
+
+**Contexto.** A spec entregava o arquivo de teste completo, o Muse o copiava literalmente e
+o testador precisava escrever outra suíte. Prova empírica: 7 defeitos plantados um a um em
+cópias de `models.py` (import proibido, `__post_init__`, `__hash__` próprio, enum com membro
+extra, enum com valor errado, classe não congelada, `__all__`, função extra). A suíte copiada
+deixou passar quase todos; a suíte independente pegou todos. **Todos os defeitos eram
+estruturais** — nenhum era de valor numérico.
+
+**Decisão.** O planejador produz dois artefatos por fatia:
+- **Spec (Muse Code).** Requisitos, assinaturas exatas, exemplos resolvidos **com números**,
+  regras de validação, critérios de aceite, `Out of scope`, estilo.
+  **Nunca um arquivo de teste pronto.** O Muse escreve os próprios testes.
+- **Kit de aceite (Claude Code).** Vive em `revisoes/KIT-ACEITE-<NNN>.md` e **nunca** é
+  colado no Muse. Contém: (a) todas as checagens estruturais; (b) o caso canônico com
+  tolerância; (c) **no mínimo um caso que a spec não mostra**.
+
+Números permanecem na spec porque modelo de contexto curto sem exemplo resolvido erra a
+fórmula e gera rodada de TRIAGEM — mais caro que o risco de overfitting. O que sai da spec
+é o *arquivo de teste* e as *checagens estruturais*, que é onde a falha foi medida.
+
+**Alternativas.** (a) Manter como está — provado insuficiente. (b) Retirar todo número da
+spec — maximiza independência e maximiza retrabalho com Muse Spark 1.3.
+
+**Consequências.** O testador deixa de duplicar trabalho: ele executa o kit. O formato do
+relatório de conformidade e as checagens estruturais vivem em `CLAUDE.md`, na raiz do
+repositório, que é o que o Claude Code lê antes de agir. Risco: kit esquecido → fatia sem
+verificação estrutural; mitigado pelo checklist de emissão de spec no `09`.
+
+---
+
+## ADR-012 — Fundação do repositório: git, pyproject, ruff, mypy
+**Data:** 17/09/2026 · **Status:** aceita
+
+**Contexto.** Sem git não há diff, e o critério "o agente não tocou em arquivos fora da
+lista" é inverificável. Sem `pyproject.toml`, "nenhuma dependência nova" é inverificável e
+o pytest não está declarado. O ambiente (`.venv` criada por `uv` no WSL Ubuntu; o Windows
+não tem Python) não estava escrito em lugar nenhum.
+
+**Decisão.** `git init`, um commit por fatia, mensagem `F-NNN: <título>`; o diff do commit é
+o que o testador revisa. `pyproject.toml` com Python 3.12, grupo `dev` = pytest + ruff +
+mypy, e configuração do pytest. ruff para lint e formatação, mypy em `strict = true`.
+Markdown fora do escopo do ruff. `uv.lock` versionado: isto é aplicação, não biblioteca, e
+o pipeline diário roda em CI — build reproduzível depende do lock no repositório.
+**Isto não é fatia do Muse Code** — não há lógica de domínio; os arquivos são criados
+direto no repositório pelo Arquiteto, e os comandos rodam via runbook no Claude Code.
+
+ruff e mypy são dependências novas, o que exige esta ADR por `06` §7 regra 7. São
+**exclusivamente de desenvolvimento**: a restrição sobre dependência de produção segue intacta.
+
+**Alternativas.** (a) Fatia F-000 com spec para o Muse — custo de round-trip sem ganho.
+(b) Seguir sem git — inverificabilidade permanente. (c) pyright em vez de mypy —
+equivalente em rigor, mas exige Node; mypy é Python puro e casa com o critério de stack
+madura do `06`.
+
+**Consequências.** Os critérios de aceite sobre dependência e sobre arquivos tocados passam
+a ser verificáveis. Primeira medição (RELATÓRIO-REV-001): 5 apontamentos de ruff e 18 de
+mypy, **todos em `tests/`**, nenhum em `seugado/`. O `mypy` estrito **acusa**
+`Confianca.ALTA == QualidadeBase.ALTA` como `comparison-overlap` — a defesa estática existe,
+mas a igualdade continua verdadeira em runtime, então a convenção do `06` §7 regra 11
+permanece necessária.
+
+---
+
 ## Template para novas ADRs
 
 ```markdown

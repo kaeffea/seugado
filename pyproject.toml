@@ -23,6 +23,9 @@ addopts = "-q --strict-markers --strict-config"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Markdown fora do escopo: o ruff reformatava blocos de codigo dentro dos
+# documentos 00-12, que o Claude Code nao tem permissao de tocar (RELATORIO-REV-001 A2).
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "PL"]

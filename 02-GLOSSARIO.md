@@ -58,7 +58,7 @@ planta intercepta ~95% da luz incidente (ver *Interceptação luminosa*).
 ### Altura de saída (resíduo)
 Altura em que o lote deve **sair**, deixando folha suficiente para rebrota rápida.
 Sair abaixo disso obriga a planta a usar reserva de raiz e degrada o pasto no longo prazo.
-- Em código: `altura_saida_cm` ou `residuo_cm`.
+- Em código: `altura_saida_cm`. **`residuo_cm` é proibido** — nome canônico é único.
 
 ### Interceptação luminosa (IL)
 Percentual da luz incidente capturado pelo dossel. A **IL de 95%** é o critério fisiológico
@@ -76,10 +76,19 @@ Dias que um lote permanece num piquete. Faixa usual em rotacionado: 1 a 3 dias.
 Calculado pelo sistema, não configurado pelo usuário.
 
 ### Eficiência de pastejo
-Fração da forragem disponível que o animal efetivamente consome. O resto é pisoteado,
-sujo com fezes ou rejeitado por seleção. Faixa real em fazenda: **40% a 50%**.
+Fração da massa de forragem **acima da altura de saída** que o animal efetivamente ingere.
+O restante desaparece sem virar alimento: pisoteio, sujidade por fezes, rejeição seletiva e
+senescência durante a ocupação. **É entrada de cálculo.**
 Ignorar esse fator superestima a capacidade do piquete em mais que o dobro.
-- Em código: `eficiencia_pastejo` (decimal, ex. 0.45).
+- Em código: `eficiencia_pastejo` (decimal). Valor: `TODO-PARAM` (ver ADR-010).
+- ⚠️ Em boa parte da literatura "eficiência de pastejo" designa a **taxa de utilização**
+  (base diferente). No SeuGado os dois termos são distintos e não se substituem.
+
+### Taxa de utilização
+Massa removida do piquete ÷ massa total pré-pastejo. **É saída descritiva**, usada em
+relatório e no caso de regressão; nunca entra no cálculo de dias de ocupação.
+Faixa observada em fazenda: 40% a 50%. Caso canônico: 1.760 ÷ 4.000 = 44%.
+- Em código: `taxa_utilizacao` (decimal).
 
 ### Unidade Animal (UA)
 Padronização para comparar categorias diferentes. **1 UA = 450 kg de peso vivo.**

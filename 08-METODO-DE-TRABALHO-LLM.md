@@ -8,14 +8,19 @@ Como três modelos com papéis distintos constroem um sistema sem se perder e se
 
 | Papel | Ferramenta | Recebe | Produz | Nunca faz |
 |---|---|---|---|---|
-| **Planejador / Arquiteto** | Claude (Opus/Sonnet) no Project | Knowledge + pedido do usuário | Specs, ADRs, análises, handoffs | Escrever código de produção |
-| **Programador** | Muse Code (Muse Spark 1.3) | **Só a spec**, autocontida, em inglês | Código + testes | Tomar decisão de arquitetura |
-| **Testador** | Claude Code | Spec + código produzido | Testes, relatório de conformidade | Alterar a spec |
+| **Planejador / Arquiteto** | Claude (Opus/Sonnet) no Project | Knowledge + pedido do usuário | Specs, **kits de aceite**, **runbooks**, ADRs, análises, handoffs, e os próprios arquivos `00`–`12` | Escrever código de produção |
+| **Programador** | Muse Code (Muse Spark 1.3) | **Só a spec**, autocontida, em inglês | Código + testes próprios | Tomar decisão de arquitetura. Ver o kit de aceite |
+| **Testador / Executor** | Claude Code (Sonnet, esforço médio) | `CLAUDE.md` + kit de aceite ou runbook + código | Suíte independente, relatório de conformidade, execução de comando | Alterar spec, ADR ou documento `00`–`12` |
+
+O Claude Code lê `CLAUDE.md`, na raiz do repositório, antes de agir: papel, ambiente WSL,
+checagens estruturais obrigatórias e formato do relatório de conformidade vivem lá.
 
 ### A regra de ouro
 
 > **O programador nunca recebe o histórico de planejamento.**
 > Ele recebe a spec, que é autocontida.
+> **E nunca recebe o kit de aceite** (ADR-011): se ele vê a checagem, ele escreve o código
+> para a checagem em vez de para o requisito.
 
 É isto que impede o crescimento de contexto de virar exponencial. Se a spec precisa do
 histórico para ser compreendida, **a spec está errada** — não o programador.
@@ -188,28 +193,30 @@ Um número plausível e falso passa despercebido e contamina tudo a jusante.
 
 ```
 1. [FATIA-NNN] no Claude
-   → lê Knowledge, produz spec em inglês
-   → você copia a spec
+   → lê Knowledge, produz DOIS artefatos:
+     · specs/SPEC-NNN-*.md          (vai para o Muse)
+     · revisoes/KIT-ACEITE-NNN.md   (só o Claude Code vê)
+   → você copia APENAS a spec
 
 2. Muse Code
    → recebe SÓ a spec
-   → produz código + testes
+   → produz código + testes próprios
 
 3. Claude Code
-   → recebe spec + código
-   → roda testes, relata conformidade
+   → lê CLAUDE.md + o kit de aceite + o código
+   → escreve suíte independente em tests/conformance/, roda, relata em revisoes/RELATORIO-*
 
 4. Se falhou:
    [TRIAGEM] no Claude → diagnóstico → spec de correção → volta ao passo 2
 
 5. Se passou:
-   [FATIA-NNN] emite handoff
-   → você atualiza 11-ESTADO-ATUAL.md no Knowledge
-   → abre próxima fatia
+   [FATIA-NNN] emite handoff e escreve ele mesmo os arquivos 00–12 alterados
+   → ação que exige shell (git, uv, lint) vai num revisoes/RUNBOOK-*.md
+   → você roda o runbook no Claude Code e abre a próxima fatia
 ```
 
-**Atualizar o Knowledge não é opcional.** É o que mantém o sistema coerente entre chats.
-O Claude sempre entrega o **bloco de texto pronto** para colar — você não precisa redigir.
+**O que o usuário faz, e só ele:** colar a spec no Muse Code, aprovar ADR, rodar o runbook,
+e sincronizar o Knowledge. O Arquiteto escreve os documentos; ninguém pede que você redija.
 
 ---
 
