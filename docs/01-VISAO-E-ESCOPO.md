@@ -78,6 +78,39 @@ O MVP está pronto quando, para uma fazenda real com piquetes desenhados:
 5. Toda recomendação carrega um nível de confiança, e recomendações de baixa confiança
    pedem foto de validação opcional.
 
+## Ideias registradas — não são escopo, são candidatas
+
+Registro de ideia boa que apareceu fora de hora. Nada aqui está aprovado; entrar em escopo
+exige ADR. O propósito da seção é não perder a ideia nem deixá-la contaminar o MVP.
+
+### Migração assistida de contínuo para rotacionado
+**Origem:** o usuário, 17/09/2026, ao descobrir que contínuo e rotacionado são métodos
+distintos e que a escolha é da fazenda, não da geografia.
+
+O rotacionado dá resultado melhor, mas exige cerca, água em cada piquete e mão de obra — é
+investimento que trava o pequeno produtor no método pior. Um sistema que já sabe estimar
+massa e crescimento por satélite tem os dados para dizer **onde cercar primeiro**: quantos
+piquetes, com que tamanho, em que ordem de prioridade, e qual o retorno esperado de cada
+etapa. Vender o plano de migração, não só a operação depois dela.
+
+Por que é forte: transforma o produto de "ferramenta para quem já rotaciona" em "caminho
+para quem quer rotacionar", o que multiplica o mercado endereçável — e é exatamente o tipo
+de análise que ninguém entrega hoje. Por que não entra agora: depende de F-008 (projeção de
+estado) funcionando, e de dado de custo de cerca e de água que o projeto não tem.
+
+**Condição de entrada:** MVP completo (F-015) e ADR própria. Se sobrar tempo antes disso,
+é a primeira candidata da fila.
+
+### Pesquisa de mercado regional (Alagoas)
+**Origem:** o usuário, 17/09/2026.
+
+Antes de decidir para quem vender: qual cultivar predomina em Alagoas, qual método de
+pastejo é mais usado, qual o porte típico. Não é fatia de código nem `[PESQUISA]` de
+parâmetro — é pesquisa de mercado, e alimenta posicionamento, não cálculo. Fazer quando o
+produto existir o suficiente para ser demonstrado a alguém.
+
+---
+
 ## Custo do desenvolvimento
 
 **Meta: R$ 0,00 até o fim do MVP.** Toda escolha de stack, hospedagem, dado e serviço deve

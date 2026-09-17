@@ -67,6 +67,36 @@ primeiro item que falhar de forma não prevista e relate. Nunca invente um passo
 arquivo não pediu. Nunca corrija código de produção por iniciativa própria: o conserto vem
 por spec nova.
 
+### Passo zero de todo runbook: árvore de trabalho
+
+O Arquiteto escreve arquivos direto no repositório, então é normal encontrar alterações não
+commitadas ao começar. Classifique antes de agir:
+
+- Alteração em `docs/`, `README.md`, `CLAUDE.md`, `pyproject.toml` ou `revisoes/` **é do
+  Arquiteto**: commite num commit próprio, mensagem `docs: <assunto>`, e siga. Não investigue
+  o conteúdo, não desfaça.
+- Alteração em `src/` ou `tests/` **não é do Arquiteto**: pare e relate. Pode ser trabalho do
+  Muse Code ainda não verificado, e um commit em massa o embaralharia.
+
+Isso vale mesmo que o runbook exija "árvore limpa", e **tem precedência sobre qualquer
+cláusula de runbook** que restrinja o diff a uma lista de arquivos de documentação. O
+Arquiteto escreve documento de forma contínua e assíncrona, então nenhum runbook consegue
+prever quais arquivos de `docs/` estarão modificados quando você rodar. Arquivo de `docs/`
+a mais no diff **não é motivo para parar**: commite e registre no relatório o que entrou.
+A restrição de arquivos continua valendo integralmente para `src/` e `tests/`.
+
+### Conferir conteúdo, não só presença
+
+Quando um runbook afirma que o Arquiteto já escreveu um arquivo, **confirme que a mudança
+está lá** antes de commitar — `git diff --stat` do arquivo, ou uma busca pelo conteúdo que o
+runbook descreve. Já aconteceu de um arquivo aparecer intacto no `git status` porque a
+escrita não sobreviveu no disco: o runbook dizia que `docs/05` tinha uma tabela nova e o
+arquivo estava na versão anterior. Commitar naquele estado teria deixado `docs/11` afirmando
+um bloqueio resolvido que `docs/05` não sustentava.
+
+Premissa de runbook que não se confirma: **pare e relate**, nomeando o arquivo e o que
+faltou. Esse é o caso em que parar é certo.
+
 ## Regras de verificação (ADR-011)
 
 A spec entregue ao Muse Code **não contém** arquivo de teste pronto. A sua verificação usa

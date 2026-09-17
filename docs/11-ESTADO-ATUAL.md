@@ -13,8 +13,10 @@
 O modelo de domínio existe, foi verificado por suíte independente e passa 157/157 testes.
 O repositório tem fundação (git, `pyproject.toml`, `CLAUDE.md`, ambiente declarado), está
 publicado no GitHub, e `ruff`, `mypy` e `pytest` estão todos limpos. Três ADRs novas
-(010, 011, 012) fecharam os quatro achados urgentes da revisão pós-F-001.
-**O que trava o avanço não é código — são parâmetros agronômicos sem fonte.**
+(010, 011, 012) fecharam os quatro achados urgentes da revisão pós-F-001. O CT-135 da
+Embrapa resolveu a maior parte das alturas canônicas (B3) — **o que trava o avanço agora é
+`densidade_kg_ha_por_cm`, `eficiencia_pastejo` e a decisão de regime para as braquiárias**,
+não mais falta de dado bruto de altura.
 
 ---
 
@@ -25,7 +27,7 @@ publicado no GitHub, e `ruff`, `mypy` e `pytest` estão todos limpos. Três ADRs
 | F-000 Fundação do repositório | ✅ concluída (ADR-012) |
 | F-001 Modelo de domínio | ✅ concluída — 13/13 critérios, 157 testes |
 | F-002 Cálculos de forragem | 🔒 bloqueada (`densidade_kg_ha_por_cm`, `eficiencia_pastejo`) |
-| F-003 Regras de manejo | 🔒 bloqueada (alturas canônicas) |
+| F-003 Regras de manejo | 🔒 bloqueada (decisão de regime p/ Marandu/Xaraés — ver Perguntas em aberto) |
 | F-004 Persistência e eventos | ⬜ não iniciada — exige `[ARQUITETURA] Schema de eventos` antes |
 | F-005 Ingestão de satélite | ⬜ não iniciada |
 | F-006 Modelo SAFER | 🔒 bloqueada (`rue_max_g_por_mj` C4) |
@@ -70,7 +72,7 @@ Estado das ferramentas: `ruff check`, `ruff format --check`, `mypy` e `pytest` l
 |---|---|---|---|
 | B1 | `densidade_kg_ha_por_cm` ausente para todas as cultivares | F-002 | `[PESQUISA]` |
 | B2 | RUE para gramínea C4 tropical ausente (paper usa 2,45 g/MJ de C3) | F-006 | `[PESQUISA]` |
-| B3 | Alturas canônicas — obter Comunicado Técnico 125 da Embrapa | F-003 | `[PESQUISA]` |
+| ~~B3~~ | ~~Alturas canônicas — obter Comunicado Técnico 125 da Embrapa~~ | — | ✅ resolvido em `[PESQUISA] Régua de Manejo Embrapa` (17/09/2026) — CT-135 cobre entrada+saída de Mombaça, Zuri, Tanzânia, Massai, Tamani, e máxima/mínima contínua de Xaraés, Piatã, Marandu, *B. decumbens*. Resíduo: entrada rotacional de Marandu/Xaraés vira pergunta de regime, não mais bloqueio de dado — ver Perguntas em aberto |
 | B4 | `temperatura_base_c` ausente | F-007 | `[PESQUISA]` |
 | B5 | Peso médio de bezerro ausente | F-002 | `[PESQUISA]` |
 | B6 | Termos de uso atuais do Earth Engine não verificados | F-005 | `[PESQUISA]` |
@@ -91,7 +93,7 @@ Estado das ferramentas: `ruff check`, `ruff format --check`, `mypy` e `pytest` l
 | DT4 | Convenções de enum e de entidade como chave de dict | `06` §7 (regras 11–12 já escritas) | ADR-016 confirma |
 | DT9 | O Muse Code lê os arquivos do repositório direto, então o kit de aceite **não está fisicamente escondido** dele. Mitigação atual: proibição explícita na spec (`09`, "Reading scope") + conferência de escopo por `git diff` no `CLAUDE.md` | método | avaliar no `[ARQUITETURA] REV-001 parte 2` se vale commitar o kit só depois do commit do Muse |
 | DT5 | Comentário `Monday first` ambíguo em `models.py` | `models.py` | próxima spec que tocar o arquivo |
-| DT6 | Tabela de alturas do `05` sem coluna de fonte | `05` | junto do `[PESQUISA]` do CT-125 |
+| ~~DT6~~ | ~~Tabela de alturas do `05` sem coluna de fonte~~ | — | ✅ resolvido em `[PESQUISA] Régua de Manejo Embrapa` (17/09/2026) — coluna de fonte e confiança adicionada, CT-135 citado |
 
 ---
 
@@ -105,17 +107,19 @@ separados) e ADR-012 (fundação do repositório) na revisão pós-F-001.
 
 ## Ordem sugerida dos próximos chats
 
-Pesquisa vem antes de arquitetura por dois motivos: F-002 e F-003 estão travadas por
-parâmetro, não por decisão; e pesquisa roda em Sonnet, enquanto arquitetura consome a cota
-semanal de Opus — gasta-se o barato enquanto o caro espera.
+Regra geral: pesquisa antes de arquitetura, porque as fatias estão travadas por parâmetro e
+porque pesquisa roda em Sonnet enquanto arquitetura queima cota de Opus. A exceção é uma
+decisão que muda o **formato** do que as fatias vão consumir — essa fura a fila, para não
+mexer no mesmo arquivo duas vezes. É o caso do chat 2.
 
 | # | Chat | Modelo | Resolve | Por que agora |
 |---|---|---|---|---|
-| 1 | `[PESQUISA] Régua de Manejo Embrapa (CT 125)` | Sonnet | B3, DT6 | Um documento público cobre 8 cultivares de uma vez e substitui a tabela de alturas inteira. Maior retorno por esforço |
-| 2 | `[PESQUISA] Densidade do dossel e eficiência de pastejo` | Sonnet | B1, B7 | Sem a densidade não existe ponte kg MS/ha ↔ cm, que é o cálculo central do F-002 |
-| 3 | `[PESQUISA] Peso por categoria animal e temperatura base` | Sonnet | B5, B4 | Fecha o último bloqueio do F-002 e prepara o F-007 |
-| 4 | `[PESQUISA] RUE de gramíneas C4 tropicais` | Sonnet | B2 | O mais difícil e o mais consequente: errar aqui enviesa toda estimativa de crescimento |
-| 5 | `[ARQUITETURA] REV-001 parte 2` | Opus | DT2, DT3, DT4, DT9 | Os contratos precisam estar certos **antes** de escrever a spec do F-002, que os consome |
+| ~~1~~ | ~~`[PESQUISA] Régua de Manejo Embrapa (CT 135)`~~ | Sonnet | B3, DT6 | ✅ concluído 17/09/2026 |
+| 2 | `[ARQUITETURA] Método de pastejo: contínuo entra no escopo?` | Opus | B8, e a natureza do resíduo de B3 | **Furou a fila.** É mudança de escopo (ADR, regra 6) e decide se `Piquete` ganha um campo `metodo_pastejo`. Decidir depois dos contratos significaria alterar o mesmo arquivo duas vezes; decidir antes junta tudo numa spec só |
+| 3 | `[PESQUISA] Densidade do dossel e eficiência de pastejo` | Sonnet | B1, B7 | Sem a densidade não existe ponte kg MS/ha ↔ cm, que é o cálculo central do F-002 |
+| 4 | `[PESQUISA] Peso por categoria animal e temperatura base` | Sonnet | B5, B4 | Fecha o último bloqueio do F-002 e prepara o F-007 |
+| 5 | `[PESQUISA] RUE de gramíneas C4 tropicais` | Sonnet | B2 | O mais difícil e o mais consequente: errar aqui enviesa toda estimativa de crescimento |
+| 6 | `[ARQUITETURA] REV-001 parte 2` | Opus | DT2, DT3, DT4, DT9 | Os contratos precisam estar certos **antes** de escrever a spec do F-002, que os consome. Carrega também o que o chat 2 tiver decidido sobre `metodo_pastejo` |
 
 Depois: `[FATIA-002] Cálculos de forragem`, com todos os parâmetros e contratos fechados.
 
@@ -128,6 +132,15 @@ E `[APRENDER] Manejo de pastagens` a qualquer momento: é didático, não produz
 
 ## Perguntas em aberto
 
+- Braquiárias (Marandu, Xaraés) no SeuGado rodam em pastejo **contínuo** (o CT-135 dá
+  máxima/mínima com alta confiança) ou **rotacionado** (o CT-135 não cobre essas cultivares
+  nesse regime — sem fonte)? A resposta decide se o `TODO-PARAM` de altura de entrada dessas
+  duas cultivares se resolve com o dado que já existe ou exige nova pesquisa. Resolver em
+  `[ARQUITETURA]`.
+- ~~Confirmar se a régua de manejo é o Comunicado Técnico 125 ou 135~~ → **resolvido
+  17/09/2026.** São duas edições: CT **125** é a original (2013); a **edição revisada de 2017
+  é o CT 135**, e é dela que vêm as tabelas do `05`. Confirmado no registro do Infoteca-e
+  `doc/1077406`, que traz literalmente "(Embrapa Gado de Corte. Comunicado técnico, 135)".
 - Earth Engine permite uso não-comercial/acadêmico nos termos atuais? Se não, qual alternativa?
 - Fonte climática: INMET (estações, densidade irregular) ou reanálise (grade, menor resolução)?
 - Conectar o repositório do GitHub como fonte do Project Knowledge? Já está publicado. O
@@ -143,6 +156,16 @@ E `[APRENDER] Manejo de pastagens` a qualquer momento: é didático, não produz
 
 _(Cole aqui o handoff de cada chat encerrado, mais recente no topo.)_
 
+**17/09/2026 — [PESQUISA] Régua de Manejo Embrapa (CT-135) (encerrado)**
+Feito: CT-135 obtido (Costa & Queiroz, Embrapa Gado de Corte) e tabela de alturas do `05`
+reescrita com fonte e confiança por cultivar, separando pastejo contínuo (braquiárias) de
+rotacionado (panicuns). Resolve B3 e DT6. Corrigida premissa inicial: Zuri e Tamani **são**
+cobertos pelo CT-135 — só Cameroon e *B. humidicola* ficam de fora.
+Pendente: achado novo — CT-135 só cobre Marandu/Xaraés em contínuo, não em rotacional; o
+`TODO-PARAM` de entrada rotacional dessas duas cultivares agora depende de uma decisão de
+regime, não de um dado ausente. Pendência secundária: confirmar número da série (125 vs. 135).
+Próximo: `[PESQUISA] Densidade do dossel e eficiência de pastejo`, em Sonnet, esforço médio.
+
 **17/09/2026 — [ARQUITETURA] Revisão pós-F-001 (encerrado)**
 Feito: ADR-010 a ADR-013 aceitas e aplicadas. Layout reorganizado (`docs/`, `src/seugado/`)
 com histórico preservado por `git mv`. Quatro runbooks executados; 001, 002 e 004 aprovados,
@@ -150,7 +173,7 @@ com histórico preservado por `git mv`. Quatro runbooks executados; 001, 002 e 0
 "passo zero" do `CLAUDE.md` e a §7.1 do `08`. Quatro ferramentas limpas, 157/157.
 Pendente: B1–B7 (parâmetros), DT2, DT3, DT4 e DT9 → `[ARQUITETURA] REV-001 parte 2`,
 depois das quatro pesquisas.
-Próximo: `[PESQUISA] Régua de Manejo Embrapa (CT 125)`, em Sonnet, esforço médio.
+Próximo: `[PESQUISA] Régua de Manejo Embrapa (CT 135)`, em Sonnet, esforço médio.
 
 **17/09/2026 — [ARQUITETURA] Revisão pós-F-001**
 Feito: ADR-010, 011 e 012 aceitas e aplicadas em `02`, `03`, `05`, `06`, `07`, `08`, `09`,
@@ -161,7 +184,7 @@ número errado, pesos sem marcação), `02` (vocabulário novo do método), `08`
 demais sobre cache de Knowledge), `09` (regra explícita de quem escreve teste).
 Pendente: DT2, DT3, DT4 → `[ARQUITETURA] REV-001 parte 2`, **depois** das quatro pesquisas.
 DT7: o usuário precisa colar o `00` novo no campo de instruções do Project.
-Próximo: `[PESQUISA] Régua de Manejo Embrapa (CT 125)`.
+Próximo: `[PESQUISA] Régua de Manejo Embrapa (CT 135)`.
 
 **17/09/2026 — F-001 Modelo de domínio**
 Feito: `seugado/core/models.py` (6 enums, 7 dataclasses frozen/slots) aprovado; 13/13

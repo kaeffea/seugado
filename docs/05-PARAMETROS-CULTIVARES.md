@@ -24,50 +24,93 @@ Campo `confianca`:
 
 ## Alturas de entrada e saída
 
-Valores consolidados da literatura pública. **Divergências entre fontes são reais**
-(variam por adubação, estação e condição experimental) — por isso tratamos como
-**faixa com default configurável**, nunca constante rígida.
+### Fonte obtida — Régua de Manejo de Pastagens (Embrapa Gado de Corte)
 
-| Cultivar | Espécie | Entrada (cm) | Saída (cm) | Confiança |
+> COSTA, J. A. A. da; QUEIROZ, H. P. de. **Régua de manejo de pastagens: edição revisada**.
+> Campo Grande, MS: Embrapa Gado de Corte, 2017. (Embrapa Gado de Corte. Comunicado técnico, 135).
+> 7 p. Acesso aberto — [registro no Infoteca-e](https://www.infoteca.cnptia.embrapa.br/infoteca/handle/doc/1077406) /
+> [PDF](https://www.infoteca.cnptia.embrapa.br/infoteca/bitstream/doc/1077406/1/Reguademanejodepastagens.pdf).
+> A edição original é de 2013 e é o **Comunicado Técnico 125**; as tabelas abaixo vêm da
+> **edição revisada de 2017, CT 135**, que é a que retirou os capins humidicola da régua.
+
+✅ **Número da série resolvido (17/09/2026).** A dúvida 125 × 135 era real e tinha as duas
+respostas certas: são duas edições. O registro do Infoteca-e da edição revisada
+(`doc/1077406`, a que gerou estas tabelas) traz literalmente
+*"(Embrapa Gado de Corte. Comunicado técnico, 135)"*, ano 2017. O CT 125 é a edição original
+de 2013. A extração automatizada do rodapé estava correta; o que estava errado era presumir
+uma edição só. Citar **CT 135 (2017)** para estes valores.
+
+**Correção de premissa.** Ao abrir esta pesquisa, presumia-se que Zuri, Tamani e Cameroon
+não fossem cobertos pelo documento. **Isso está parcialmente errado: Zuri e Tamani SÃO
+cobertos** (Tabela 2 do documento, pastejo rotacionado). Só **Cameroon** fica de fora — é
+capim-elefante (*Pennisetum purpureum*), gênero fora do escopo do documento, que trata
+apenas de braquiárias e coloniões (panicuns). **B. humidicola também fica de fora**: a
+edição revisada declara que os capins humidicola foram retirados da régua atual.
+
+**Achado estrutural — leia antes de usar a tabela.** O documento usa duas grandezas, não
+uma. Braquiárias (Xaraés, Piatã, Marandu, *B. decumbens*) são tratadas só sob **pastejo
+contínuo**: altura **máxima/mínima** para decidir quando aumentar ou reduzir a lotação do
+piquete — não é o mesmo conceito de "entrada/saída" de um giro rotacionado. Coloniões
+(Mombaça, Zuri, Tanzânia, Quênia, Massai, Tamani) são tratados só sob **pastejo
+rotacionado**: altura de **entrada e saída** por giro. Consequência prática: **o CT-135 não
+resolve** o `TODO-PARAM` de altura de entrada rotacional para Marandu/Xaraés — o documento
+simplesmente não modela essas cultivares nesse regime. O TODO-PARAM permanece, mas muda de
+natureza: não é mais "falta dado", é "falta decidir se braquiária no SeuGado roda em
+contínuo (dado existe, alta confiança) ou em rotacionado (dado não existe nesta fonte)".
+Essa é uma decisão de arquitetura — fica registrada aqui para um chat `[ARQUITETURA]`
+futuro, não decidida neste `[PESQUISA]`.
+
+#### Tabela A — Pastejo rotacionado (coloniões / *Panicum* spp.)
+
+| Cultivar | Entrada (cm) | Saída (cm) | Confiança | Notas |
 |---|---|---|---|---|
-| Mombaça | *Panicum maximum* | 90 | 40 | média |
-| Tanzânia | *Panicum maximum* | 70 | 30 | média |
-| Massai | *Panicum maximum* | 55 | TODO-PARAM | baixa |
-| Zuri | *Panicum maximum* | 80 | TODO-PARAM | baixa |
-| Tamani | *Panicum maximum* | 50 | TODO-PARAM | baixa |
-| Marandu | *Brachiaria brizantha* | TODO-PARAM | 10–15 | média |
-| Xaraés | *Brachiaria brizantha* | TODO-PARAM | 15 | média |
-| Cameroon | *Pennisetum purpureum* | 100 | 45 | alta |
+| Mombaça | 85 | 45 | media | Diverge um pouco de fonte anterior (90/40) — ver nota abaixo |
+| Zuri | 80 | 40 | alta | Entrada já registrada antes já batia com o CT-135; saída resolve TODO-PARAM |
+| Tanzânia | 70 | 35 | media | Saída diverge um pouco de fonte anterior (30) — ver nota abaixo |
+| Massai | 55 | 30 | alta | Resolve TODO-PARAM de saída |
+| Tamani | 50 | 25 | alta | Resolve TODO-PARAM de saída |
+| Quênia | 65 | 35 | alta | Fora do escopo atual do projeto (não é uma das 8 cultivares-alvo). Registrado porque veio de graça na mesma fonte — sem TODO-PARAM associado hoje |
+
+#### Tabela B — Pastejo contínuo (braquiárias)
+
+| Cultivar | Máxima (cm) | Mínima (cm) | Confiança | Notas |
+|---|---|---|---|---|
+| Xaraés | 40 | 20 | alta | Grandeza é contínua, não rotacional — não resolve `altura_entrada_cm` rotacional (TODO-PARAM mantido) |
+| Piatã | 40 | 20 | alta | Cultivar nova nesta tabela |
+| Marandu | 35 | 20 | alta | Grandeza é contínua — não resolve `altura_entrada_cm` rotacional (TODO-PARAM mantido). Prioridade do projeto (braquiária mais plantada do Brasil) |
+| *B. decumbens* | 30 | 15 | alta | Cultivar nova nesta tabela |
+| *B. humidicola* | TODO-PARAM | TODO-PARAM | ausente | **Não coberto pelo CT-135** — retirado da edição revisada. Segue sem fonte |
+| Cameroon (capim-elefante) | 100 (entrada) | 45 (saída) | alta | **Não coberto pelo CT-135** (*Pennisetum*, fora de escopo do documento). Mantido o dado anterior — fonte experimental dedicada, melhor do que o CT-135 traria de qualquer forma |
 
 ### Notas por cultivar
 
-**Mombaça.** Fontes divergem: 90 cm citado tanto para 90% de IL quanto para 95% de IL;
-outra fonte dá 90 cm para 95% IL e **115 cm para 100% IL**. Saída aparece como 30, 40 e 50 cm
-em fontes diferentes. Estudos experimentais usaram combinações de 30 e 50 cm de resíduo.
-→ Default: entrada 90, saída 40. Faixa aceitável: entrada 85–95, saída 30–50.
+**Mombaça.** CT-135: entrada 85 cm, saída 45 cm. Fonte anterior (podcast Embrapa "Primeiro
+Pastejo") registrava ~90 cm para 90% de IL e 115 cm para 100% IL; saída aparecia como 30, 40
+e 50 cm em fontes experimentais diferentes (resíduos testados). **Registrando a faixa, sem
+escolher calado:** entrada 85–90 cm, saída 30–50 cm. Default recomendado: usar o valor do
+CT-135 (85/45) por ser fonte institucional específica para esta decisão, mantendo a faixa
+como `altura_entrada_faixa`/`altura_saida_faixa` configurável.
 
-**Tanzânia.** Alturas pré-pastejo estáveis ao longo de um ano experimental:
-**65 cm para meta de 90% IL** e **75 cm para 95% IL**. Outra fonte simplifica para ~70 cm.
-Resíduos testados: 30 e 50 cm. Com resíduo de 50 cm a IL pós-pastejo foi **67%**,
-contra **40%** com 30 cm — o resíduo mais alto gerou **mais ciclos de pastejo**.
-→ Default: entrada 70, saída 30. Registrar que 50 cm pode render mais ciclos.
+**Tanzânia.** CT-135: entrada 70 cm, saída 35 cm. Fonte anterior já convergia em 70 cm de
+entrada; saída divergia (30 cm). Estudo de resíduos testou 30 e 50 cm, com resíduo de 50 cm
+gerando IL pós-pastejo de 67% (vs. 40% com 30 cm) e mais ciclos de pastejo por período. →
+Faixa de saída: 30–50 cm, default CT-135 (35).
+
+**Massai / Zuri / Tamani.** Entrada já registrada antes batia exatamente com o CT-135 nos
+três casos — bom sinal de que a fonte anterior (não documentada por nome) já vinha desta
+mesma régua. Saída estava `TODO-PARAM` nos três; resolvida agora pelo CT-135 (30/40/25 cm
+respectivamente).
+
+**Xaraés / Marandu (contínuo).** CT-135 dá faixa 20–40 cm (Xaraés) e 20–35 cm (Marandu) para
+pastejo **contínuo** — ajuste de lotação, não giro de piquete. O dado antigo de "saída
+10–15 cm" para Marandu e "saída 15 cm" para Xaraés era para **rotacionado** e continua sem
+fonte identificada; não foi descartado, só mantido separado por ser grandeza diferente.
+Marandu é `TODO-PARAM` prioritário para entrada rotacional — ver achado estrutural acima.
 
 **Cameroon.** Entrada a 100 cm (95% IL) superou 130 cm (100% IL): **−16%** leite/vaca/dia,
 **−34%** leite/ha, **+911 kg/ha** de forragem perdida. Descanso fixo recomendado: **27 dias**.
-→ Melhor evidência quantitativa disponível. Usar como caso de validação do motor.
-
-**Xaraés.** Descanso fixo recomendado: **28 dias**.
-
-**Marandu.** Resíduos de **10 e 15 cm**. Altura de entrada não capturada numericamente nas
-fontes consultadas (aparece só como "95% e 100% de IL"). `TODO-PARAM` prioritário —
-Marandu é a braquiária mais plantada do Brasil.
-
-### Fonte prioritária a obter
-**Comunicado Técnico 125 — "Régua de Manejo de Pastagens", Embrapa Gado de Corte.**
-Cobre oito forrageiras tropicais (Xaraés, Piatã, Marandu, *B. decumbens*, *B. humidicola*,
-Mombaça, Tanzânia, Massai) com alturas de entrada e saída em rotacionado **e** faixas
-máxima/mínima em contínuo. Publicação Embrapa é de acesso aberto.
-→ Obter em `[PESQUISA]` e substituir a tabela acima pelos valores canônicos.
+Fora do escopo do CT-135 (gênero *Pennisetum*). Melhor evidência quantitativa disponível
+entre todas as cultivares — usar como caso de validação do motor.
 
 ---
 
@@ -78,8 +121,8 @@ máxima/mínima em contínuo. Publicação Embrapa é de acesso aberto.
 | `densidade_kg_ha_por_cm` (todas cultivares) | ponte massa↔altura | 🔴 crítica | Ver §"Como obter", abaixo |
 | `rue_max_g_por_mj` para C4 tropical | eq. 11 do SAFER | 🔴 crítica | Paper usa 2,45 g/MJ **para C3**. C4 é maior |
 | `temperatura_base_c` | graus-dia | 🟠 alta | Gramíneas tropicais param abaixo de ~15 °C |
-| `altura_entrada_cm` Marandu, Xaraés | regra de entrada | 🟠 alta | Cultivares mais plantadas |
-| `altura_saida_cm` Massai, Zuri, Tamani | regra de saída | 🟡 média | Cultivares menos frequentes |
+| `altura_entrada_cm` rotacional — Marandu, Xaraés | regra de entrada | 🟠 alta | CT-135 (17/09/2026) não resolve: só cobre estas cultivares em contínuo. Ou se obtém fonte específica de rotacionado, ou vira decisão de regime (`[ARQUITETURA]`) |
+| `altura_maxima/minima_cm` contínuo — *B. humidicola* | regra de contínuo | 🟡 média | CT-135 não cobre; cultivar retirada da edição revisada. Buscar fonte alternativa se a cultivar entrar em produção |
 | `descanso_min/max_dias` por cultivar | limites de segurança | 🟡 média | Faixa geral 21–45 conhecida |
 | `taxa_senescencia` | balanço de massa | 🟡 média | Aproximação declarada aceita no MVP |
 | `eficiencia_pastejo` (ingestão ÷ massa acima do resíduo) | dias de ocupação | 🔴 crítica | ADR-010. A faixa 0,40–0,50 mede taxa de utilização |
@@ -198,9 +241,10 @@ mombaca:
   nome_exibicao: "Mombaça"
   especie: "Panicum maximum"
   via_fotossintetica: C4
-  altura_entrada_cm: 90
-  altura_entrada_faixa: [85, 95]
-  altura_saida_cm: 40
+  regime: rotacionado
+  altura_entrada_cm: 85
+  altura_entrada_faixa: [85, 90]
+  altura_saida_cm: 45
   altura_saida_faixa: [30, 50]
   densidade_kg_ha_por_cm: null      # TODO-PARAM
   rue_max_g_por_mj: null            # TODO-PARAM (C4)
@@ -209,12 +253,36 @@ mombaca:
   descanso_max_dias: 45
   qualidade_base: alta
   fontes:
-    altura_entrada: "Embrapa, Podcast Primeiro Pastejo (90% IL ~90cm)"
-    altura_saida: "Embrapa, idem (~40cm)"
+    altura_entrada: "Embrapa Gado de Corte, CT-135, Costa & Queiroz (2013/ed. rev. 2017)"
+    altura_saida: "idem"
   observacoes: >
-    Fontes divergem: outra referência dá 90cm para 95% IL e 115cm para 100% IL.
-    Resíduos experimentais de 30 e 50 cm também documentados.
+    Fonte anterior (podcast Embrapa "Primeiro Pastejo") registrava ~90cm (90% IL) e
+    115cm (100% IL) para entrada; saída documentada em 30/40/50cm em estudos de resíduo.
+    Faixa mantida como configurável; default é o valor institucional do CT-135.
   confianca: media
+
+marandu:
+  nome_exibicao: "Marandu"
+  especie: "Brachiaria brizantha"
+  via_fotossintetica: C4
+  regime: continuo
+  altura_maxima_cm: 35
+  altura_minima_cm: 20
+  altura_entrada_cm: null            # TODO-PARAM — CT-135 não cobre rotacionado p/ Marandu
+  altura_saida_cm: null              # TODO-PARAM — mesma razão; ver nota de 10-15cm sem fonte
+  densidade_kg_ha_por_cm: null       # TODO-PARAM
+  rue_max_g_por_mj: null             # TODO-PARAM (C4)
+  temperatura_base_c: null           # TODO-PARAM
+  descanso_min_dias: 21
+  descanso_max_dias: 45
+  qualidade_base: alta
+  fontes:
+    altura_maxima: "Embrapa Gado de Corte, CT-135, Costa & Queiroz (2013/ed. rev. 2017)"
+    altura_minima: "idem"
+  observacoes: >
+    CT-135 só documenta esta cultivar em pastejo contínuo. Prioridade do projeto —
+    braquiária mais plantada do Brasil — segue com TODO-PARAM para uso em rotacionado.
+  confianca: alta
 ```
 
 Todo parâmetro `null` com comentário `TODO-PARAM` faz o sistema **recusar-se a operar**

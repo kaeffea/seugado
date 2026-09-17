@@ -222,7 +222,24 @@ e sincronizar o Knowledge. O Arquiteto escreve os documentos; ninguém pede que 
 
 ---
 
-## 7.1. Runbook que move arquivo
+## 7.1. Como escrever runbook que não trava sozinho
+
+Dois runbooks foram reprovados por pré-condição que o próprio Arquiteto quebrou, não por erro
+do executor. A causa é a mesma nos dois: **o Arquiteto escreve documento entre a emissão do
+runbook e a execução dele.** Regras que saem daí, para quem escreve runbook:
+
+- **Nunca** restringir o diff a uma lista fechada de arquivos de `docs/`. O executor não tem
+  como saber quais documentos foram escritos depois. Restrição de arquivo vale para `src/` e
+  `tests/`, onde o autor é outro.
+- Todo runbook começa commitando o que estiver pendente em documentação, num commit próprio.
+- Nunca exigir "árvore limpa" sem antes dar ao executor o passo que a limpa.
+- Afirmar que um arquivo "já foi escrito" é uma premissa, não um fato: peça conferência de
+  **conteúdo** e trate a ausência como parada legítima. Escrita em disco pode não sobreviver;
+  aconteceu com `docs/05` em 17/09/2026, e só o testador pegou.
+- O Arquiteto confere as próprias escritas relistando o diretório depois de gravar. A
+  confirmação da ferramenta de escrita não é prova de que o arquivo ficou no disco.
+
+## 7.2. Runbook que move arquivo
 
 Reorganizar layout parece trivial e tem um ponto cego provado: a suíte de
 `tests/conformance/` lê o código-fonte por caminho literal (para checar estrutura via AST),
