@@ -65,6 +65,17 @@ Mudar qualquer item desta lista exige ADR. Não implemente, não planeje, não "
 - ❌ App nativo iOS/Android (web responsivo + bot de mensagem resolvem)
 - ❌ Multi-fazenda / multi-tenant complexo (uma fazenda por conta no MVP)
 - ❌ Previsão de preço de arroba, mercado, cotação
+- ❌ **Prescrição quantificada de ajuste de lotação em pastejo contínuo** (quantos animais
+  entram ou saem). Atenção à fronteira, definida pela **ADR-014**: o regime contínuo **está**
+  no escopo como conceito — é campo do piquete, tem bloco de parâmetro próprio no `05`, entra
+  na projeção de estado e gera alerta de altura. O que fica fora do MVP é **o número**: a
+  prescrição é a fatia **F-009B**, posicionada depois do F-015. Risco aceito e registrado: uma
+  fazenda 100% contínua, no MVP, recebe diagnóstico e alerta, não ordem de manejo.
+- ❌ **O sistema decidir comprar ou vender animal** para ajustar lotação (o *put-and-take* com
+  animal regulador entrando e saindo da fazenda). O produtor **atualizar** a composição do
+  lote — nasceu bezerro, vendeu boi — **não é isto e está dentro do escopo**: é cadastro, já
+  previsto como evento `lote_alterado` no `06` §4, e é justamente o que a ADR-007 existe para
+  tornar barato. A distinção entra aqui porque foi confundida uma vez, em 17/09/2026.
 
 ## Definição de pronto (MVP)
 
@@ -100,14 +111,48 @@ estado) funcionando, e de dado de custo de cerca e de água que o projeto não t
 
 **Condição de entrada:** MVP completo (F-015) e ADR própria. Se sobrar tempo antes disso,
 é a primeira candidata da fila.
+**Dependência descoberta em 17/09/2026:** a premissa "o rotacionado dá resultado melhor" é
+empírica e ainda não tem fonte no projeto. Se o diferencial medido de desempenho entre os
+dois regimes for pequeno, esta ideia perde a razão de existir. Verificar antes de promovê-la.
+
+### Lote prioritário na função objetivo
+**Origem:** o usuário, 17/09/2026, ao argumentar que um lote em terminação deveria receber o
+piquete de melhor qualidade.
+
+Um campo `prioridade` no lote e um peso por lote na função objetivo do `07` §2:
+`w1 · Σ_l prioridade[l] · consumo_dentro_da_janela[l]`. Expressa "põe o lote que vai ser
+vendido no melhor pasto" **sem** modelar ganho de peso, nutriente ou custo — usa o indicador
+`ótima / declinando / passado do ponto` que a ADR-005 já entrega. Custo de implementação
+próximo de zero; `indissoluvel` já é campo de lote no `06` §5 e `prioridade` mora no mesmo lugar.
+
+Riscos conhecidos: (a) é mecanismo *soft* e degrada sozinho — se tudo é prioritário, o peso
+vira ruído e o otimizador volta ao comportamento neutro sem avisar; precisa de limite ou de
+prioridade relativa; (b) a base agronômica ainda não foi verificada — a técnica candidata
+chama-se **pastejo líder-seguidor**, e sem fonte o peso é `HIPOTESE-CALIBRAR`, não dado.
+
+**Condição de entrada:** fonte para líder-seguidor, e ADR junto com a de pesos da função
+objetivo prevista antes do F-009.
 
 ### Pesquisa de mercado regional (Alagoas)
-**Origem:** o usuário, 17/09/2026.
+**Origem:** o usuário, 17/09/2026. **Antecipada em 17/09/2026** — ver abaixo.
 
-Antes de decidir para quem vender: qual cultivar predomina em Alagoas, qual método de
-pastejo é mais usado, qual o porte típico. Não é fatia de código nem `[PESQUISA]` de
-parâmetro — é pesquisa de mercado, e alimenta posicionamento, não cálculo. Fazer quando o
-produto existir o suficiente para ser demonstrado a alguém.
+Qual cultivar predomina em Alagoas, qual método de pastejo é mais usado, qual o porte típico.
+
+**Por que deixou de ser "fazer quando o produto existir".** A justificativa original era que
+isto alimenta posicionamento, não cálculo. Está errado: ela **poda a pesquisa de parâmetro**,
+que é o que trava o projeto hoje. Cada cultivar do `05` custa uma busca com fonte rastreável
+por parâmetro, e a lista pode dobrar se cultivar usada nos dois regimes for comum. Saber quais
+três ou quatro cultivares realmente dominam a região transforma dez pesquisas em quatro, e
+decide quais cultivares merecem busca. O ganho é de esforço economizado, não de marketing —
+e o marketing vem de graça junto.
+
+**Atualização de 17/09/2026 (ADR-014).** O eixo *regime* já está decidido: cada cultivar precisa
+de um bloco de parâmetro por regime em que a fazenda a usa, e a célula vazia é perguntada ao
+produtor em vez de bloquear. Alagoas passou a ser **downstream** da ADR-014 — poda o eixo
+*cultivar* sabendo quantas células buscar para cada uma.
+
+**Condição de entrada:** nenhuma além da ADR-014, já fechada. É chat `[PESQUISA]` próprio, em
+Sonnet, e não depende de código nenhum.
 
 ---
 

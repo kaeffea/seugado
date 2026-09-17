@@ -28,6 +28,9 @@ Um lote tem composição por categoria (ex.: 3 bezerros, 10 novilhos, 20 adultos
 Faixa que determina peso vivo médio e consumo. No MVP: `bezerro`, `novilho`, `adulto`.
 Simplificação deliberada — o que importa para o cálculo é o **peso vivo total do lote**,
 não a identidade dos animais.
+As categorias são **ordenadas** pela escala de UA do `05` (bezerro 0,25 · novilho 0,50–0,75 ·
+adulto 1,00 · touro 1,25). Essa ordem é o que define compatibilidade de fusão: duas categorias
+são compatíveis quando estão a no máximo um degrau de distância (ADR-014, DT11).
 
 ### Cultivar
 Variedade específica de capim. Ex.: Mombaça, Marandu, Tanzânia, Xaraés, Massai, Zuri, Tamani.
@@ -93,6 +96,12 @@ Faixa observada em fazenda: 40% a 50%. Caso canônico: 1.760 ÷ 4.000 = 44%.
 ### Unidade Animal (UA)
 Padronização para comparar categorias diferentes. **1 UA = 450 kg de peso vivo.**
 Permite dizer "3 UA/ha" independentemente de serem bezerros ou adultos.
+Dois usos e um não-uso, fixados pela ADR-014:
+- **Exibição** da taxa de lotação (`UA/ha`).
+- **Preenchimento**: quando o produtor não sabe o peso médio de uma categoria, o sistema deriva
+  `peso_medio_kg = coeficiente_UA × 450`, com `origem: 'ua_tabela'` e `confianca: media`.
+- **Nunca** como fórmula paralela de consumo — o cálculo canônico usa `peso_medio_kg`
+  (`03` §6.1).
 
 ### Taxa de lotação
 Quantidade de animais (ou UA) por área. Unidade: `UA/ha`.
@@ -114,13 +123,36 @@ No SeuGado, **um evento de movimentação de lote** (tirar de um piquete, coloca
 Distribuir os animais de um lote entre outros lotes existentes, quando não há piquete apto
 para recebê-lo. Operação de último recurso, sempre com confirmação humana.
 
+### Método de pastejo
+Qual dos dois regimes governa um piquete: `rotacionado` ou `continuo`. **É propriedade do
+piquete, não da fazenda** — fazendas mistas existem (ADR-014). Em código: `metodo_pastejo`,
+enum `MetodoPastejo`. Determina qual bloco de parâmetro da cultivar vale ali.
+- Proibido: *sistema de pastejo* (na literatura inclui também espécie e lotação), *regime*
+  sozinho como nome de campo.
+
+### Parâmetros por regime
+Bloco de alturas que uma cultivar tem **para um método de pastejo específico**. A mesma
+cultivar tem valores diferentes em contínuo e em rotacionado, e pode ter fonte para um e não
+para o outro — o `05` é uma matriz esparsa cultivar × regime (ADR-014).
+Em código: `ParametrosRegime`, acessado por `resolver_parametros(cultivar, metodo)`, que é a
+porta única e devolve junto a lista de parâmetros `faltantes`.
+
 ### Pastejo rotacionado / lotação rotacionada
 Método em que o lote alterna entre piquetes, com períodos de ocupação e descanso.
-É o método que o SeuGado otimiza.
+É o método que o SeuGado prescreve no MVP.
 
 ### Pastejo contínuo / lotação contínua
 Lote permanece na mesma área o tempo todo, ajustando-se a carga animal.
-Fora do escopo do MVP.
+**Está no escopo** como regime desde a ADR-014: tem campo no piquete, bloco de parâmetro
+próprio, entra na projeção de estado e gera alerta de altura. O que fica para depois do MVP é a
+**prescrição quantificada** de ajuste de lotação (fatia F-009B), que roda em laço **semanal**
+por gatilho de altura, separado do laço diário do rotacionado.
+
+### Aguardando parâmetro
+Estado de um piquete cuja combinação cultivar × método de pastejo não tem altura conhecida.
+Ele entra na projeção de estado, **não** entra em prescrição, e vira pendência de cadastro: o
+sistema pergunta ao produtor a altura que ele usa. A resposta é parâmetro **daquela fazenda**,
+com `confianca: baixa` — nunca default de catálogo (ADR-014).
 
 ### ILPF / ILP
 Integração Lavoura-Pecuária(-Floresta). Sistemas com árvores ou rotação com lavoura.

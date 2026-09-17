@@ -310,6 +310,150 @@ antigo; o RUNBOOK-REV-003 verifica as quatro ferramentas depois da mudança.
 
 ---
 
+## ADR-014 — Método de pastejo: parâmetro por regime, célula vazia perguntada ao produtor, contínuo em laço próprio
+**Data:** 17/09/2026 · **Status:** aceita
+
+**Contexto.** O CT-135 documenta braquiária só em pastejo contínuo e colonião só em
+rotacionado, mas a `[PESQUISA] Regime de pastejo na prática brasileira` (17/09/2026) mostrou
+que a mesma cultivar roda nos dois regimes, com altura própria em cada um: **a ambiguidade é
+a norma, não a exceção**. A altura deixou de ser propriedade da cultivar e passou a ser
+propriedade do par **cultivar × regime** — uma matriz esparsa, com a maioria das células ainda
+vazia (`05`, Tabelas A, A2, B e B2). Dois pontos já estavam acordados e entram aqui como
+premissa, não como opção: `metodo_pastejo` é campo do **piquete** (fazendas mistas existem), e
+o produtor alterar a composição de um lote é **cadastro** (`lote_alterado`), não ERP.
+
+**Decisão.** Cinco partes.
+
+**1. Schema: parâmetro por regime, e a recusa passa a ter dono explícito (absorve DT3).**
+`Cultivar` perde os campos planos de altura e passa a carregar uma tupla de blocos, um por
+regime em que a cultivar tem fonte:
+
+```python
+class MetodoPastejo(StrEnum):          # mesmo valor de piquete.metodo_pastejo
+    CONTINUO = "continuo"
+    ROTACIONADO = "rotacionado"
+
+@dataclass(frozen=True, slots=True)
+class ParametrosRegime:
+    metodo: MetodoPastejo
+    altura_entrada_cm: float | None    # rotacionado: entrada do giro
+    altura_saida_cm: float | None      # rotacionado: resíduo de saída
+    altura_maxima_cm: float | None     # contínuo: gatilho de aumentar lotação
+    altura_minima_cm: float | None     # contínuo: gatilho de reduzir lotação
+    confianca: Confianca
+    fonte: str
+
+@dataclass(frozen=True, slots=True)
+class Cultivar:
+    ...
+    parametros_por_regime: tuple[ParametrosRegime, ...]
+```
+
+Tupla, e não `dict`, porque `Cultivar` é `frozen/slots`: `frozen` impede rebind, não mutação —
+um `dict` dentro dela seria mutável na prática e tornaria a entidade não hasheável, contra a
+regra 12 do `06` §7. **A célula vazia é a ausência da entrada**, não um bloco cheio de `None`.
+
+A recusa por `TODO-PARAM` (DT3) **não** vai para `__post_init__`. Carregar cultivar com buraco
+tem de ser legal — senão o catálogo não pode nem ser lido, e a tela de cadastro não consegue
+dizer ao produtor o que falta. A recusa vira função pura, **porta única de acesso ao
+parâmetro**, em `core/regras.py`:
+
+```python
+@dataclass(frozen=True, slots=True)
+class ResolucaoParametros:
+    parametros: ParametrosRegime | None
+    faltantes: tuple[str, ...]     # nomes do que falta; vazia quando resolveu
+
+def resolver_parametros(cultivar: Cultivar, metodo: MetodoPastejo) -> ResolucaoParametros: ...
+```
+
+Ninguém obtém o parâmetro sem receber `faltantes` no mesmo retorno. Quem barra é o `planner/`:
+piquete com `faltantes` não entra em prescrição. `core/forragem.py` continua recebendo número
+por argumento, como o escopo de bloqueio da ADR-010 já permite.
+
+**2. Célula vazia: perguntar ao produtor, com o piquete parado até a resposta.**
+Cair numa célula vazia não é hipótese remota — Xaraés, *B. decumbens*, Massai, Zuri e Tamani
+estão sem fonte no regime que falta. Enquanto não há resposta, o piquete fica em
+`aguardando_parametro`: **entra** na projeção de estado, **não entra** em prescrição, e aparece
+como pendência de cadastro. O cadastro pergunta ao produtor a altura que ele usa, em cm, e a
+resposta vira evento `parametro_alterado` com `origem: 'produtor'` e `confianca: baixa`, que a
+camada de confiança propaga até a mensagem.
+
+**A guarda que faz isso caber na regra 1:** altura dada pelo produtor é parâmetro **daquela
+fazenda**. Não entra no `05`, não vira default de catálogo, não se propaga para outra fazenda
+com a mesma cultivar. A regra 1 proíbe número sem fonte rastreável; aqui a fonte é o produtor,
+e fica registrada no evento junto com o número.
+
+**3. Contínuo ganha laço próprio, mais lento — e continua visível ao otimizador.**
+Piquete contínuo sai da variável de atribuição `x[l,p,d]` do `07` §2 (seu lote está fixado) e
+**não** ganha variável inteira de número de animais no problema diário. Ele recebe avaliação
+**semanal**, disparada por gatilho de altura (`altura_maxima_cm` / `altura_minima_cm` do bloco
+de regime), produzindo recomendação de **ajuste de lotação**, não de movimentação.
+
+Semanal, e não mensal: a P2 mostrou reavaliação da ordem de um mês **quando o produtor não
+monitora altura** — e o SeuGado é exatamente o monitoramento que falta. O `01` já promete
+plano de 7 dias; a cadência do contínuo se encaixa nessa mesma batida sem criar uma terceira.
+
+O piquete contínuo **continua na projeção de estado** e continua candidato na hierarquia do
+`07` §4. Isto corrige de propósito o erro (b) registrado no `11` — esconder o contínuo do
+otimizador o piora, porque ele é válvula de escape acima da fusão de lotes. O que sai do
+problema diário é só a variável de atribuição.
+
+**4. `peso_medio_kg` é canônico; UA é preenchimento e exibição.**
+A cadeia do `03` §6.1 não muda: consumo é Σ(`n_animais` × `peso_medio_kg` × `pct_consumo`).
+Quando o produtor não sabe o peso médio de uma categoria, o sistema **deriva**
+`peso_medio_kg = coeficiente_UA(categoria) × 450`, grava com `origem: 'ua_tabela'` e
+`confianca: media`. UA nunca vira fórmula paralela de consumo — segue como unidade de exibição
+(`UA/ha`) e de normalização de lote, como o `03` §6.5 já dizia.
+
+Risco nomeado: o coeficiente de bezerro (0,25 UA → 112,5 kg) fica **abaixo** do peso de desmama
+achado na pesquisa (180–210 kg, confiança baixa). Subestimar peso subestima consumo, o que
+superestima `dias_ocupacao` — erro na direção do super-pastejo, que é o caro (`07` §2, `w4=5,0`).
+Por isso o valor derivado carrega confiança média e não encerra o assunto: **B5 deixa de
+bloquear F-002 e vira item de precisão**, não de fundação.
+
+**5. DT11 — "categoria compatível", definida pela escala de UA.**
+`compativel[a,b] = 1 ⟺ |ordem(a) − ordem(b)| ≤ 1`, onde `ordem` é a posição da categoria na
+escala de UA do `05` (bezerro 0,25 · novilho 0,50–0,75 · adulto 1,00 · touro 1,25). Dois lotes
+só são fundíveis se **todo** par de categorias entre eles for compatível. Com as três
+categorias do MVP isso produz exatamente a regra que o `03` §9.4 já enunciava em prosa:
+bezerro com novilho pode, novilho com adulto pode, **bezerro com adulto não**.
+
+O limiar `≤ 1` é escolha nossa, não dado empírico: **`HIPOTESE-CALIBRAR`**, a calibrar na ADR
+de fusão de lotes prevista antes do F-022.
+
+**Alternativas.**
+- *Campos planos com sufixo de regime* (`altura_entrada_rotacionado_cm`, …) — dobra o número de
+  campos, metade sempre `None`, e acrescentar um regime vira alteração de dataclass.
+- *Recusa em `__post_init__` da `Cultivar`* — torna ilegal carregar o catálogo incompleto, que
+  é o estado real do projeto hoje, e esconde de quem monta a tela exatamente o que falta.
+- *Default conservador na célula vazia* — é valor plausível inventado, proibido pela regra 1.
+  *Recusar o piquete e parar ali*, sem perguntar, é honesto mas trava o produto numa cultivar
+  comum; virou o estado intermediário (`aguardando_parametro`), não o destino.
+- *Contínuo no mesmo laço diário* — exige a variável inteira `n[l,p,d]` no problema diário, o
+  que muda a classe do modelo do `07` §2 para comprar uma cadência que a prática não usa.
+- *UA como fonte canônica de consumo* — mais grossa que o peso real e obrigaria a reescrever a
+  `03` §6.1 para ganhar robustez que o fallback já entrega.
+
+**Consequências.**
+- **F-003 destrava.** Em troca, **F-001 é reaberta**: `models.py`, intocada desde a aprovação,
+  ganha `MetodoPastejo`, `ParametrosRegime` e o campo novo em `Cultivar`. É o primeiro arquivo
+  aprovado a ser reaberto, e exige spec própria antes do F-002.
+- Pastejo contínuo **deixa de ser "fora do escopo do MVP"** como conceito: entra no modelo de
+  dados, na projeção de estado e no alerta. A **prescrição** de lotação contínua é a fatia nova
+  **F-009B**, posicionada depois do F-015 — ou seja, pós-MVP. Consequência honesta e registrada
+  como risco de produto: uma fazenda 100% contínua, no MVP, recebe estado e alerta ("acima da
+  altura máxima, considere aumentar a lotação"), mas **não** recebe número de animais.
+- A fila de parâmetro do `05` ganha forma definida — célula por cultivar × regime. A
+  `[PESQUISA] Mercado e pecuária de Alagoas` passa a podar o eixo *cultivar* sabendo quantas
+  células buscar para cada uma.
+- **DT3 e DT11 fechados. B5 rebaixado** de bloqueio a refinamento. A
+  `[ARQUITETURA] REV-001 parte 2` encolhe para DT2, DT4 e DT9.
+- Aparece uma classe nova de parâmetro — **override por fazenda** — que F-004 (evento) e F-014
+  (cadastro) têm de carregar, e que não existia antes desta ADR. É o preço da parte 2.
+
+---
+
 ## Template para novas ADRs
 
 ```markdown

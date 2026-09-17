@@ -105,6 +105,32 @@ class EstimativaForragem:
     origem_ndvi: Literal["optico", "sintetico_sar", "interpolado"]
     dias_desde_imagem_limpa: int
 
+# core → core: porta ÚNICA de acesso a parâmetro de cultivar (ADR-014)
+class MetodoPastejo(StrEnum):
+    CONTINUO = "continuo"
+    ROTACIONADO = "rotacionado"
+
+class ParametrosRegime:               # frozen/slots
+    metodo: MetodoPastejo
+    altura_entrada_cm: float | None   # rotacionado
+    altura_saida_cm: float | None     # rotacionado
+    altura_maxima_cm: float | None    # contínuo
+    altura_minima_cm: float | None    # contínuo
+    confianca: Confianca
+    fonte: str
+
+class ResolucaoParametros:            # frozen/slots
+    parametros: ParametrosRegime | None
+    faltantes: tuple[str, ...]        # vazia quando resolveu
+
+def resolver_parametros(
+    cultivar: Cultivar,
+    metodo: MetodoPastejo,
+) -> ResolucaoParametros: ...
+
+# Ninguém lê parâmetro de cultivar por outro caminho. Quem barra é o planner:
+# piquete com `faltantes` fica `aguardando_parametro` — entra no estado, não no plano.
+
 # core → planner
 def dias_ocupacao(
     massa_atual_kg_ms_ha: float,
@@ -173,10 +199,20 @@ Por que vale o esforço arquitetural:
 fazenda      (id, nome, timezone, funcionarios_disponiveis,
               manejos_por_funcionario_dia, dias_preferenciais_manejo[])
 piquete      (id, fazenda_id, nome, geometria GEOMETRY(Polygon,4326),
-              area_ha, cultivar_id, ativo)
+              area_ha, cultivar_id, metodo_pastejo, ativo)
+                                                 -- metodo_pastejo é do PIQUETE, não da
+                                                 -- fazenda: fazendas mistas existem (ADR-014)
 cultivar     (id, slug, parametros JSONB)        -- espelha 05-PARAMETROS
+                                                 -- parametros.por_regime[]: um bloco de
+                                                 -- alturas por método de pastejo. Matriz
+                                                 -- esparsa: a célula vazia é a ausência do
+                                                 -- bloco, não bloco cheio de null
+parametro_fazenda (fazenda_id, cultivar_id, metodo_pastejo, campo, valor,
+                   origem, confianca)            -- override do produtor para célula vazia.
+                                                 -- NUNCA sobe para `cultivar` (ADR-014)
 lote         (id, fazenda_id, nome, indissoluvel BOOL, ativo)
-lote_composicao (lote_id, categoria, n_animais, peso_medio_kg)
+lote_composicao (lote_id, categoria, n_animais, peso_medio_kg, origem_peso)
+                                                 -- origem_peso: 'produtor' | 'ua_tabela'
 leitura      (id, piquete_id, data, ndvi, origem, pct_nuvem,
               pixels_validos, massa_kg_ms_ha, taxa_acumulo, confianca)
 plano        (id, fazenda_id, gerado_em, horizonte_dias, payload JSONB)

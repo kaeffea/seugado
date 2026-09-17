@@ -19,14 +19,25 @@ git, `pyproject.toml` (Python 3.12, pytest/ruff/mypy no grupo `dev`), `.gitignor
 Entidades puras: `Piquete`, `Lote`, `Cultivar`, `Manejo`, `Evento`.
 Dataclasses com type hints, sem persistência, sem I/O.
 **Módulo:** `core/models.py` · **Entrega:** vocabulário do glossário virou código.
+⚠️ **Reaberta pela ADR-014.** `Cultivar` perde os campos planos de altura e ganha
+`parametros_por_regime: tuple[ParametrosRegime, ...]`; entram o enum `MetodoPastejo` e o campo
+`metodo_pastejo` em `Piquete`. É o primeiro arquivo aprovado a ser reaberto — exige spec
+própria (**F-001B**), antes do F-002.
 
 ### F-002 · Cálculos de forragem
 `massa ↔ altura`, consumo do lote, dias de ocupação (com crescimento durante a ocupação).
 **Módulo:** `core/forragem.py` · **Entrega:** caso de regressão canônico passa.
-⚠️ Bloqueada por `TODO-PARAM: densidade_kg_ha_por_cm` e `TODO-PARAM: eficiencia_pastejo`.
+✅ **Não bloqueada.** `TODO-PARAM` barra **default de produção**, não implementação (`05`,
+"Escopo do bloqueio"; ADR-010). As funções recebem `densidade_kg_ha_por_cm` e
+`eficiencia_pastejo` por argumento, e o caso canônico do `05` roda com os dois neutralizados
+(`eficiencia_pastejo = 1.0`, `taxa_acumulo = 0.0`). O contrato de `dias_ocupacao` (`06` §3)
+recebe só floats, então esta fatia **também não depende do F-001B**. Ver `11`, "Correção de
+17/09/2026".
 
 ### F-003 · Regras de manejo
-`apto_para_entrada?`, `precisa_sair?`, `urgencia`, `descanso_cumprido?`.
+`apto_para_entrada?`, `precisa_sair?`, `urgencia`, `descanso_cumprido?`, e
+`resolver_parametros(cultivar, metodo)` — a porta única de acesso a parâmetro, que devolve o
+bloco de regime ou a lista de `faltantes` (ADR-014).
 **Módulo:** `core/regras.py` · **Entrega:** decisão binária por piquete, testada.
 
 ### F-004 · Persistência e eventos
@@ -66,6 +77,15 @@ com este nível de rigor.
 Ordena por urgência, aloca ao melhor piquete apto. Sem lookahead.
 Respeita mão de obra e dias preferenciais desde já.
 **Módulo:** `planner/otimizador.py` · **Entrega:** plano de 7 dias.
+
+### F-009B · Ajuste de lotação em pastejo contínuo — **pós-MVP**
+Laço **semanal**, separado do diário, disparado por gatilho de altura
+(`altura_maxima_cm` / `altura_minima_cm`). Produz recomendação de **quantos animais entram ou
+saem** do piquete contínuo, não de movimentação.
+**Módulo:** `planner/` · **Entrega:** prescrição para fazenda que não rotaciona.
+⚠️ **Entra depois do F-015**, não aqui. Fica listada nesta posição porque é onde ela pertence
+conceitualmente (é a irmã do F-009), mas a ordem de execução é pós-MVP — ver ADR-014. Até ela
+existir, piquete contínuo recebe estado e alerta de altura, **não** número de animais.
 
 ### F-010 · Camada de confiança
 Cálculo de confiança por estimativa; faixas alta/média/baixa.
@@ -148,7 +168,8 @@ para colar em `05-PARAMETROS-CULTIVARES.md`.
 | `eficiencia_pastejo` (ingestão ÷ massa acima do resíduo) — ADR-010 | F-002 | 🔴 |
 | RUE de gramínea C4 tropical | F-006 | 🔴 |
 | `temperatura_base_c` de gramínea tropical | F-007 | 🟠 |
-| Pesos médios por categoria animal (bezerro!) | F-002 | 🟠 |
+| Pesos médios por categoria animal (bezerro) | F-002 | 🟡 rebaixado pela ADR-014 — a tabela de UA do `05` preenche o peso ausente; isto virou refinamento de precisão |
+| Altura por regime nas células vazias do `05` (Xaraés, *B. decumbens*, Massai, Zuri, Tamani) | F-003 | 🟠 |
 | Termos de uso atuais do Earth Engine | F-005 | 🟠 |
 | INMET vs. reanálise: qual fonte climática | F-007 | 🟡 |
 
@@ -161,6 +182,7 @@ para colar em `05-PARAMETROS-CULTIVARES.md`.
 | Schema de eventos e projeção de estado | antes de F-004 | ADR |
 | Estratégia de correção da âncora de satélite | antes de F-008 | ADR |
 | Pesos da função objetivo | antes de F-009 | ADR |
+| Fusão de lotes: calibrar o limiar de categoria compatível | antes de F-022 | ADR |
 | Hospedagem da API (Fly.io vs Render) | antes de F-015 | ADR |
 | Features do modelo de gap-filling | antes de F-016 | ADR |
 

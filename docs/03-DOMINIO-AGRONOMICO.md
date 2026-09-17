@@ -49,6 +49,12 @@ declarada, não uma omissão.
 
 Este é o conceito central do manejo rotacionado, e a razão é fisiológica, não arbitrária.
 
+> **A altura não é da cultivar — é do par cultivar × método de pastejo (ADR-014).** A mesma
+> cultivar tem alvo diferente em pastejo contínuo e em rotacionado, e em contínuo a grandeza
+> nem é "entrada/saída": é altura **máxima/mínima**, gatilho para aumentar ou reduzir a
+> lotação. Quando a combinação não tem fonte, o piquete fica `aguardando_parametro` e o sistema
+> pergunta a altura ao produtor, em vez de usar um valor plausível.
+
 O capim cresce e vai fechando o dossel. Quando intercepta **95% da luz incidente** (só 5%
 chega à base da planta), ele atinge o ponto de máxima produtividade: máxima quantidade de
 folhas, poucos talos, pouco material morto.
@@ -129,6 +135,14 @@ consumo_lote_dia (kg MS/dia) = Σ_categorias ( n_animais × peso_medio_kg × pct
 Faixa de `pct_consumo`: **2% a 3% do peso vivo**.
 Exemplo da literatura: recria de 300 kg a 2,2% → 6,6 kg MS/dia.
 
+**Quando o produtor não sabe o peso médio (ADR-014).** O sistema **não** troca de fórmula. Ele
+preenche o `peso_medio_kg` faltante a partir da tabela de UA do `05`:
+`peso_medio_kg = coeficiente_UA(categoria) × 450`, gravado com `origem: 'ua_tabela'` e
+`confianca: media`. Bezerro sai em 112,5 kg por esse caminho — abaixo do peso de desmama
+registrado no `05` (180–210 kg, confiança baixa). Subestimar peso subestima consumo e
+**superestima** dias de ocupação, que é o erro na direção do super-pastejo. Por isso o valor
+derivado nunca chega como confiança alta ao plano.
+
 ### 6.2. Forragem efetivamente disponível
 
 ```
@@ -184,6 +198,10 @@ Portanto ele valida consumo individual, % PV e taxa de utilização — **não**
 **1 UA = 450 kg de peso vivo** (algumas fontes usam 454 kg, ou definem 1 UA como consumindo
 12 kg MS/dia). Serve para normalizar lotes heterogêneos e para exibir taxa de lotação.
 Não entra no cálculo de ocupação — lá usamos peso vivo direto, que é mais preciso.
+
+A ADR-014 confirmou isso e acrescentou dois papéis sem mexer na fórmula: UA é **fonte de
+preenchimento** do `peso_medio_kg` ausente (§6.1) e é a **escala que ordena as categorias**
+para a regra de compatibilidade de fusão (§9.4). Fonte da tabela de coeficientes: `05`.
 
 ---
 
@@ -263,6 +281,19 @@ Flag booleana `indissoluvel`. O otimizador nunca propõe fusão desses.
 ### 9.4. Compatibilidade de fusão
 Se houver fusão, só entre categorias compatíveis. Não misturar bezerros com adultos:
 competição alimentar, risco de lesão, manejo sanitário diferente.
+
+**Regra formal (ADR-014, fecha DT11).** Ordene as categorias pelo coeficiente de UA do `05`
+(bezerro 0,25 · novilho 0,50–0,75 · adulto 1,00 · touro 1,25). Então:
+
+```
+compativel[a,b] = 1  ⟺  |ordem(a) − ordem(b)| ≤ 1
+```
+
+Dois lotes só são fundíveis se **todo** par de categorias entre eles for compatível. Com as
+três categorias do MVP isso dá exatamente o que o parágrafo acima dizia em prosa: bezerro com
+novilho pode, novilho com adulto pode, bezerro com adulto não. O limiar `≤ 1` é escolha nossa,
+não dado empírico — `HIPOTESE-CALIBRAR`, a calibrar na ADR de fusão de lotes prevista antes do
+F-022.
 
 ---
 

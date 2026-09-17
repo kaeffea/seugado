@@ -25,9 +25,21 @@ Concorrentes entregam mapa NDVI porque não têm quem formule isto.
 
 ## 2. Formulação
 
+### Escopo do problema diário (ADR-014)
+
+A formulação abaixo é do **pastejo rotacionado**. Piquete com `metodo_pastejo = continuo` fica
+**fora da variável de atribuição** `x[l,p,d]` — seu lote está fixado, e não existe variável
+inteira de número de animais no problema diário. Ele **continua** na projeção de estado e
+**continua** candidato na hierarquia do §4, porque é válvula de escape acima da fusão de lotes.
+
+O contínuo tem laço próprio, **semanal**, disparado por gatilho de altura
+(`altura_maxima_cm` / `altura_minima_cm` do bloco de regime da cultivar), que produz
+recomendação de **ajuste de lotação** em vez de movimentação. É a fatia **F-009B**, pós-MVP;
+até ela existir, piquete contínuo gera estado e alerta, não prescrição quantificada.
+
 ### Índices
 - `l ∈ L` — lotes
-- `p ∈ P` — piquetes
+- `p ∈ P` — piquetes **em pastejo rotacionado**
 - `d ∈ D` — dias do horizonte (14 a 30)
 
 ### Variável principal
@@ -55,9 +67,20 @@ y[l_org,l_dst] ∈ {0,1}  # fusão de lote (só quando acionada)
 | R7 | **Mão de obra** | `Σ_l move[l,d] ≤ capacidade_manejo[d]  ∀d` |
 | R8 | **Rotina** | `move[l,d] = 0` se `d ∉ dias_preferenciais` |
 | R9 | Lotes indissolúveis | `y[l,·] = 0  ∀l ∈ indissolúveis` |
-| R10 | Fusão só entre categorias compatíveis | `y[a,b] ≤ compatível[a,b]` |
+| R10 | Fusão só entre categorias compatíveis | `y[a,b] ≤ compatível[a,b]` — ver abaixo |
+| R11 | Piquete sem parâmetro não recebe lote | `x[l,p,d] = 0` se `resolver_parametros` devolve `faltantes` |
 
 **R7 e R8 são o diferencial.** Nenhum concorrente pesquisado modela mão de obra ou rotina.
+
+**R10, definido (ADR-014, fecha DT11).** `compatível[a,b] = 1 ⟺ |ordem(a) − ordem(b)| ≤ 1`,
+com `ordem` sendo a posição da categoria na escala de UA do `05` (bezerro 0,25 · novilho
+0,50–0,75 · adulto 1,00 · touro 1,25). Dois lotes são fundíveis só se **todo** par de
+categorias entre eles for compatível. O limiar `≤ 1` é **`HIPOTESE-CALIBRAR`** — escolha
+nossa, a calibrar na ADR de fusão de lotes prevista antes do F-022. Ver `03` §9.4.
+
+**R11 é a contrapartida da matriz esparsa.** Piquete cuja combinação cultivar × método de
+pastejo não tem altura conhecida fica `aguardando_parametro`: aparece no estado, não entra no
+plano, e vira pergunta ao produtor no cadastro (ADR-014).
 
 ### Função objetivo
 

@@ -261,6 +261,57 @@ inclui, obrigatoriamente:
 - a exigência de que o commit de renomeação seja puro (`R` no status, zero inserções);
 - a correção de caminho num commit **separado**, que é do testador e não do Arquiteto.
 
+## 7.3. Verificação de escrita: manifesto, não número solto
+
+**Regra, a partir de 17/09/2026:** runbook **nunca** carrega tamanho esperado em bytes nem
+`grep` de conteúdo escrito à mão. Essas checagens existiam por causa da gravação que truncava
+em silêncio (REV-006/REV-007), e elas **falharam como remédio** — no REV-008 reprovaram um
+disco que estava correto, duas vezes, pelo mesmo motivo:
+
+1. O Arquiteto escreveu o tamanho de `docs/10` no runbook e **depois editou `docs/10` de novo**.
+   O número no runbook virou fóssil no instante da edição seguinte.
+2. O Arquiteto pediu `grep aguardando_parametro` em `docs/02`, mas escreveu no glossário o
+   verbete "Aguardando parâmetro", com acento e espaço. A premissa nunca existiu no arquivo.
+
+Os dois erros têm a mesma raiz: **o runbook afirmava um fato sobre o disco que o Arquiteto
+digitou de memória**, e o disco continua mudando depois que o runbook é emitido — o que o
+próprio `CLAUDE.md` já diz ser normal e assíncrono.
+
+### O que substitui
+
+O Arquiteto verifica a própria escrita **no momento em que grava**: relê o arquivo de volta do
+disco e compara byte a byte com o que pretendia escrever. Isso é estritamente mais forte que
+um tamanho no runbook, e não pode envelhecer, porque acontece antes de o runbook existir.
+
+Depois de gravar, o Arquiteto emite um **manifesto** — `revisoes/MANIFESTO-<ID>.sha256`,
+gerado a partir dos bytes que estão no disco, nunca digitado à mão. O runbook então carrega
+**uma linha**:
+
+```bash
+sha256sum -c revisoes/MANIFESTO-<ID>.sha256
+```
+
+Propriedades que isso compra:
+- Nenhum número no runbook é escrito de memória, então não há premissa falsa a envelhecer.
+- Detecta truncamento, edição parcial e corrupção — tudo que o tamanho detectava, e mais.
+- Se o Arquiteto editar um documento depois de emitir o manifesto, ele emite manifesto novo.
+  Falha de `sha256sum -c` passa a significar **uma coisa só**: o disco não é o que o Arquiteto
+  gravou. É sinal verdadeiro, não ruído.
+
+### O que o Claude Code faz quando falha
+
+Igual a antes: **pare e relate**, nomeando os arquivos que o `sha256sum -c` marcou como
+`FAILED`. Não commite. Mas agora a falha é informativa — ela aponta o arquivo, não uma
+divergência de contagem que pode ser só o Arquiteto tendo editado de novo.
+
+### O que continua valendo
+
+Verificar **presença** de arquivo, classificar a árvore de trabalho (passo zero) e conferir
+escopo de `src/`/`tests/` por `git diff --stat` seguem exatamente como estão. O que sai é só
+a checagem de conteúdo escrita à mão dentro do runbook.
+
+---
+
 ## 8. Erros de método a evitar
 
 1. **Chat gigante que faz tudo.** Cada turno reprocessa o histórico inteiro.

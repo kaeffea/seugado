@@ -96,17 +96,31 @@ for o mesmo commit que o runbook queria, use a mensagem do runbook — não a ge
 `docs: <assunto>`. A genérica é para quando o passo zero está limpando o caminho de um
 runbook que trata de outra coisa.
 
-### Conferir conteúdo, não só presença
+### Conferir conteúdo por manifesto (`08` §7.3)
 
-Quando um runbook afirma que o Arquiteto já escreveu um arquivo, **confirme que a mudança
-está lá** antes de commitar — `git diff --stat` do arquivo, ou uma busca pelo conteúdo que o
-runbook descreve. Já aconteceu de um arquivo aparecer intacto no `git status` porque a
-escrita não sobreviveu no disco: o runbook dizia que `docs/05` tinha uma tabela nova e o
-arquivo estava na versão anterior. Commitar naquele estado teria deixado `docs/11` afirmando
-um bloqueio resolvido que `docs/05` não sustentava.
+A escrita do Arquiteto já truncou em silêncio neste projeto: um arquivo aparece intacto no
+`git status` porque a gravação não sobreviveu no disco. A defesa contra isso **não** é mais
+tamanho em bytes nem `grep` escrito à mão dentro do runbook — essa versão reprovou um disco
+correto no REV-008, porque o Arquiteto editava o documento depois de emitir o runbook.
 
-Premissa de runbook que não se confirma: **pare e relate**, nomeando o arquivo e o que
-faltou. Esse é o caso em que parar é certo.
+Agora o runbook que toca documentação traz **uma linha** de verificação:
+
+```bash
+sha256sum -c revisoes/MANIFESTO-<ID>.sha256
+```
+
+O manifesto é gerado pelo Arquiteto a partir dos bytes que ele acabou de gravar, nunca
+digitado de memória.
+
+- `sha256sum -c` **OK** em tudo → siga para o commit.
+- Qualquer `FAILED` → **pare e relate**, nomeando os arquivos marcados. Não commite: significa
+  que o disco não é o que o Arquiteto gravou.
+- Manifesto **ausente** quando o runbook o cita → pare e relate. Não invente a verificação
+  nem siga sem ela.
+
+Runbook que ainda traga tamanho em bytes ou `grep` de conteúdo é runbook antigo: **execute a
+checagem assim mesmo, mas se ela falhar e o manifesto passar, relate como premissa velha do
+runbook, não como disco corrompido.**
 
 ## Regras de verificação (ADR-011)
 
