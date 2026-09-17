@@ -85,6 +85,17 @@ prever quais arquivos de `docs/` estarão modificados quando você rodar. Arquiv
 a mais no diff **não é motivo para parar**: commite e registre no relatório o que entrou.
 A restrição de arquivos continua valendo integralmente para `src/` e `tests/`.
 
+**Verificação vem antes do commit, sempre.** Se o runbook tiver checagem de conteúdo sobre
+algum dos arquivos pendentes — tamanho esperado, `grep` de um trecho, qualquer premissa sobre
+o que deveria estar no arquivo — rode **essas checagens primeiro** e só depois commite. O
+passo zero existe para destravar o runbook, não para commitar sem olhar. Checagem que falha
+antes do commit é uma parada limpa; depois do commit, é um commit a reverter.
+
+**Mensagem do commit.** Se o runbook pedir uma mensagem específica e o commit do passo zero
+for o mesmo commit que o runbook queria, use a mensagem do runbook — não a genérica
+`docs: <assunto>`. A genérica é para quando o passo zero está limpando o caminho de um
+runbook que trata de outra coisa.
+
 ### Conferir conteúdo, não só presença
 
 Quando um runbook afirma que o Arquiteto já escreveu um arquivo, **confirme que a mudança

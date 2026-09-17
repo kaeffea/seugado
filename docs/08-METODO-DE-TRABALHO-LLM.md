@@ -238,6 +238,17 @@ runbook e a execução dele.** Regras que saem daí, para quem escreve runbook:
   aconteceu com `docs/05` em 17/09/2026, e só o testador pegou.
 - O Arquiteto confere as próprias escritas relistando o diretório depois de gravar. A
   confirmação da ferramenta de escrita não é prova de que o arquivo ficou no disco.
+  **Mecanismo identificado em 17/09/2026:** reaproveitar o mesmo caminho de origem em
+  escritas sucessivas fazia a gravação repetir o conteúdo da primeira vez — o arquivo era
+  tocado, o tamanho ficava o antigo, e a ferramenta reportava sucesso. Foi o que apagou a
+  tabela do CT-135 do `docs/05` e o que engoliu duas edições do `CLAUDE.md`. Contorno:
+  **caminho de origem novo e único a cada gravação**, e conferir o tamanho no disco depois.
+  Enquanto esse contorno estiver em uso, todo runbook que dependa de um arquivo escrito pelo
+  Arquiteto deve checar tamanho ou conteúdo esperado antes de commitar.
+- Quando o runbook **é** o commit da documentação pendente, dizer isso na abertura e colocar
+  as checagens de conteúdo **antes** do passo de commit, não numa seção que o executor lê
+  depois. O passo zero do `CLAUDE.md` commita; se a conferência vier depois, ela conferiu um
+  commit em vez de evitá-lo.
 
 ## 7.2. Runbook que move arquivo
 
