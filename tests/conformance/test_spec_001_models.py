@@ -20,7 +20,7 @@ import pytest
 from seugado.core import models
 
 ROOT = Path(__file__).resolve().parents[2]
-MODELS_PATH = ROOT / "seugado" / "core" / "models.py"
+MODELS_PATH = ROOT / "src" / "seugado" / "core" / "models.py"
 SOURCE = MODELS_PATH.read_text(encoding="utf-8")
 TREE = ast.parse(SOURCE)
 
@@ -471,8 +471,8 @@ def test_ac10_new_attributes_cannot_be_added(name):
 @pytest.mark.parametrize(
     "rel",
     [
-        "seugado/__init__.py",
-        "seugado/core/__init__.py",
+        "src/seugado/__init__.py",
+        "src/seugado/core/__init__.py",
         "tests/__init__.py",
         "tests/core/__init__.py",
     ],
