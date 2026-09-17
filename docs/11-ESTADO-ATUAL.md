@@ -39,7 +39,7 @@ Legenda: ⬜ não iniciada · 🟨 em andamento · 🔒 bloqueada · ✅ conclu�
 
 ## O que existe no repositório
 
-Layout definido pela ADR-013 (aplicado pelo RUNBOOK-REV-003):
+Layout da ADR-013, aplicado e verificado (RELATORIO-REV-004):
 
 ```
 C:\code\seugado                git, main, publicado no GitHub (privado)
@@ -56,7 +56,8 @@ C:\code\seugado                git, main, publicado no GitHub (privado)
 ```
 
 Commits: `73ff3af` fundação + F-001 · `d06880b` ADRs 010–012 · `354382b` uv.lock ·
-`3877064` dívida de lint zerada.
+`3877064` dívida de lint zerada · `91d115c` ADR-013 (16 arquivos renomeados, 0 alterações) ·
+`a1ef54e` caminhos hardcoded de `tests/conformance` para o src-layout.
 Ambiente: `.venv` por `uv` no WSL Ubuntu. O Windows hospedeiro não tem Python.
 Versões medidas: Python 3.12.3, pytest 9.1.1, ruff 0.16.8, mypy 2.3.1.
 Estado das ferramentas: `ruff check`, `ruff format --check`, `mypy` e `pytest` limpos, 157/157.
@@ -84,6 +85,7 @@ Estado das ferramentas: `ruff check`, `ruff format --check`, `mypy` e `pytest` l
 | ~~DT1~~ | ~~apontamentos de `ruff` e `mypy` em `tests/`~~ | — | ✅ resolvido em RELATORIO-REV-002 |
 | DT7 | O campo de instruções do Project descreve o fluxo antigo (entregar blocos para colar, pedir re-upload) | instruções do Project | usuário cola o `00` novo |
 | DT8 | `SPEC-001` contém arquivo de teste pronto, o que a ADR-011 passou a proibir | `specs/` | histórico; não reescrever |
+| DT10 | Caminhos `seugado/...` sem `src/` em `SPEC-001`, no texto da ADR-013 e no log de handoffs | `specs/`, `docs/12`, `docs/11` | **decidido: não corrigir.** São registros datados — a spec como foi emitida, a ADR descrevendo o estado anterior à própria decisão, e o log do dia. Corrigi apenas onde o caminho descreve o estado atual (`README`, árvore do `11`) |
 | DT2 | Contratos de `06` §3 divergem do modelo implementado (`Literal` vs enum, `list` vs `tuple`, frozen não declarado, `Movimentacao` ≡ `Manejo`?) | `06` §3 | ADR-014 |
 | DT3 | `Cultivar` exige todos os parâmetros; a recusa por `TODO-PARAM` precisa de dono | `core/` | ADR-015 |
 | DT4 | Convenções de enum e de entidade como chave de dict | `06` §7 (regras 11–12 já escritas) | ADR-016 confirma |
@@ -140,6 +142,15 @@ E `[APRENDER] Manejo de pastagens` a qualquer momento: é didático, não produz
 ## Log de handoffs
 
 _(Cole aqui o handoff de cada chat encerrado, mais recente no topo.)_
+
+**17/09/2026 — [ARQUITETURA] Revisão pós-F-001 (encerrado)**
+Feito: ADR-010 a ADR-013 aceitas e aplicadas. Layout reorganizado (`docs/`, `src/seugado/`)
+com histórico preservado por `git mv`. Quatro runbooks executados; 001, 002 e 004 aprovados,
+003 corretamente reprovado por pré-condição que eu mesmo havia quebrado — lição virou o
+"passo zero" do `CLAUDE.md` e a §7.1 do `08`. Quatro ferramentas limpas, 157/157.
+Pendente: B1–B7 (parâmetros), DT2, DT3, DT4 e DT9 → `[ARQUITETURA] REV-001 parte 2`,
+depois das quatro pesquisas.
+Próximo: `[PESQUISA] Régua de Manejo Embrapa (CT 125)`, em Sonnet, esforço médio.
 
 **17/09/2026 — [ARQUITETURA] Revisão pós-F-001**
 Feito: ADR-010, 011 e 012 aceitas e aplicadas em `02`, `03`, `05`, `06`, `07`, `08`, `09`,

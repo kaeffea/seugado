@@ -28,7 +28,7 @@ decisão é tomada no olho ou em calendário fixo.
 |---|---|
 | Base de conhecimento (13 documentos) | pronta |
 | Repositório com git, ambiente e ferramentas | pronto |
-| Modelo de domínio em código (`seugado/core/models.py`) | pronto, 157 testes passando |
+| Modelo de domínio em código (`src/seugado/core/models.py`) | pronto, 157 testes passando |
 | Cálculos de forragem, regras, satélite, otimizador, mensagem | **nada ainda** |
 
 Estamos na fundação. Duas fatias concluídas de 22. O que trava o avanço agora **não é código**:

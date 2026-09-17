@@ -222,6 +222,17 @@ e sincronizar o Knowledge. O Arquiteto escreve os documentos; ninguém pede que 
 
 ---
 
+## 7.1. Runbook que move arquivo
+
+Reorganizar layout parece trivial e tem um ponto cego provado: a suíte de
+`tests/conformance/` lê o código-fonte por caminho literal (para checar estrutura via AST),
+então mover o pacote quebra a suíte sem quebrar nenhum import. Todo runbook que move arquivo
+inclui, obrigatoriamente:
+
+- um passo explícito de **atualizar caminho hardcoded em `tests/conformance/`**;
+- a exigência de que o commit de renomeação seja puro (`R` no status, zero inserções);
+- a correção de caminho num commit **separado**, que é do testador e não do Arquiteto.
+
 ## 8. Erros de método a evitar
 
 1. **Chat gigante que faz tudo.** Cada turno reprocessa o histórico inteiro.
