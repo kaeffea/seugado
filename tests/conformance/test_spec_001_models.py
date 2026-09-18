@@ -135,6 +135,8 @@ DATACLASSES = {
         ("registrado_em", "datetime", NO_DEFAULT),
         ("payload", "dict[str, Any]", NO_DEFAULT),
         ("origem", "OrigemEvento", NO_DEFAULT),
+        ("sequencia", "int", NO_DEFAULT),
+        ("corrige_evento_id", "UUID | None", None),
     ],
 }
 
@@ -182,6 +184,7 @@ def _sample(name: str) -> typing.Any:
             datetime(2026, 1, 1, tzinfo=UTC),
             {},
             models.OrigemEvento.PRODUTOR,
+            1,
         ),
     }
     return builders[name]()
@@ -594,6 +597,7 @@ def test_finding_naive_datetimes_are_accepted():
         datetime(2026, 1, 1),
         {},
         models.OrigemEvento.PRODUTOR,
+        1,
     )
     assert e.ocorrido_em.tzinfo is None
 

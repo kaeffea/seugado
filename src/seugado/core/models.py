@@ -189,3 +189,5 @@ class Evento:
     registrado_em: datetime  # when the system learned about it
     payload: dict[str, Any]
     origem: OrigemEvento
+    sequencia: int  # write order, assigned by the database
+    corrige_evento_id: UUID | None = None  # set when this event corrects another

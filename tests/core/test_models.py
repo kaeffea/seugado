@@ -135,6 +135,7 @@ def test_evento_payload_is_opaque():
         registrado_em=datetime(2026, 3, 12, 9, 5, tzinfo=UTC),
         payload={"anything": [1, 2, 3]},
         origem=OrigemEvento.SATELITE,
+        sequencia=1,
     )
     assert e.payload["anything"] == [1, 2, 3]
     assert e.ocorrido_em < e.registrado_em
