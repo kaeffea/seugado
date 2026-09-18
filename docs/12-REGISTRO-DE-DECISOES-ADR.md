@@ -454,6 +454,281 @@ de fusão de lotes prevista antes do F-022.
 
 ---
 
+## ADR-016 — Custo espacial no otimizador: distância entra no MVP, grafo de porteiras fica para depois
+**Data:** 18/09/2026 · **Status:** aceita
+
+**Contexto.** Toda a formulação do `07` era **espacialmente cega**: `x[l,p,d]` trata os piquetes
+como intercambiáveis e nenhuma restrição ou termo de objetivo olha onde eles ficam. O resultado
+é o plano que o produtor rejeita antes de ler o motivo — dois lotes atravessando a fazenda em
+sentidos opostos quando bastava cada um andar até o vizinho. O dado para evitar isso já existe e
+nunca foi usado: `piquete.geometria GEOMETRY(Polygon,4326)` no `06` §5.
+
+**Decisão.** Três partes, uma por estágio do otimizador (ADR-008):
+
+1. **Matriz de distância por centroide.** `dist[p_origem, p_destino]`, em metros, derivada da
+   geometria via PostGIS (`ST_Distance` sobre centroides reprojetados para CRS métrico),
+   calculada uma vez por fazenda e invalidada quando a geometria de um piquete muda. É **dado
+   derivado, não cadastro novo**: fricção adicional para o produtor é zero.
+2. **No F-009 (guloso), a distância é critério de desempate, não termo de objetivo.** O guloso
+   não tem função objetivo para ponderar. A ordem de escolha do destino passa a ser:
+   (a) piquetes aptos (R3, R11), (b) melhor encaixe agronômico — o mais próximo do alvo de
+   entrada, (c) **menor `dist` a partir do piquete atual do lote**. O item (c) é o que esta ADR
+   acrescenta e custa uma ordenação.
+3. **No F-021 (CP-SAT), a distância vira termo da função objetivo:** `− w6 · custo_espacial`,
+   com `custo_espacial = Σ_l Σ_d dist[origem(l,d), destino(l,d)] · peso_vivo_total[l]`. A
+   multiplicação pelo peso vivo é deliberada: caminhar 3 km com 200 bois não custa o mesmo que
+   com 20 bezerros. `w6` é **`HIPOTESE-CALIBRAR`**, a fixar na ADR de pesos da função objetivo
+   prevista antes do F-009.
+
+**Por que o centroide já resolve a queixa que originou esta ADR.** A reclamação é sobre rotas
+que se cruzam. Num problema de atribuição bipartida com custo euclidiano, **a solução de custo
+mínimo nunca tem rotas cruzadas**: se duas atribuições se cruzam, trocar os destinos entre elas
+reduz a soma das distâncias pela desigualdade triangular, logo a solução cruzada não era mínima.
+A garantia sobrevive à troca de distância euclidiana por distância de caminho mínimo num grafo,
+porque a desigualdade triangular vale em ambas. Isto é resultado, não heurística: **minimizar a
+distância total elimina o cruzamento absurdo por construção.**
+
+**Alternativas.**
+
+(a) **Grafo de porteiras com caminho mínimo.** Tecnicamente superior e agronomicamente mais
+honesto: gado anda por porteira e corredor, não em linha reta, e um trajeto pode atravessar um
+piquete em descanso — pisoteio que o centroide não enxerga. **Rejeitada para o MVP** porque
+exige cadastrar as conexões entre piquetes, que é fricção de configuração real e não trivial de
+desenhar num mapa. Fica registrada como candidata pós-MVP; **condição de entrada:** validação em
+fazenda real mostrar que a distância de centroide gera rota inaceitável. Enquanto isso, a
+premissa é explícita — ver Consequências.
+
+(b) **Substituir `w3 · numero_de_movimentacoes` por `w_dist · distância`.** Rejeitada: são custos
+diferentes e ambos reais. O número de movimentações consome mão de obra (já limitada por R7); a
+distância consome tempo de caminhamento e desgasta o animal. Os dois termos coexistem.
+
+(c) **Restrição dura de não-cruzamento.** Desnecessária — o resultado acima mostra que o termo
+de distância já a entrega.
+
+**Consequências.**
+
+- Vale para o F-009 em diante. **Não** muda F-001 a F-008; nenhuma fatia concluída é reaberta.
+- O `[ARQUITETURA] Schema de eventos` (antes do F-004) passa a ter um item a mais: onde mora a
+  matriz de distância — tabela materializada, view PostGIS ou cache em memória do job diário.
+- **Premissa explicitada, e é risco.** O modelo de distância assume que um lote consegue ir de
+  qualquer piquete a qualquer outro, e que **todo piquete tem água**. Fazenda com bebedouro
+  central, corredor único ou piquete sem água quebra a premissa em silêncio. Não vira campo de
+  cadastro no MVP; vira pergunta na primeira validação em campo, e é o gatilho da alternativa (a).
+- O guloso continua sem *lookahead*. O cenário "vale a pena esperar dois dias pelo piquete
+  vizinho?" **não é resolvido no MVP** — ver a nota de horizonte no `07` §5.
+
+---
+
+## ADR-018 — Schema de eventos: append-only no banco, projeção como dobra pura, matriz de distância é projeção
+**Data:** 18/09/2026 · **Status:** aceita
+
+**Contexto.** A ADR-007 decidiu event sourcing e o `06` §4 esboçou uma tabela `eventos` de sete
+colunas. O esboço não responde o que o F-004 precisa: quem impede que alguém edite o passado, em
+que ordem os eventos são relidos quando um fato chega atrasado, onde mora o estado derivado, como
+se corrige um evento errado e o que acontece quando o pipeline diário roda duas vezes. A ADR-016
+deixou um item explícito para cá: onde mora a matriz de distância.
+
+**Decisão.** Cinco partes.
+
+**1. Tabela `evento`, no singular, append-only garantido pelo banco.**
+
+```sql
+CREATE TABLE evento (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  fazenda_id         UUID NOT NULL REFERENCES fazenda(id),
+  sequencia          BIGINT GENERATED ALWAYS AS IDENTITY,
+  tipo               TEXT NOT NULL REFERENCES tipo_evento(tipo),
+  origem             TEXT NOT NULL REFERENCES origem_evento(origem),
+  ocorrido_em        TIMESTAMPTZ NOT NULL,
+  registrado_em      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ator               TEXT,          -- id do produtor, ou nome do job que gerou
+  corrige_evento_id  UUID REFERENCES evento(id),
+  chave_idempotencia TEXT,
+  versao_payload     SMALLINT NOT NULL DEFAULT 1,
+  payload            JSONB NOT NULL,
+  entidade_id        UUID GENERATED ALWAYS AS ((payload->>'entidade_id')::uuid) STORED,
+  UNIQUE (fazenda_id, chave_idempotencia)
+);
+
+CREATE INDEX ON evento (fazenda_id, ocorrido_em, sequencia);   -- ordem de releitura
+CREATE INDEX ON evento (fazenda_id, entidade_id);              -- "eventos do piquete X"
+CREATE INDEX ON evento (fazenda_id, tipo, ocorrido_em);
+
+REVOKE UPDATE, DELETE ON evento FROM PUBLIC;  -- e dos papéis da aplicação no Supabase
+-- + trigger BEFORE UPDATE OR DELETE que levanta exceção, para fechar o caminho do dono
+```
+
+Duas colunas de tempo com papéis distintos: **`ocorrido_em` é a ordem do mundo**, `sequencia` é a
+ordem de gravação. A releitura ordena por `(ocorrido_em, sequencia)` — determinística mesmo quando
+o produtor confirma hoje um manejo de ontem. `sequencia` também é o marcador de até onde cada
+projeção foi derivada.
+
+`tipo` e `origem` são `TEXT` com FK para tabela de domínio, **não** `CREATE TYPE`: acrescentar um
+tipo de evento vira `INSERT`, não migração de tipo, e não se cria no banco a comparação entre enums
+que o `06` §7 regra 11 proíbe. O `StrEnum` Python continua sendo a fronteira, usando `.value`.
+
+`entidade_id` é coluna gerada a partir do payload e indexada, porque "todos os eventos do piquete X"
+é a consulta que auditoria, tela de histórico e debug fazem. **Todo payload carrega `entidade_id`**;
+quem valida é um modelo Pydantic por `tipo`, na porta única de escrita (`persistencia/eventos.py`,
+função `registrar_evento`). Nenhum outro caminho escreve em `evento`.
+
+**2. Correção é evento novo, nunca `UPDATE`.** `corrige_evento_id` aponta o evento errado. A dobra
+faz uma pré-passagem montando o conjunto de ids corrigidos; o evento corrigido é ignorado e a
+correção entra **na posição temporal do corrigido**, não na dela própria. Sem isso, corrigir a data
+de um manejo reordenaria a história e mudaria estado que não deveria mudar.
+
+**3. `chave_idempotencia` existe porque o pipeline é re-disparável.** O `06` §6 permite
+`workflow_dispatch`, e GitHub Actions re-executa job falho. Sem chave, a releitura de satélite do
+dia entra duas vezes e a massa é contada em dobro. A chave é determinística por natureza do fato —
+para leitura de satélite, `leitura:<piquete_id>:<data>`.
+
+**4. Projeção é dobra pura em `core/projecao.py`; o banco guarda só a entrada e a saída.**
+
+```python
+def projetar(eventos: Sequence[Evento]) -> EstadoFazenda: ...
+```
+
+Sem I/O, sem banco, testável com lista literal de eventos — a mesma disciplina do `06` §2. As
+tabelas derivadas são `estado_piquete`, `estado_lote`, `leitura` e `piquete_distancia`; cada uma
+carrega `derivado_ate_sequencia` e `derivado_em`, e a reconstrução é `DELETE` + `INSERT` da fazenda
+inteira numa transação. **Tabela derivada nunca recebe escrita de outro lugar.**
+
+Cuidado de nome, porque "projeção" passa a ter dois sentidos no projeto e confundi-los é bug:
+`core/projecao.py` dobra **o passado até o presente** (F-004); `planner/estado.py` projeta **o
+presente para a frente no tempo** (F-008, o marco ⭐). Módulos separados, propósitos separados.
+
+**Sem snapshot no MVP.** Uma fazenda de 80 piquetes gera da ordem de 35 mil eventos por ano,
+dominados por leitura de satélite; dobrar isso em Python leva menos de um segundo. Snapshot é
+complexidade que só se paga depois. **Condição de entrada:** releitura completa passar de 2 s
+medidos — aí entra tabela `snapshot(fazenda_id, ate_sequencia, estado JSONB)` e a dobra passa a
+partir dela.
+
+**5. A matriz de distância da ADR-016 é projeção, não cadastro.** Tabela materializada
+`piquete_distancia (fazenda_id, piquete_origem_id, piquete_destino_id, distancia_m)`, preenchida por
+`ST_Distance` sobre centroides reprojetados para CRS métrico, reconstruída pela mesma dobra quando
+a releitura encontra `piquete_criado` ou `piquete_alterado` com mudança de geometria. 80 piquetes
+dão 6.400 linhas — custo irrelevante.
+
+**Alternativas.**
+- *View PostGIS para a distância* — recalcula O(n²) a cada rodada do guloso, e o guloso consulta a
+  matriz em todo passo de escolha de destino.
+- *Cache em memória do job diário* — o job do GitHub Actions é sem estado e morre a cada execução;
+  o cache nunca sobreviveria entre a rodada de ingestão e a de planejamento.
+- *Tabelas de estado mutáveis, atualizadas a cada evento* — é o estado mutável que a ADR-007
+  rejeitou, entrando pela porta dos fundos. Derivada reconstruída não pode divergir da fonte.
+- *`CREATE TYPE` para `tipo` e `origem`* — cada tipo novo vira migração, e `ALTER TYPE ... ADD VALUE`
+  não roda dentro de transação em todas as versões. FK resolve com `INSERT`.
+- *Manter `leitura` como tabela-fonte, escrita direto pela ingestão* — cria um segundo caminho de
+  escrita e duas verdades sobre o mesmo fato, já que `leitura_satelite` também é evento.
+
+**Consequências.**
+- **F-004 ganha escopo fechado:** migração SQL, `registrar_evento` com validação Pydantic por tipo,
+  `core/projecao.py` com a dobra, e as quatro tabelas derivadas. `piquete_distancia` entra aqui
+  ainda que só o F-009 a use — é a dobra que a mantém coerente.
+- **`leitura` deixa de ser tabela-fonte e vira derivada.** O F-005 passa a gravar evento
+  `leitura_satelite`, não linha em `leitura`. Ajuste no `06` §5, sem fatia reaberta.
+- `Cultivar` passa a ser **sempre carregada no contexto de uma fazenda**: o override de
+  `parametro_fazenda` (ADR-014) é aplicado na camada de carga, que monta o bloco de regime com
+  `fonte: 'produtor:<fazenda_id>'` e `confianca: baixa`. A assinatura pura de `resolver_parametros`
+  da SPEC-004 fica **intacta** — `core/` continua sem saber o que é fazenda.
+- Auditoria fica completa de verdade: `ator`, `origem`, `corrige_evento_id` e as duas colunas de
+  tempo respondem "por que recomendou isso em 12/03, e com que dado, sabido quando".
+- Custo honesto: toda escrita passa por uma função só, e toda leitura de estado depende de uma
+  dobra ter rodado. Fazenda sem projeção derivada não tem estado — o pipeline precisa garantir a
+  ordem ingestão → dobra → plano.
+
+---
+
+## ADR-019 — Confiança é o elo mais fraco, não um produto (fecha Q14)
+**Data:** 18/09/2026 · **Status:** aceita
+
+**Contexto.** Q14 perguntava duas coisas: se o parâmetro de cultivar precisa de `confianca` própria
+além da `fonte`, e se a confiança final da recomendação é composição da confiança da estimativa com
+a do parâmetro. A pergunta ficou marcada para cá porque o `01` exige, na definição de pronto, que
+toda recomendação carregue confiança, e porque confiança `baixa` é o gatilho do pedido de foto.
+
+**Decisão.** Cinco partes.
+
+1. **O campo já existe.** `ParametrosRegime.confianca` entrou com a ADR-014. Q14 não pede campo
+   novo; pede a regra de composição, que é o que falta.
+2. **A composição é o mínimo numa escala ordenada, não um produto.** Função pura
+   `combinar_confianca(*fatores: Confianca) -> Confianca` em `core/regras.py`, com a ordem
+   declarada num `dict` explícito (`baixa` 0 · `media` 1 · `alta` 2). A ordem **nunca** vem de
+   comparação de enum — `06` §7 regra 11.
+3. **Três fatores no MVP**, e a lista é fechada: confiança da estimativa de forragem
+   (`EstimativaForragem.confianca`), confiança do parâmetro de regime resolvido, e confiança do peso
+   (`origem_peso: 'produtor'` → alta; `'ua_tabela'` → média, conforme ADR-014).
+4. **Toda recomendação carrega `confianca` e `motivo_confianca`** — o nome do elo mais fraco, em
+   PT-BR, pronto para a mensagem: *"confiança baixa porque a altura de entrada foi informada por
+   você, não por fonte técnica"*. Empate entre fatores no mesmo grau: vence a ordem da lista acima.
+5. **`baixa` dispara o pedido de foto de validação** do `01`. É a única consequência automática de
+   grau de confiança no MVP.
+
+**Por que não produto.** Multiplicar exige mapear três graus em números — 1,0 / 0,7 / 0,4, ou outra
+escolha qualquer — que ninguém tem fonte para justificar. Seria `HIPOTESE-CALIBRAR` criada à toa,
+contra a regra 1. O mínimo é monótono, não degrada por acumular fatores bons, e é explicável em uma
+frase ao produtor: a recomendação vale o que vale o dado mais fraco que entrou nela.
+
+**Alternativas.**
+- *Produto de pesos numéricos* — ver acima; inventa número e ainda faz três fatores "alta" virarem
+  confiança menor que um fator "alta", o que é falso.
+- *Confiança só da estimativa de satélite* — esconde exatamente o caso que a ADR-014 criou: altura
+  dada pelo produtor, em piquete com estimativa ótima. Seria mentir com número bom.
+- *Escala numérica contínua (0 a 1) em vez de três graus* — dá falsa precisão e não tem como ser
+  calibrada sem dado de campo que o projeto não tem.
+
+**Consequências.**
+- `planner/confianca.py` fica reduzido a montar a lista de fatores e chamar o primitivo puro; a
+  regra de combinação mora em `core/`, onde é testável sem banco.
+- A fatia F-010 (camada de confiança) encolhe e deixa de depender de pesquisa.
+- `motivo_confianca` vira campo obrigatório de `Movimentacao` e `Alerta`, tocando o contrato do
+  `06` §3 — alteração feita agora, antes de existir implementação que dependa dele.
+- Q14 fecha. Nenhuma fatia concluída é reaberta.
+
+---
+
+## ADR-020 — Driver de banco, migrações como SQL puro, e teste de I/O opcional (F-004)
+**Data:** 18/09/2026 · **Status:** aceita
+
+**Contexto.** A ADR-018 fechou o schema da tabela `evento` e das derivadas, mas não escolheu como o
+Python fala com o Postgres. O `06` §1 lista "PostgreSQL + PostGIS via Supabase" como banco, sem
+biblioteca cliente. `pyproject.toml` hoje tem `dependencies = []` — a F-004 é a primeira fatia a
+tocar I/O de verdade, e sem decisão aqui o Muse Code escolhe sozinho, o que a regra 7 do `06` §7
+proíbe. Falta também dizer como o `pytest` do Antigravity, rodando no WSL sem Postgres à mão, lida
+com um teste que precisa de banco de verdade.
+
+**Decisão.** Três partes.
+
+1. **Driver: `psycopg` (v3, síncrono, extra `binary`).** Sem ORM. SQL puro nas funções de
+   persistência, coerente com "stack madura, muita documentação" do `06` (topo do arquivo) e com o
+   projeto não ter modelado nenhuma camada de ORM em nenhuma ADR anterior. `pydantic` entra junto,
+   como dependência própria (já implícita no `06` §1 via FastAPI, agora explícita porque é usada
+   antes de existir API).
+2. **Migração é arquivo SQL versionado, sem framework.** `db/migrations/0001_evento_e_derivadas.sql`,
+   numerado, aplicado manualmente pelo Antigravity (`psql` ou SQL Editor do Supabase). Alembic ou
+   equivalente adicionaria ORM implícito e uma segunda fonte de verdade sobre o schema; o projeto
+   já tem uma — o próprio SQL.
+3. **Teste de I/O é opcional, não bloqueante.** Testes que abrem conexão real leem
+   `SEUGADO_TEST_DATABASE_URL` do ambiente; ausente, o teste é pulado (`pytest.mark.skipif`), nunca
+   falha. A validação Pydantic por tipo — a parte que a regra 1 do `06` §7 e a regra de pureza mais
+   se importam em cobrir sem banco — é testada sempre, sem depender de conexão.
+
+**Alternativas.**
+- *`asyncpg` / stack assíncrona* — FastAPI se beneficiaria, mas o pipeline diário (`06` §6) é um
+  job síncrono do GitHub Actions; async sem servidor rodando o event loop é complexidade sem uso.
+- *SQLAlchemy Core ou ORM* — mais familiar, mas é a stack "elegante mas rara" que o topo do `06`
+  pede para evitar num agente de contexto curto; SQL puro com `psycopg` é mais previsível para ele.
+- *Exigir Postgres local (Docker) para rodar a suíte* — contradiz "custo R$ 0,00" e "sem servidor";
+  o ambiente de teste do Antigravity é o WSL, sem Docker garantido.
+
+**Consequências.**
+- `pyproject.toml` ganha duas dependências novas: `psycopg[binary]`, `pydantic`.
+- Toda spec de persistência a partir daqui referencia esta ADR em vez de reabrir a escolha.
+- O teste de conformidade de I/O real fica pendente até existir um projeto Supabase configurado —
+  registrado como item de dívida técnica, não como bloqueio da F-004.
+
+---
+
 ## Template para novas ADRs
 
 ```markdown

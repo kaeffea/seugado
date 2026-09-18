@@ -94,9 +94,10 @@ O MVP está pronto quando, para uma fazenda real com piquetes desenhados:
 Registro de ideia boa que apareceu fora de hora. Nada aqui está aprovado; entrar em escopo
 exige ADR. O propósito da seção é não perder a ideia nem deixá-la contaminar o MVP.
 
-### Migração assistida de contínuo para rotacionado
+### Planejador de capacidade — migração assistida entre regimes, nos dois sentidos
 **Origem:** o usuário, 17/09/2026, ao descobrir que contínuo e rotacionado são métodos
 distintos e que a escolha é da fazenda, não da geografia.
+**Ampliada em 18/09/2026, pelo usuário:** a migração não tem um sentido só.
 
 O rotacionado dá resultado melhor, mas exige cerca, água em cada piquete e mão de obra — é
 investimento que trava o pequeno produtor no método pior. Um sistema que já sabe estimar
@@ -108,6 +109,25 @@ Por que é forte: transforma o produto de "ferramenta para quem já rotaciona" e
 para quem quer rotacionar", o que multiplica o mercado endereçável — e é exatamente o tipo
 de análise que ninguém entrega hoje. Por que não entra agora: depende de F-008 (projeção de
 estado) funcionando, e de dado de custo de cerca e de água que o projeto não tem.
+
+**A ampliação de 18/09/2026.** O enquadramento original era de mão única — levar quem está em
+contínuo para rotacionado, porque rotacionado é melhor. O enquadramento novo é melhor de
+verdade: o sistema pergunta **qual é a ambição do produtor** e planeja na direção que ele
+escolher. Há duas, e são legítimas:
+
+- *"Quero produzir mais por hectare"* → caminho para o rotacionado: quantos piquetes, de que
+  tamanho, em que ordem de cerca e de água.
+- *"Quero trabalhar menos"* → caminho para o contínuo bem dimensionado, ou para um rotacionado
+  de ciclo longo: menos divisões, lotes redimensionados, menos manejo por semana.
+
+O que torna isto produto e não consultoria é que as duas direções usam **o mesmo motor**: em
+ambas a alavanca é o dimensionamento — quantos animais por piquete, de que tamanho. O que muda é
+a função objetivo. Vale registrar a correção agronômica que o usuário fez a si mesmo no caminho:
+a intuição de "lote pequeno num piquete grande fica parado mais tempo, logo dá menos trabalho"
+está **invertida**. Ocupação longa é justamente o sub-pastejo que o produto existe para evitar —
+o gado colhe o melhor, pisoteia o resto e o capim passa do ponto. A alavanca para reduzir
+trabalho **não** é emparelhar lote pequeno com piquete grande; é dimensionar piquete e lote,
+que é precisamente esta ideia.
 
 **Condição de entrada:** MVP completo (F-015) e ADR própria. Se sobrar tempo antes disso,
 é a primeira candidata da fila.

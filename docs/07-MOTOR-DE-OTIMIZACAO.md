@@ -63,7 +63,7 @@ y[l_org,l_dst] ∈ {0,1}  # fusão de lote (só quando acionada)
 | R3 | Só entra em piquete apto | `x[l,p,d] ≤ apto[p,d]` |
 | R4 | Nunca abaixo do resíduo mínimo | `massa[p,d] ≥ residuo_min[p]` |
 | R5 | Descanso mínimo respeitado | ver §3 |
-| R6 | Ocupação dentro da faixa da cultivar | `1 ≤ ocupação ≤ 3 dias` (configurável) |
+| R6 | Ocupação dentro da faixa da cultivar | `1 ≤ ocupação ≤ 3 dias` (configurável) — ver nota de assimetria abaixo |
 | R7 | **Mão de obra** | `Σ_l move[l,d] ≤ capacidade_manejo[d]  ∀d` |
 | R8 | **Rotina** | `move[l,d] = 0` se `d ∉ dias_preferenciais` |
 | R9 | Lotes indissolúveis | `y[l,·] = 0  ∀l ∈ indissolúveis` |
@@ -77,6 +77,16 @@ com `ordem` sendo a posição da categoria na escala de UA do `05` (bezerro 0,25
 0,50–0,75 · adulto 1,00 · touro 1,25). Dois lotes são fundíveis só se **todo** par de
 categorias entre eles for compatível. O limiar `≤ 1` é **`HIPOTESE-CALIBRAR`** — escolha
 nossa, a calibrar na ADR de fusão de lotes prevista antes do F-022. Ver `03` §9.4.
+
+**R6 precisa de assimetria, e ainda não tem.** A faixa 1–3 dias tem fonte (`03` §5), mas hoje é
+dura nos dois lados, e os dois lados não têm o mesmo custo. Estourar **3 dias** faz o gado comer
+a rebrota da própria planta — dano agronômico, que é o erro que o produto existe para evitar.
+Ficar **abaixo de 1 dia** é só incômodo operacional: acontece sempre que o lote é grande demais
+para o piquete, e numa fazenda com lotes grandes e piquetes pequenos torna **todo** par
+`(lote, piquete)` inviável — o modelo volta sem solução em vez de voltar com um plano ruim.
+Decisão pendente: limite superior duro, limite inferior *soft* com penalidade. Fica para a **ADR
+de pesos da função objetivo**, prevista antes do F-009 (`10`), junto com `w6`. Registrada como
+**Q13** no `11`.
 
 **R11 é a contrapartida da matriz esparsa.** Piquete cuja combinação cultivar × método de
 pastejo não tem altura conhecida fica `aguardando_parametro`: aparece no estado, não entra no
@@ -93,9 +103,15 @@ maximizar:
   − w3 · numero_de_movimentacoes
   − w4 · penalidade_violacao_residuo_soft
   − w5 · desvio_da_rotina_preferida
+  − w6 · custo_espacial
 ```
 
-Pesos iniciais: `w1=1.0, w2=0.8, w3=0.3, w4=5.0, w5=0.2` — **`HIPOTESE-CALIBRAR`**.
+`custo_espacial = Σ_l Σ_d dist[origem(l,d), destino(l,d)] · peso_vivo_total[l]` (ADR-016).
+Multiplicar pelo peso vivo é deliberado: mover 200 bois por 3 km não custa o mesmo que mover 20
+bezerros. `dist` é a matriz de distância entre centroides de piquete, derivada da geometria que o
+`06` §5 já guarda. Este termo é o que impede o plano de rotas cruzadas — ver a prova na ADR-016.
+
+Pesos iniciais: `w1=1.0, w2=0.8, w3=0.3, w4=5.0, w5=0.2, w6` a definir — **`HIPOTESE-CALIBRAR`**.
 Não são dado empírico e não estão sujeitos à regra 1 (ver `05`, "Escopo desta regra"):
 são escolha de projeto, a ser calibrada na ADR de pesos da função objetivo, prevista
 antes do F-009. `w4` alto de propósito: violar resíduo degrada o pasto por temporadas,
@@ -148,8 +164,20 @@ Transparência aqui não é cortesia — é o que faz o produtor confiar no moto
 
 ### Estágio 1 — Heurística gulosa (F-009)
 Ordena por urgência: quem precisa sair já > quem está no ponto > quem pode esperar.
-Aloca ao melhor piquete apto disponível.
+Aloca ao melhor piquete apto disponível, escolhido nesta ordem: **(a)** apto por R3 e R11,
+**(b)** melhor encaixe agronômico — o mais próximo do alvo de entrada, **(c)** menor `dist` a
+partir do piquete atual do lote. O critério (c) é a distância entrando como **desempate**, não
+como termo de objetivo: o guloso não tem função objetivo para ponderar (ADR-016).
 Sem lookahead. **Já é infinitamente melhor que mapa NDVI.**
+
+> **O que o guloso não faz, e é bom saber antes de prometer.** "Vale a pena esperar dois dias
+> pelo piquete vizinho ficar pronto, em vez de mandar o lote para o piquete distante hoje?" é
+> exatamente a pergunta que um algoritmo sem lookahead **não** responde. Ela só é resolvida de
+> verdade no Estágio 3. Meio-termo barato, se o F-009 se mostrar curto demais na validação:
+> como o F-008 já projeta massa para os próximos dias, o guloso pode considerar apto não só
+> `apto[p,hoje]` mas `apto[p, hoje+k]` para `k ≤ 2`, e comparar "esperar k dias" com "ir agora
+> para o mais distante". É um lookahead de horizonte fixo, não busca — não vira CP-SAT
+> disfarçado. **Não** entra no F-009 sem ADR; registrado como **Q15** no `11`.
 Serve de baseline para medir os estágios seguintes.
 
 ### Estágio 2 — Busca local (F-020, pós-MVP)

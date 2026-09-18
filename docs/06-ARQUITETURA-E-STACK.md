@@ -60,14 +60,16 @@ src/seugado/
 ├── core/           # entidades e regras puras. SEM I/O, SEM rede, SEM banco.
 │   ├── models.py         # Piquete, Lote, Cultivar, Manejo, Evento
 │   ├── forragem.py       # massa↔altura, consumo, dias de ocupação
-│   └── regras.py         # apto para entrada? precisa sair? urgência?
+│   ├── regras.py         # apto para entrada? precisa sair? urgência? confiança combinada
+│   └── projecao.py       # dobra pura: eventos do passado → estado atual (ADR-018)
 ├── sensing/        # sensoriamento remoto
 │   ├── earth_engine.py   # cliente GEE, amostragem por geometria
 │   ├── safer.py          # as 11 equações, funções puras
 │   ├── clima.py          # ingestão climática, graus-dia, ET₀
 │   └── gapfill.py        # modelo SAR→NDVI
 ├── planner/        # decisão
-│   ├── estado.py         # projeção diária do estado dos piquetes
+│   ├── estado.py         # projeção do presente para a FRENTE no tempo (F-008).
+│   │                     # Não confundir com core/projecao.py, que dobra o passado
 │   ├── otimizador.py     # CP-SAT
 │   └── confianca.py      # cálculo de confiança
 ├── delivery/       # saída
@@ -155,8 +157,15 @@ class Movimentacao:
     piquete_origem_id: UUID | None
     piquete_destino_id: UUID
     dias_previstos: int
-    motivo: str          # texto em PT-BR, legível pelo produtor
-    confianca: str
+    motivo: str               # texto em PT-BR, legível pelo produtor
+    confianca: Confianca
+    motivo_confianca: str     # elo mais fraco, em PT-BR (ADR-019). Obrigatório
+
+# eventos → estado: dobra PURA, sem I/O (ADR-018)
+def projetar(eventos: Sequence[Evento]) -> EstadoFazenda: ...
+
+# core → core: composição de confiança pelo elo mais fraco (ADR-019)
+def combinar_confianca(*fatores: Confianca) -> Confianca: ...
 ```
 
 **Regra para o Muse Code:** nunca alterar um contrato. Se uma spec parecer exigir mudança
@@ -168,17 +177,32 @@ de contrato, isso é sinal de spec errada — voltar ao chat de arquitetura.
 
 Tudo que acontece vira um evento imutável. O estado atual é **derivado**, nunca editado.
 
+Schema completo, garantias e regra de releitura: **ADR-018**. Resumo do que vale como contrato:
+
 ```sql
-CREATE TABLE eventos (
-  id            UUID PRIMARY KEY,
-  fazenda_id    UUID NOT NULL,
-  tipo          TEXT NOT NULL,
-  ocorrido_em   TIMESTAMPTZ NOT NULL,
-  registrado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
-  payload       JSONB NOT NULL,
-  origem        TEXT NOT NULL   -- 'produtor' | 'sistema' | 'satelite' | 'sar_inferido'
+CREATE TABLE evento (              -- singular; append-only garantido pelo banco
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  fazenda_id         UUID NOT NULL REFERENCES fazenda(id),
+  sequencia          BIGINT GENERATED ALWAYS AS IDENTITY,   -- ordem de gravação
+  tipo               TEXT NOT NULL REFERENCES tipo_evento(tipo),
+  origem             TEXT NOT NULL REFERENCES origem_evento(origem),
+  ocorrido_em        TIMESTAMPTZ NOT NULL,                  -- ordem do mundo
+  registrado_em      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ator               TEXT,
+  corrige_evento_id  UUID REFERENCES evento(id),            -- correção é evento novo
+  chave_idempotencia TEXT,
+  versao_payload     SMALLINT NOT NULL DEFAULT 1,
+  payload            JSONB NOT NULL,                        -- sempre traz entidade_id
+  entidade_id        UUID GENERATED ALWAYS AS ((payload->>'entidade_id')::uuid) STORED,
+  UNIQUE (fazenda_id, chave_idempotencia)
 );
 ```
+
+Regras que acompanham a tabela:
+- Releitura ordena por **`(ocorrido_em, sequencia)`** — fato atrasado entra no lugar certo.
+- `REVOKE UPDATE, DELETE` mais trigger que levanta exceção. Nada edita o passado.
+- Porta única de escrita: `registrar_evento`, com modelo Pydantic por `tipo`.
+- Correção entra na **posição temporal do evento corrigido**, que é ignorado na dobra.
 
 Tipos de evento: `piquete_criado`, `piquete_alterado`, `lote_criado`, `lote_alterado`,
 `lote_dissolvido`, `manejo_recomendado`, `manejo_confirmado`, `manejo_recusado`,
@@ -213,10 +237,25 @@ parametro_fazenda (fazenda_id, cultivar_id, metodo_pastejo, campo, valor,
 lote         (id, fazenda_id, nome, indissoluvel BOOL, ativo)
 lote_composicao (lote_id, categoria, n_animais, peso_medio_kg, origem_peso)
                                                  -- origem_peso: 'produtor' | 'ua_tabela'
-leitura      (id, piquete_id, data, ndvi, origem, pct_nuvem,
-              pixels_validos, massa_kg_ms_ha, taxa_acumulo, confianca)
 plano        (id, fazenda_id, gerado_em, horizonte_dias, payload JSONB)
-eventos      (ver §4)
+evento       (ver §4)
+```
+
+**Tabelas derivadas (projeções da ADR-018).** Nenhuma recebe escrita fora da dobra; todas
+carregam `derivado_ate_sequencia` e `derivado_em`, e são reconstruídas por `DELETE` + `INSERT`
+da fazenda inteira numa transação.
+
+```
+estado_piquete    (fazenda_id, piquete_id, situacao, lote_atual_id, desde,
+                   massa_kg_ms_ha, dias_descanso, aguardando_parametro)
+estado_lote       (fazenda_id, lote_id, piquete_atual_id, desde, peso_vivo_total_kg)
+leitura           (id, piquete_id, data, ndvi, origem, pct_nuvem, pixels_validos,
+                   massa_kg_ms_ha, taxa_acumulo, confianca)
+                                                 -- derivada de `leitura_satelite`;
+                                                 -- a ingestão grava EVENTO, não esta linha
+piquete_distancia (fazenda_id, piquete_origem_id, piquete_destino_id, distancia_m)
+                                                 -- matriz da ADR-016, por ST_Distance sobre
+                                                 -- centroides; refeita em piquete_criado/alterado
 ```
 
 Geometria em **EPSG:4326** (lat/lon) para armazenamento; reprojetar para métrico
