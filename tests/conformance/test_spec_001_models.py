@@ -1,4 +1,4 @@
-"""Independent conformance suite for SPEC-001 (pure domain entities).
+"""Independent conformance suite covering the schema as of SPEC-001 and SPEC-002.
 
 Written by the tester role, not the implementer. Each test maps to an acceptance
 criterion (AC-n) or requirement (R-n) of SPEC-001. Tests marked `finding_` are
@@ -29,6 +29,7 @@ ALLOWED_IMPORTS = {"dataclasses", "datetime", "enum", "typing", "uuid"}
 ENUMS = {
     "CategoriaAnimal": {"BEZERRO": "bezerro", "NOVILHO": "novilho", "ADULTO": "adulto"},
     "QualidadeBase": {"ALTA": "alta", "MEDIA": "media", "BAIXA": "baixa"},
+    "MetodoPastejo": {"CONTINUO": "continuo", "ROTACIONADO": "rotacionado"},
     "Confianca": {"ALTA": "alta", "MEDIA": "media", "BAIXA": "baixa"},
     "StatusManejo": {
         "RECOMENDADO": "recomendado",
@@ -70,12 +71,20 @@ DATACLASSES = {
         ("dias_preferenciais_manejo", "tuple[int, ...]", NO_DEFAULT),
         ("ativo", "bool", True),
     ],
+    "ParametrosRegime": [
+        ("metodo", "MetodoPastejo", NO_DEFAULT),
+        ("altura_entrada_cm", "float | None", NO_DEFAULT),
+        ("altura_saida_cm", "float | None", NO_DEFAULT),
+        ("altura_maxima_cm", "float | None", NO_DEFAULT),
+        ("altura_minima_cm", "float | None", NO_DEFAULT),
+        ("confianca", "Confianca", NO_DEFAULT),
+        ("fonte", "str", NO_DEFAULT),
+    ],
     "Cultivar": [
         ("id", "UUID", NO_DEFAULT),
         ("slug", "str", NO_DEFAULT),
         ("nome", "str", NO_DEFAULT),
-        ("altura_entrada_cm", "float", NO_DEFAULT),
-        ("altura_saida_cm", "float", NO_DEFAULT),
+        ("parametros_por_regime", "tuple[ParametrosRegime, ...]", NO_DEFAULT),
         ("densidade_kg_ha_por_cm", "float", NO_DEFAULT),
         ("temperatura_base_c", "float", NO_DEFAULT),
         ("rue_max_g_por_mj", "float", NO_DEFAULT),
@@ -87,6 +96,7 @@ DATACLASSES = {
         ("nome", "str", NO_DEFAULT),
         ("area_ha", "float", NO_DEFAULT),
         ("cultivar_id", "UUID", NO_DEFAULT),
+        ("metodo_pastejo", "MetodoPastejo", NO_DEFAULT),
         ("geometria_geojson", "dict[str, Any] | None", None),
         ("ativo", "bool", True),
     ],
@@ -140,12 +150,16 @@ def _classes() -> dict[str, ast.ClassDef]:
 def _sample(name: str) -> typing.Any:
     """Build one valid instance of each dataclass with arbitrary fixture values."""
     comp = models.ComposicaoLote(models.CategoriaAnimal.ADULTO, 1, 1.0)
+    regime = models.ParametrosRegime(
+        models.MetodoPastejo.ROTACIONADO, 1.0, 1.0, None, None, models.Confianca.ALTA, "f"
+    )
     builders: dict[str, typing.Callable[[], typing.Any]] = {
         "Fazenda": lambda: models.Fazenda(U, "f", "America/Fortaleza", 1, 1, (0,)),
+        "ParametrosRegime": lambda: regime,
         "Cultivar": lambda: models.Cultivar(
-            U, "s", "n", 1.0, 1.0, 1.0, 1.0, 1.0, models.QualidadeBase.ALTA
+            U, "s", "n", (regime,), 1.0, 1.0, 1.0, models.QualidadeBase.ALTA
         ),
-        "Piquete": lambda: models.Piquete(U, U, "p", 1.0, U),
+        "Piquete": lambda: models.Piquete(U, U, "p", 1.0, U, models.MetodoPastejo.ROTACIONADO),
         "ComposicaoLote": lambda: comp,
         "Lote": lambda: models.Lote(U, U, "l", (comp,)),
         "Manejo": lambda: models.Manejo(
@@ -286,7 +300,7 @@ def test_ac5_exactly_seven_dataclasses():
     found = [
         n for n in vars(models).values() if isinstance(n, type) and dataclasses.is_dataclass(n)
     ]
-    assert len(found) == 7
+    assert len(found) == 8
 
 
 # --- AC-6 / R3..R8: fields ----------------------------------------------------
@@ -328,6 +342,34 @@ def test_r4_cultivar_has_no_defaults(name):
 def test_r4_cultivar_requires_every_parameter():
     with pytest.raises(TypeError):
         models.Cultivar(id=U, slug="s", nome="n")  # type: ignore[call-arg]
+
+
+def test_ac2_cultivar_accepts_zero_regime_blocks():
+    c = models.Cultivar(U, "s", "n", (), 1.0, 1.0, 1.0, models.QualidadeBase.ALTA)
+    assert len(c.parametros_por_regime) == 0
+    with pytest.raises(FrozenInstanceError):
+        c.parametros_por_regime = (regime_for_finding(),)  # type: ignore[misc]  # intentional: verifying frozen mutation raises at runtime
+
+
+def regime_for_finding() -> models.ParametrosRegime:
+    return models.ParametrosRegime(
+        models.MetodoPastejo.CONTINUO, None, None, 1.0, 1.0, models.Confianca.BAIXA, "f"
+    )
+
+
+def test_finding_cultivar_accepts_list_instead_of_tuple_for_regimes():
+    # No validation by design, same as test_finding_types_are_not_enforced_so_lists_slip_in.
+    c = models.Cultivar(
+        U,
+        "s",
+        "n",
+        [regime_for_finding()],  # type: ignore[arg-type]
+        1.0,
+        1.0,
+        1.0,
+        models.QualidadeBase.ALTA,
+    )
+    assert isinstance(c.parametros_por_regime, list)
 
 
 def test_no_default_factories_anywhere():
@@ -522,7 +564,9 @@ def test_finding_immutability_is_shallow_for_dict_fields():
 
 def test_finding_piquete_hashability_depends_on_geometry():
     hash(_sample("Piquete"))  # geometry None -> hashable
-    p = models.Piquete(U, U, "p", 1.0, U, geometria_geojson={"type": "Polygon"})
+    p = models.Piquete(
+        U, U, "p", 1.0, U, models.MetodoPastejo.ROTACIONADO, geometria_geojson={"type": "Polygon"}
+    )
     with pytest.raises(TypeError):
         hash(p)
 

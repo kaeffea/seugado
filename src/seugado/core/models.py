@@ -27,6 +27,13 @@ class QualidadeBase(StrEnum):
     BAIXA = "baixa"
 
 
+class MetodoPastejo(StrEnum):
+    """Grazing method: continuous stocking or rotational grazing."""
+
+    CONTINUO = "continuo"
+    ROTACIONADO = "rotacionado"
+
+
 class Confianca(StrEnum):
     """Reliability tier of an estimate or recommendation."""
 
@@ -84,14 +91,31 @@ class Fazenda:
 
 
 @dataclass(frozen=True, slots=True)
+class ParametrosRegime:
+    """Height parameters for a cultivar under one grazing method.
+
+    A cultivar carries one of these per grazing method it has a documented
+    source for. The absence of a block for a given method means the source
+    is missing, not that the height is null.
+    """
+
+    metodo: MetodoPastejo
+    altura_entrada_cm: float | None
+    altura_saida_cm: float | None
+    altura_maxima_cm: float | None
+    altura_minima_cm: float | None
+    confianca: Confianca
+    fonte: str
+
+
+@dataclass(frozen=True, slots=True)
 class Cultivar:
-    """Grass variety with its explicit management parameters."""
+    """Grass variety with its regime-specific management parameters."""
 
     id: UUID
     slug: str  # stable machine key
     nome: str  # display name
-    altura_entrada_cm: float
-    altura_saida_cm: float
+    parametros_por_regime: tuple[ParametrosRegime, ...]
     densidade_kg_ha_por_cm: float
     temperatura_base_c: float
     rue_max_g_por_mj: float
@@ -107,6 +131,7 @@ class Piquete:
     nome: str
     area_ha: float
     cultivar_id: UUID
+    metodo_pastejo: MetodoPastejo
     geometria_geojson: dict[str, Any] | None = None
     ativo: bool = True
 

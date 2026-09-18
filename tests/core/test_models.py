@@ -13,7 +13,9 @@ from seugado.core.models import (
     Fazenda,
     Lote,
     Manejo,
+    MetodoPastejo,
     OrigemEvento,
+    ParametrosRegime,
     Piquete,
     QualidadeBase,
     StatusManejo,
@@ -31,8 +33,17 @@ def test_cultivar_carries_every_parameter_explicitly():
         id=CULTIVAR_ID,
         slug="fixture-grass",
         nome="Fixture Grass",
-        altura_entrada_cm=1.0,
-        altura_saida_cm=1.0,
+        parametros_por_regime=(
+            ParametrosRegime(
+                metodo=MetodoPastejo.ROTACIONADO,
+                altura_entrada_cm=1.0,
+                altura_saida_cm=1.0,
+                altura_maxima_cm=None,
+                altura_minima_cm=None,
+                confianca=Confianca.ALTA,
+                fonte="fixture source",
+            ),
+        ),
         densidade_kg_ha_por_cm=1.0,
         temperatura_base_c=1.0,
         rue_max_g_por_mj=1.0,
@@ -40,6 +51,8 @@ def test_cultivar_carries_every_parameter_explicitly():
     )
     assert c.slug == "fixture-grass"
     assert c.qualidade_base == "alta"  # StrEnum compares equal to its value
+    assert isinstance(c.parametros_por_regime, tuple)
+    assert len(c.parametros_por_regime) == 1
 
 
 def test_entities_are_frozen():
@@ -49,6 +62,7 @@ def test_entities_are_frozen():
         nome="Piquete 7",
         area_ha=1.0,
         cultivar_id=CULTIVAR_ID,
+        metodo_pastejo=MetodoPastejo.ROTACIONADO,
     )
     with pytest.raises(FrozenInstanceError):
         p.area_ha = 2.0  # type: ignore[misc]  # intentional: verifying frozen mutation raises at runtime
@@ -61,6 +75,7 @@ def test_piquete_geometry_is_opaque_and_optional():
         nome="Piquete 7",
         area_ha=1.0,
         cultivar_id=CULTIVAR_ID,
+        metodo_pastejo=MetodoPastejo.ROTACIONADO,
         geometria_geojson={"type": "Polygon", "coordinates": []},
     )
     assert p.geometria_geojson is not None
@@ -72,6 +87,7 @@ def test_piquete_geometry_is_opaque_and_optional():
             nome="x",
             area_ha=1.0,
             cultivar_id=CULTIVAR_ID,
+            metodo_pastejo=MetodoPastejo.CONTINUO,
         ).geometria_geojson
         is None
     )
@@ -138,3 +154,26 @@ def test_fazenda_preferred_days_are_immutable():
         dias_preferenciais_manejo=(0, 2, 4),
     )
     assert isinstance(f.dias_preferenciais_manejo, tuple)
+
+
+def test_metodo_pastejo_has_two_members():
+    assert MetodoPastejo.CONTINUO == "continuo"  # type: ignore[comparison-overlap]  # runtime equality is the documented behaviour; see 06 §7 rule 11
+    assert MetodoPastejo.ROTACIONADO == "rotacionado"  # type: ignore[comparison-overlap]  # runtime equality is the documented behaviour; see 06 §7 rule 11
+    assert len(list(MetodoPastejo)) == 2
+
+
+def test_parametros_regime_continuo_uses_max_min_heights():
+    pr = ParametrosRegime(
+        metodo=MetodoPastejo.CONTINUO,
+        altura_entrada_cm=None,
+        altura_saida_cm=None,
+        altura_maxima_cm=1.0,
+        altura_minima_cm=1.0,
+        confianca=Confianca.MEDIA,
+        fonte="fixture source",
+    )
+    assert pr.metodo == "continuo"
+    assert pr.altura_entrada_cm is None
+    assert pr.altura_maxima_cm == 1.0
+    with pytest.raises(FrozenInstanceError):
+        pr.fonte = "other"  # type: ignore[misc]  # intentional: verifying frozen mutation raises at runtime
