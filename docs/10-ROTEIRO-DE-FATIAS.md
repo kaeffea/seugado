@@ -158,20 +158,12 @@ exibição das alternativas descartadas.
 
 ## Chats `[PESQUISA]` que desbloqueiam fatias
 
-Executar **antes** das fatias que dependem deles. Cada um produz um bloco pronto
-para colar em `05-PARAMETROS-CULTIVARES.md`.
+A fila canônica e o status de cada pesquisa vivem exclusivamente no **`11-ESTADO-ATUAL.md` (tabela Q1–Q12)**, que é o registro único de perguntas e bloqueios de pesquisa do projeto.
 
-| Pesquisa | Desbloqueia | Prioridade |
-|---|---|---|
-| Régua de Manejo (CT 125, Embrapa) — alturas canônicas | F-003 | 🔴 |
-| `densidade_kg_ha_por_cm` por cultivar | F-002 | 🔴 |
-| `eficiencia_pastejo` (ingestão ÷ massa acima do resíduo) — ADR-010 | F-002 | 🔴 |
-| RUE de gramínea C4 tropical | F-006 | 🔴 |
-| `temperatura_base_c` de gramínea tropical | F-007 | 🟠 |
-| Pesos médios por categoria animal (bezerro) | F-002 | 🟡 rebaixado pela ADR-014 — a tabela de UA do `05` preenche o peso ausente; isto virou refinamento de precisão |
-| Altura por regime nas células vazias do `05` (Xaraés, *B. decumbens*, Massai, Zuri, Tamani) | F-003 | 🟠 |
-| Termos de uso atuais do Earth Engine | F-005 | 🟠 |
-| INMET vs. reanálise: qual fonte climática | F-007 | 🟡 |
+Conforme a **ADR-014** e a divisão em **Duas Raias**:
+- **Raia A (código):** F-001B ✅ → F-002 ✅ → **F-003 (próxima)** → `[ARQUITETURA] schema de eventos` → F-004. Zero dependência de pesquisa.
+- **Raia B (pesquisa):** Q1 → Q2 (+Q3) → Q4 → Q5 (+Q6). Rodam em chats dedicados no Sonnet entre as fatias de código. As duas raias só se encontram a partir de F-005 e no marco F-008.
+
 
 ---
 

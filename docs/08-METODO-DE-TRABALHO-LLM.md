@@ -99,14 +99,12 @@ O Claude monitora isso sozinho e emite o handoff. Você não precisa vigiar.
 
 ### Formato do handoff
 
-```
-🔄 FIM DE CICLO — abrir chat novo
-Feito: <3 linhas>
-Pendente: <3 linhas>
-Próximo chat: [ETIQUETA] <título>
-Primeira mensagem sugerida: "<prompt pronto para colar>"
-Atualizar no Knowledge: <arquivos que mudaram>
-```
+O encerramento é feito em **prosa limpa e humana** (conforme a regra 6 do `00`, sendo **proibido** o uso de blocos de código ou molduras com `🔄 FIM DE CICLO`).
+O Arquiteto resume em poucas linhas o que foi feito, o que ficou pendente, indica o próximo chat (com modelo e esforço recomendados) e fornece o prompt exato pronto para colar.
+
+Exemplo de formato:
+> *Essa tarefa está concluída e documentada. Para poupar sua cota de contexto, abra um novo chat intitulado `[FATIA-003] Regras de manejo` no modelo Sonnet (esforço médio) e envie a mensagem abaixo para começarmos:*
+> `<prompt pronto para colar>`
 
 O handoff escrito **substitui 50 mensagens de histórico**. É a técnica de maior retorno
 de todo este documento.
