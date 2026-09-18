@@ -280,7 +280,7 @@ Elas entram em toda spec.
   mensagem `F-NNN: <título>`. O diff do commit é o que o testador revisa.
 - Layout (ADR-013): `docs/` para a base de conhecimento, `src/seugado/` para o pacote
   (src-layout), `tests/core/` e `tests/conformance/`, `specs/`, `revisoes/`.
-  Na raiz ficam só `README.md`, `CLAUDE.md` e os arquivos de configuração.
+  Na raiz ficam só `README.md` e os arquivos de configuração.
 - **O Windows hospedeiro não tem Python.** Todo comando roda no WSL, nunca no PowerShell.
 - `.venv` criada com `uv`. Instalar: `uv sync --group dev`.
 - `pyproject.toml` declara Python >= 3.12 e o grupo `dev`: pytest, ruff, mypy (`strict`).

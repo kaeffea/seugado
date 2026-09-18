@@ -101,16 +101,15 @@ Layout da ADR-013, aplicado e verificado (RELATORIO-REV-004):
 ```
 C:\code\seugado                git, main, publicado no GitHub (privado)
 ├── README.md                  mapa simples do projeto — ler primeiro
-├── CLAUDE.md                  instruções permanentes do Claude Code
 ├── pyproject.toml             Python 3.12; dev: pytest, ruff, mypy strict; md fora do ruff
 ├── uv.lock                    versionado (ADR-012)
 ├── docs/                      00–12, a base de conhecimento (fonte de verdade)
 ├── src/seugado/core/models.py 7 enums, 8 dataclasses frozen/slots — F-001B, parâmetro por regime
 ├── tests/core/                suíte do Muse Code (fumaça)
-├── tests/conformance/         suíte independente do Claude Code (verificação de registro)
+├── tests/conformance/         suíte de conformidade independente (Antigravity)
 ├── specs/                     SPEC-001-domain-model.md · SPEC-002-domain-model-regime.md ·
 │                              SPEC-002-CORRECAO-A-mypy-annotation.md
-└── revisoes/                  REV-*, KIT-ACEITE-*, RUNBOOK-*, RELATORIO-*
+└── revisoes/                  relatórios finais de fatia (arquivo/ contém o legado)
 ```
 
 Commits: `73ff3af` fundação + F-001 · `d06880b` ADRs 010–012 · `354382b` uv.lock ·

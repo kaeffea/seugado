@@ -62,8 +62,7 @@ Suas ações: **apontar o Muse para a spec, pedir para o Antigravity testar/comm
 
 ## 5. Onde fica cada coisa
 
-Na raiz ficam só dois arquivos para ler — este, para você, e o `CLAUDE.md`, para o Claude
-Code — mais a configuração. Todo o resto está em pasta.
+Na raiz fica apenas o `README.md` como guia do projeto, mais as configurações (`pyproject.toml`, `uv.lock`, `.gitignore`). Todo o resto está organizado em pastas:
 
 ```
 docs/
@@ -75,16 +74,16 @@ docs/
   05-PARAMETROS    TODO número agronômico, com fonte. Nada entra em código sem estar aqui
   06-ARQUITETURA   stack, módulos, contratos, regras de código, ambiente
   07-MOTOR         o otimizador: formulação e restrições
-  08-METODO        como os quatro participantes trabalham
+  08-METODO        método de trabalho com LLMs (Claude Projects + Muse Code + Antigravity)
   09-TEMPLATE      o molde de toda spec para o Muse
   10-ROTEIRO       as 22 fatias, na ordem
   11-ESTADO        ⬅ o que está feito, o que está travado, qual o próximo chat
   12-ADR           toda decisão fechada, com o porquê
 
-src/seugado/       o código do app
-tests/             core = testes do Muse · conformance = testes do Claude Code
-specs/             as specs já emitidas
-revisoes/          kits de aceite, runbooks e relatórios
+src/seugado/       o código do app (src-layout)
+tests/             core = testes do Muse · conformance = testes de conformidade
+specs/             as specs emitidas para o Muse Code
+revisoes/          relatórios finais de cada fatia (arquivo/ contém o legado)
 ```
 
 `src/seugado/` em vez de `seugado/seugado/` é convenção de Python (*src-layout*): evita que
