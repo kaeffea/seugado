@@ -42,6 +42,7 @@ Mesmo assim o F-002 esteve marcado 🔒 no `11` desde a ADR-010.
 - **~~DT3~~ `Cultivar` exige todos os parâmetros; a recusa por `TODO-PARAM` precisa de dono:** ✅ **Resolvido pela ADR-014** (17/09/2026). A recusa não vai para `__post_init__`: vira `resolver_parametros(cultivar, metodo)` em `core/regras.py`, porta única que devolve o bloco ou a lista de `faltantes`. Quem barra é o `planner/`.
 - **~~DT6~~ Tabela de alturas do `05` sem coluna de fonte:** ✅ Resolvido em `[PESQUISA] Régua de Manejo Embrapa` (17/09/2026) — coluna de fonte e confiança adicionada, CT-135 citado.
 - **~~DT11~~ O `07` §2 R10 diz "fusão só entre categorias compatíveis" e nunca define compatível:** ✅ **Resolvido pela ADR-014** (17/09/2026). `compativel[a,b] = 1 ⟺ |ordem(a) − ordem(b)| ≤ 1` na escala de UA do `05`. Escrito em `07` §2 e `03` §9.4. O limiar `≤ 1` é `HIPOTESE-CALIBRAR` — ADR de fusão de lotes, antes do F-022.
+- **~~DT12~~ Caminho espúrio de migração (`src/seugado/db/migracoes/`):** ✅ **Resolvido (18/09/2026).** Diretório espúrio criado pelo Muse Code foi removido. Migração SQL padronizada exclusivamente em `db/migrations/0001_evento_e_derivadas.sql` conforme ADR-020 §2 e SPEC-005. Commit `cfcac56`.
 
 > **Renumeração de ADR (17/09/2026):** DT2, DT3 e DT4 apontavam para ADR-014/015/016.
 > O número 014 passou a ser da ADR de método de pastejo, que foi a primeira a fechar. As dívidas andaram:
