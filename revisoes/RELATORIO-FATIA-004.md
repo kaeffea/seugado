@@ -24,7 +24,7 @@ A Fatia F-004 foi dividida em duas especificações complementares seguindo a re
 - **Caso oculto 3 (Idempotência com banco real):** **PULADO** (teste skipped em `test_registrar_evento_idempotente_sem_commit` e `test_hidden_case_3_idempotency_with_db` devido à ausência da variável de ambiente `SEUGADO_TEST_DATABASE_URL` no ambiente local de desenvolvimento, conforme previsto na ADR-020).
 
 ## Ajustes pontuais do testador
-- Copiada a migração para ambos os caminhos padronizados: `db/migrations/0001_evento_e_derivadas.sql` (conforme ADR-020/SPEC-005) e `src/seugado/db/migracoes/0001_eventos.sql`.
+- Padronizada a migração SQL estritamente em `db/migrations/0001_evento_e_derivadas.sql` (conforme ADR-020 e SPEC-005). O caminho espúrio gerado pelo Muse em `src/seugado/db/` foi removido.
 - Atualizado o teste `test_ac12` em `tests/conformance/test_spec_001_models.py` para reconhecer as dependências autorizadas pela ADR-020 (`psycopg[binary]`, `pydantic`).
 - Tipagem rigorosa em `tests/conformance/test_spec_006_projecao.py` para manter o `mypy --strict` 100% limpo.
 

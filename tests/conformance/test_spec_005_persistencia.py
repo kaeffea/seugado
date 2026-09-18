@@ -23,8 +23,6 @@ SOURCE = EVENTOS_PATH.read_text(encoding="utf-8")
 TREE = ast.parse(SOURCE)
 
 MIGRATION_PATH = ROOT / "db" / "migrations" / "0001_evento_e_derivadas.sql"
-if not MIGRATION_PATH.exists():
-    MIGRATION_PATH = ROOT / "src" / "seugado" / "db" / "migracoes" / "0001_eventos.sql"
 
 ALLOWED_MODULES = {
     "datetime",
