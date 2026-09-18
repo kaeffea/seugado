@@ -1,8 +1,8 @@
 # Estado Atual — SeuGado
 
 **Atualizado em:** 18/09/2026
-**Fase:** Fundação — F-000, F-001, **F-001B** e **F-002 concluídas**. F-003 é a próxima
-fatia de código, sem bloqueio de decisão nem de parâmetro.
+**Fase:** Fundação — F-000, F-001, **F-001B** e **F-002 concluídas**. F-003 tem
+`specs/SPEC-004-regras.md` emitida, aguardando implementação do Muse Code.
 
 > Este é o registro único do estado operacional ativo e da fila de trabalho.
 > Mudanças históricas, handoffs antigos e discussões passadas foram arquivados em `13-HISTORICO.md`.
@@ -30,7 +30,7 @@ O modelo de domínio e os cálculos de forragem estão implementados e cobertos 
 | F-001 Modelo de domínio | ✅ concluída — 13/13 critérios, 157 testes |
 | **F-001B Modelo de domínio: parâmetro por regime** | ✅ **concluída** — 14/14 critérios, commit `5a600c8`, 177/177 testes |
 | **F-002 Cálculos de forragem** | ✅ **concluída** — `core/forragem.py`, commit `d76c7f6`, 196/196 testes |
-| F-003 Regras de manejo | ✅ **destravada pela ADR-014** — depende de F-001B (próxima) |
+| F-003 Regras de manejo | 🟨 **spec emitida** (`SPEC-004-regras.md`) — aguarda Muse Code |
 | F-004 Persistência e eventos | ⬜ não iniciada — exige `[ARQUITETURA] Schema de eventos` antes |
 | F-005 Ingestão de satélite | ⬜ não iniciada |
 | F-006 Modelo SAFER | 🔒 bloqueada (`rue_max_g_por_mj` C4) |
@@ -148,6 +148,18 @@ As duas raias só se encontram no **F-005**. Até lá, nenhuma pesquisa bloqueia
 ## Log de handoffs
 
 > Handoffs anteriores estão arquivados em `13-HISTORICO.md`.
+
+**18/09/2026 — [FATIA-003] Regras de manejo (spec emitida)**
+- **Feito:** `specs/SPEC-004-regras.md` emitida para o Muse Code — `core/regras.py`,
+  funções puras: `resolver_parametros` (porta única de parâmetro, ADR-014),
+  `apto_para_entrada`, `precisa_sair`, `urgencia`, `descanso_cumprido`. Kit de aceite em
+  `revisoes/KIT-ACEITE-004.md`, com 4 casos ocultos (bloco parcial, fronteira de descanso,
+  `ValueError` em bloco contínuo, múltiplos blocos por cultivar).
+- **Nota de escopo:** `urgencia` marcada `HIPOTESE-CALIBRAR` (escala em cm bruto, não
+  normalizada pela faixa entrada–saída) — não bloqueia, revisitar se F-020/F-021 precisarem
+  de urgência comparável entre piquetes.
+- **Pendente:** implementação pelo Muse Code, teste e commit pelo Antigravity.
+- **Próximo:** `[ARQUITETURA] Schema de eventos` antes de F-004.
 
 **17/09/2026 — [FATIA-002] Cálculos de forragem (concluída)**
 - **Feito:** F-002 implementada em `core/forragem.py` com 7 funções puras (`massa_para_altura`, `altura_para_massa`, `consumo_lote_kg_ms_dia`, `dias_ocupacao`, `taxa_utilizacao`, `consumo_individual_kg_ms_dia`, `consumo_pct_pv`). Testada com suíte do Muse e suíte de conformidade independente em `tests/conformance/test_forragem_conformance.py`. Commit `d76c7f6`. 196/196 testes passando. `mypy` strict e `ruff` 100% limpos.
