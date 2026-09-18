@@ -1,8 +1,9 @@
 # Estado Atual — SeuGado
 
 **Atualizado em:** 17/09/2026
-**Fase:** Fundação — F-000, F-001 e **F-001B concluídas**. F-002 e F-003 são as próximas
-fatias de código, sem bloqueio de decisão nem de parâmetro.
+**Fase:** Fundação — F-000, F-001 e **F-001B concluídas**. **F-002 em andamento**
+(SPEC-003-forragem.md emitida). F-003 é a próxima fatia de código, sem bloqueio de decisão
+nem de parâmetro.
 
 > Este é o único arquivo do Knowledge que muda com frequência, e é por onde se começa.
 > O Arquiteto escreve este arquivo direto, no repositório e no Knowledge — você não cola nada.
@@ -80,7 +81,7 @@ fatias de código seguidas sem depender de nenhuma pesquisa.
 | F-000 Fundação do repositório | ✅ concluída (ADR-012) |
 | F-001 Modelo de domínio | ✅ concluída — 13/13 critérios, 157 testes |
 | **F-001B Modelo de domínio: parâmetro por regime** | ✅ **concluída** — 14/14 critérios (RELATORIO-FATIA-001B), correção de anotação mypy aplicada (SPEC-002-CORRECAO-A), commit `5a600c8`, 177/177 testes |
-| F-002 Cálculos de forragem | ⬜ **implementável — não estava bloqueada.** Ver "Correção de 17/09/2026", abaixo. O que está bloqueado é **operar em produção** com cultivar real, não escrever e testar as funções |
+| F-002 Cálculos de forragem | 🟨 **em andamento** — SPEC-003-forragem.md emitida (17/09/2026), kit de aceite em `revisoes/KIT-ACEITE-003.md`, aguardando implementação pelo Muse Code. Ver "Correção de 17/09/2026", abaixo. O que segue bloqueado é **operar em produção** com cultivar real, não escrever e testar as funções |
 | F-003 Regras de manejo | ✅ **destravada pela ADR-014** — depende de F-001B, não mais de decisão |
 | F-004 Persistência e eventos | ⬜ não iniciada — exige `[ARQUITETURA] Schema de eventos` antes |
 | F-005 Ingestão de satélite | ⬜ não iniciada |
@@ -108,7 +109,8 @@ C:\code\seugado                git, main, publicado no GitHub (privado)
 ├── tests/core/                suíte do Muse Code (fumaça)
 ├── tests/conformance/         suíte de conformidade independente (Antigravity)
 ├── specs/                     SPEC-001-domain-model.md · SPEC-002-domain-model-regime.md ·
-│                              SPEC-002-CORRECAO-A-mypy-annotation.md
+│                              SPEC-002-CORRECAO-A-mypy-annotation.md ·
+│                              SPEC-003-forragem.md (emitida, aguardando Muse Code)
 └── revisoes/                  relatórios finais de fatia (arquivo/ contém o legado)
 ```
 
@@ -384,6 +386,23 @@ e a primeira parede de verdade é o **F-008**, que precisa do Q2.
 ## Log de handoffs
 
 _(Cole aqui o handoff de cada chat encerrado, mais recente no topo.)_
+
+**17/09/2026 — [FATIA-002] Cálculos de forragem (spec emitida)**
+Feito: `specs/SPEC-003-forragem.md` emitida, autocontida — sete funções puras para
+`core/forragem.py`: ponte massa↔altura (`massa_para_altura`, `altura_para_massa`),
+`consumo_lote_kg_ms_dia` (soma por categoria), `dias_ocupacao` (contrato do `06` §3
+inalterado, agora com fórmula fechada — não iterativa — para o ajuste de crescimento durante
+a ocupação), e três funções descritivas (`taxa_utilizacao`, `consumo_individual_kg_ms_dia`,
+`consumo_pct_pv`) para reproduzir o caso de regressão canônico do `05`. `densidade_kg_ha_por_cm`
+e `eficiencia_pastejo` seguem sem default de produção em qualquer lugar do módulo — recebidos
+só por argumento, conforme ADR-010 e a "Correção de 17/09/2026" abaixo. Kit de aceite em
+`revisoes/KIT-ACEITE-003.md`, com três casos ocultos: crescimento não-nulo na fórmula de
+`dias_ocupacao`, inversão exata de massa↔altura para densidades diferentes do worked example,
+e a distinção proposital entre `ValueError` / `0.0` / `float("inf")` nos três casos de
+fronteira de `dias_ocupacao`.
+Pendente: implementação pelo Muse Code; teste e commit pelo Antigravity.
+Próximo: ação manual do usuário (ver mensagem de fechamento deste chat). Depois:
+`[FATIA-003] Regras de manejo`, em Sonnet, esforço médio.
 
 **17/09/2026 — [FATIA-001B] Modelo de domínio: parâmetro por regime (encerrado)**
 Feito: **F-001B concluída.** SPEC-002 aplicou a ADR-014 em `models.py` — `MetodoPastejo`
