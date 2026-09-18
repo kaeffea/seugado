@@ -1,7 +1,8 @@
 # Estado Atual — SeuGado
 
 **Atualizado em:** 17/09/2026
-**Fase:** Fundação — F-000 e F-001 concluídas; F-001 **reaberta** pela ADR-014 (ver F-001B)
+**Fase:** Fundação — F-000 e F-001 concluídas; F-001 **reaberta** pela ADR-014 (ver F-001B);
+spec da F-001B emitida (SPEC-002), aguardando Muse Code
 
 > Este é o único arquivo do Knowledge que muda com frequência, e é por onde se começa.
 > O Arquiteto escreve este arquivo direto, no repositório e no Knowledge — você não cola nada.
@@ -87,7 +88,7 @@ fatias de código seguidas sem depender de nenhuma pesquisa.
 |---|---|
 | F-000 Fundação do repositório | ✅ concluída (ADR-012) |
 | F-001 Modelo de domínio | ✅ concluída — 13/13 critérios, 157 testes |
-| **F-001B Modelo de domínio: parâmetro por regime** | ⬜ **nova, criada pela ADR-014** — reabre `models.py`. Próxima fatia |
+| **F-001B Modelo de domínio: parâmetro por regime** | 🟨 **spec emitida** — `specs/SPEC-002-domain-model-regime.md` pronta para colar no Muse Code; kit em `revisoes/KIT-ACEITE-002.md` |
 | F-002 Cálculos de forragem | ⬜ **implementável — não estava bloqueada.** Ver "Correção de 17/09/2026", abaixo. O que está bloqueado é **operar em produção** com cultivar real, não escrever e testar as funções |
 | F-003 Regras de manejo | ✅ **destravada pela ADR-014** — depende de F-001B, não mais de decisão |
 | F-004 Persistência e eventos | ⬜ não iniciada — exige `[ARQUITETURA] Schema de eventos` antes |
@@ -122,7 +123,9 @@ C:\code\seugado                git, main, publicado no GitHub (privado)
 
 Commits: `73ff3af` fundação + F-001 · `d06880b` ADRs 010–012 · `354382b` uv.lock ·
 `3877064` dívida de lint zerada · `91d115c` ADR-013 (16 arquivos renomeados, 0 alterações) ·
-`a1ef54e` caminhos hardcoded de `tests/conformance` para o src-layout.
+`a1ef54e` caminhos hardcoded de `tests/conformance` para o src-layout ·
+`e82f0b4` ADR-014, correção do status do F-002 e verificação por manifesto (RELATORIO-REV-009,
+aprovada 5/5).
 Ambiente: `.venv` por `uv` no WSL Ubuntu. O Windows hospedeiro não tem Python.
 Versões medidas: Python 3.12.3, pytest 9.1.1, ruff 0.16.8, mypy 2.3.1.
 Estado das ferramentas: `ruff check`, `ruff format --check`, `mypy` e `pytest` limpos, 157/157.
@@ -322,20 +325,50 @@ E `[APRENDER] Manejo de pastagens` a qualquer momento: é didático, não produz
   180–210 kg) que não é a mesma coisa que "peso médio da fase de cria inteira", então B5 não
   fecha 100%.
 
-### As que não travam nada agora
+### Registro de perguntas abertas — dono e posição na fila
 
-- **Pastejo líder-seguidor** existe, é recomendado, com que ganho medido? É a base agronômica
-  candidata do campo `prioridade` (ver `01`, Ideias registradas). Sem fonte, o peso é
-  `HIPOTESE-CALIBRAR`. Verificado em 17/09/2026 que apartação por categoria é prática
-  documentada (sexo, peso, ganho, condição corporal, idade, raça), mas a fonte consultada
-  **não** confirma o critério de destinar o melhor pasto à categoria mais exigente.
-- **Diferencial de desempenho medido contínuo × rotacionado.** Se for pequeno, contínuo deixa
-  de ser "regime inferior a corrigir" e a migração assistida do `01` perde a razão de existir.
-- Earth Engine permite uso não-comercial/acadêmico nos termos atuais? Se não, qual alternativa?
-- Fonte climática: INMET (estações, densidade irregular) ou reanálise (grade, menor resolução)?
-- Conectar o repositório do GitHub como fonte do Project Knowledge? **Recomendação atual: não
-  conectar ainda** — o Arquiteto já escreve as duas cópias sozinho.
-- Existe fazenda-piloto acessível para validação futura? (não bloqueia MVP)
+> **Por que esta tabela existe (17/09/2026).** O usuário perguntou se as perguntas levantadas
+> em chats anteriores chegaram a virar pesquisa. Auditoria feita: **nenhuma se perdeu — todas
+> estavam escritas** — mas estavam espalhadas por quatro lugares (`11` perguntas, `05`
+> parâmetros ausentes, `01` ideias registradas, `10` tabela de pesquisa), sem nada que
+> reconciliasse os quatro. Pergunta sem posição na fila parece que se multiplica sozinha.
+> **Esta tabela passa a ser o registro único.** Os outros quatro lugares continuam existindo,
+> mas quem quiser saber o estado de uma pergunta olha aqui.
+>
+> Regra: **toda pergunta tem uma linha, e toda linha tem uma posição ou uma recusa explícita.**
+> "Sem dono" não é estado permitido. Se a resposta for "não vamos investigar", isso é uma
+> decisão e fica escrito como tal.
+
+| # | Pergunta | Trava o quê | Posição na fila |
+|---|---|---|---|
+| Q1 | Termos de uso atuais do Earth Engine permitem uso não-comercial/acadêmico? Se não, qual alternativa? (B6) | F-005, e a arquitetura de F-006 | **Pesquisa 1.** É aposta, não parâmetro: resposta ruim muda a rota, não só um número |
+| Q2 | `densidade_kg_ha_por_cm` por cultivar (B1) e `eficiencia_pastejo` (B7) | **F-008, o marco ⭐** | **Pesquisa 2.** A parede real do produto. Cara: 15–20 pares (altura, massa) por cultivar |
+| Q3 | Quais cultivares dominam a pecuária de Alagoas? | nada | **Pesquisa 3.** Poda a Q2 — decide para quais cultivares vale caçar densidade. Pode rodar junto com a 2 |
+| Q4 | RUE de gramínea C4 tropical (B2) | F-006 | **Pesquisa 4.** Errar enviesa toda estimativa de crescimento |
+| Q5 | `temperatura_base_c` de gramínea tropical (B4) | F-007 | **Pesquisa 5.** Barato e isolado |
+| Q6 | Fonte climática: INMET (estações, densidade irregular) ou reanálise (grade, menor resolução)? | F-007 | **Pesquisa 5, junto com Q5.** Estava só no `10` e não tinha posição — corrigido aqui |
+| Q7 | `descanso_min/max_dias` por cultivar e `taxa_senescencia` | nada — há faixa geral (21–45) e aproximação declarada | **Pesquisa 6**, opcional. Só vira prioridade se o erro medido do motor for alto |
+| Q8 | A faixa de entrada rotacional do Marandu (19–30 cm) pode ser estreitada? | nada — a ADR-014 aceita faixa | **Fora da fila por decisão.** Reabre só se a validação em fazenda mostrar que a faixa larga custa caro |
+| Q9 | Pastejo líder-seguidor: existe, com que ganho medido? | a ideia "Lote prioritário" do `01`, não o MVP | **Fora da fila por decisão.** É condição de entrada daquela ideia; a pesquisa roda quando a ideia for promovida, não antes |
+| Q10 | Diferencial de desempenho medido contínuo × rotacionado | a ideia "Migração assistida" do `01` | **Fora da fila por decisão.** Mesmo motivo do Q9. Atenção: se o diferencial for pequeno, aquela ideia perde a razão de existir — verificar **antes** de promovê-la, nunca depois |
+| Q11 | Existe fazenda-piloto acessível para validação? | nada no MVP | **Fora da fila por decisão.** Não é pesquisa web; é contato humano. Vira relevante perto do F-015 |
+| Q12 | Conectar o repositório do GitHub como fonte do Project Knowledge? | nada | **Respondida: não, ainda não.** O Arquiteto escreve as duas cópias sozinho e a verificação por manifesto (`08` §7.3) cobre o risco que a conexão resolveria |
+
+**Perguntas que a ADR-014 tirou desta tabela:** altura por regime nas células vazias (Xaraés,
+*B. decumbens*, Massai, Zuri, Tamani) deixou de ser pesquisa e virou pergunta ao produtor, com
+confiança baixa. Peso médio de bezerro (B5) deixou de bloquear — a tabela de UA preenche.
+
+### Duas raias, não uma fila
+
+Pesquisa espera o mundo; código não espera nada. Enquanto as duas dividiram a mesma fila,
+pareceu que nada andava.
+
+- **Raia A (código, Sonnet):** F-001B → F-002 → F-003 → `[ARQUITETURA] schema de eventos` →
+  F-004. **Zero dependência de pesquisa.**
+- **Raia B (pesquisa, Sonnet):** Q1 → Q2 (+Q3) → Q4 → Q5 (+Q6). Um chat entre fatias.
+
+As duas raias só se encontram no **F-005**. Até lá, nenhuma pesquisa bloqueia nenhum código —
+e a primeira parede de verdade é o **F-008**, que precisa do Q2.
 
 ### Resolvidas
 
@@ -380,8 +413,15 @@ reescrito e está sinalizado. O limiar `≤ 1` de categoria compatível é escol
 O fallback de UA para bezerro (112,5 kg) fica abaixo do peso de desmama conhecido (180–210 kg)
 e erra na direção do super-pastejo — por isso confiança média obrigatória, e B5 continua
 aberto como refinamento.
-Pendente: **F-001B** (spec que aplica o schema em `models.py`) não foi escrita. Commit dos
-nove documentos pendente — `RUNBOOK-REV-008` emitido para isso.
+Pendente: **F-001B** (spec que aplica o schema em `models.py`) não foi escrita. Commit **feito**
+(`e82f0b4`, RELATORIO-REV-009 aprovada 5/5).
+Terceiro erro meu, e o que mais custou tempo: o `RUNBOOK-REV-008` reprovou por **duas premissas
+minhas erradas**, não por disco ruim — pedi `grep aguardando_parametro` num arquivo onde escrevi
+o verbete com acento e espaço, e fixei o tamanho de `docs/10` antes de editar `docs/10` de novo.
+Conserto aplicado no método, não só neste runbook: **`08` §7.3 e `CLAUDE.md` agora proíbem
+tamanho em bytes e `grep` escrito à mão dentro de runbook**. No lugar, o Arquiteto relê a
+gravação do disco e compara byte a byte na hora, emite `revisoes/MANIFESTO-<ID>.sha256` gerado
+dos bytes reais, e o runbook carrega uma linha só: `sha256sum -c`. Estreado no REV-009, 14/14 OK.
 Dois erros meus, corrigidos no fim do chat: (a) mandei o usuário "pedir o runbook no próximo
 chat" em vez de escrevê-lo, contra a regra de que toda ação de terminal vira runbook;
 (b) repeti DT7 como pendente quando o usuário já havia colado o `00` novo há vários chats —
