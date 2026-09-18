@@ -8,7 +8,7 @@ Como três modelos com papéis distintos constroem um sistema sem se perder e se
 
 | Papel | Ferramenta | Recebe | Produz | Nunca faz |
 |---|---|---|---|---|
-| **Planejador / Arquiteto** | Claude (Opus/Sonnet) no Project | Knowledge + pedido do usuário | Specs, critérios de aceite, ADRs, pesquisas e atualizações de `docs/` | Escrever código de produção, gerar runbooks ou comandos de terminal |
+| **Planejador / Arquiteto** | Claude (Opus/Sonnet) no Project | `docs/` lido do disco + pedido do usuário | Specs, critérios de aceite, ADRs, pesquisas e atualizações de `docs/` | Escrever código de produção, gerar runbooks ou comandos de terminal |
 | **Programador** | Muse Code (Muse Spark 1.3) | **Só a spec**, autocontida, em inglês | Código em `src/` + testes próprios em `tests/core/` | Tomar decisão de arquitetura |
 | **Testador / Committer / Supervisor** | Antigravity (Gemini) | Código + spec + critérios | Execução de testes (WSL), correção direta de lints em testes, commits Git, relatório final e mentoria didática | Alterar regras de negócio ou inventar parâmetros |
 
@@ -112,35 +112,43 @@ de todo este documento.
 ### Continuidade entre chats de mesmo tipo
 
 Quando um `[FATIA-007]` esgota e a fatia não acabou, abra `[FATIA-007] parte 2` e cole o
-handoff como primeira mensagem. O Knowledge carrega o resto.
+handoff como primeira mensagem — **com a linha `Leia:`**, porque o chat novo abre sem nenhum
+documento carregado.
 
 ---
 
 ## 5. Economia de tokens — o que realmente funciona
 
-### A inversão que muda tudo
+### A economia mudou em 18/09/2026
 
-> Conteúdo estável do Project é cacheado entre mensagens; reutilizá-lo é **mais barato** que
-> reenviar texto novo. Não é grátis — o cache reduz o custo da releitura, não o elimina, e o
-> detalhe da contabilidade nos planos de consumo não é público. Trate como desconto, não isenção.
+Até 17/09 a base vivia no **Project Knowledge**, e o raciocínio era: documento denso se paga
+porque o Knowledge é cacheado entre mensagens. **Isso acabou.** O Knowledge foi esvaziado e a
+base passou a ser lida do disco (`docs/`), a cada chat, por leitura explícita de arquivo.
 
-**Consequência prática, que não depende do detalhe acima:** documento no Knowledge é lido uma
-vez e reaproveitado; chat longo reprocessa o histórico **a cada turno**, e o histórico só cresce.
-A estratégia correta é **base de conhecimento densa + chats magros**, não o contrário.
+O que isso muda:
 
-Por isso os documentos deste projeto são densos de propósito. Eles se pagam na primeira
-reutilização.
+- **Não existe mais amortização por cache.** Todo arquivo lido é custo cheio, toda vez.
+- **Densidade deixou de ser virtude automática.** Um documento dá lucro se for *lido inteiro
+  quando é lido*; se 80% dele é irrelevante para a tarefa, esses 80% são desperdício puro.
+  Foi por isso que o `13-HISTORICO.md` nasceu: separar o que se lê sempre do que quase nunca.
+- **A granularidade virou a alavanca principal.** O ganho não vem mais de escrever bem, vem
+  de **ler pouco e certo**. Daí o protocolo de leitura por etiqueta no `00`.
+
+O que **não** mudou: chat longo reprocessa o histórico a cada turno, e o histórico só cresce.
+Chats magros continuam sendo a regra, e o handoff continua sendo a técnica de maior retorno
+deste documento.
 
 ### Regras operacionais
 
 | Regra | Por quê |
 |---|---|
-| Nunca reimprimir o que está no Knowledge; citar pelo nome do arquivo | O Knowledge já está cacheado |
+| Ler só os arquivos que a tabela do `00` manda | Sem cache, arquivo lido à toa é custo puro |
+| Todo prompt e handoff carrega a linha `Leia:` | Chat novo abre com zero documento carregado |
+| Nunca reimprimir o conteúdo de um arquivo já lido; citar pelo nome | Pagar duas vezes pelo mesmo texto |
 | Agrupar perguntas relacionadas numa mensagem | Cada mensagem reprocessa o histórico |
 | Pedir e produzir **diffs**, não arquivos inteiros | Reescrever arquivo é o maior desperdício isolado |
 | Nunca pedir "confira o que você escreveu" | Custo alto, retorno baixo. Verificação é papel do `[REVISAO]` |
 | Revisar o prompt antes de enviar | Prompt vago gera rodada de esclarecimento |
-| Referenciar documentos pelo nome ao perguntar | Ajuda o RAG a focar a busca |
 
 ### Esforço (effort level)
 
@@ -192,7 +200,7 @@ Um número plausível e falso passa despercebido e contamina tudo a jusante.
 
 ```
 1. [FATIA-NNN] no Claude Projects
-   → Lê o Knowledge e emite a spec autocontida em specs/SPEC-NNN-*.md
+   → Lê do disco os arquivos da linha "Leia:" e emite a spec autocontida em specs/SPEC-NNN-*.md
    → Indica a ação manual em uma linha (pedir ao Muse Code para implementar)
    → Para e aguarda
 
@@ -229,7 +237,8 @@ Ao atualizar a base de conhecimento (`docs/`), modifique apenas as seções ou t
 1. **Chat gigante que faz tudo.** Cada turno reprocessa o histórico inteiro.
 2. **Mandar histórico de conversa para o Muse Code.** Ele se perde e você paga por isso.
 3. **Spec vaga.** "Implemente o otimizador" → falha garantida.
-4. **Esquecer de atualizar o Knowledge.** Duas semanas depois ninguém sabe o que foi decidido.
+4. **Esquecer de atualizar o `docs/` no disco.** Duas semanas depois ninguém sabe o que foi decidido.
+   Não há mais cópia no Knowledge para salvar o esquecimento: o disco é a única fonte.
 5. **Deixar o programador decidir arquitetura.** Ele decide diferente a cada chamada.
 6. **Reabrir decisão fechada sem ADR.** Consome cota e produz incoerência.
 7. **Usar Opus para tudo.** A cota semanal acaba e você fica sem ele quando precisa.

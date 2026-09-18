@@ -26,13 +26,16 @@ decisão é tomada no olho ou em calendário fixo.
 
 | Coisa | Estado |
 |---|---|
-| Base de conhecimento (13 documentos) | pronta |
+| Base de conhecimento (14 documentos) | pronta |
 | Repositório com git, ambiente e ferramentas | pronto |
-| Modelo de domínio em código (`src/seugado/core/models.py`) | pronto, 157 testes passando |
-| Cálculos de forragem, regras, satélite, otimizador, mensagem | **nada ainda** |
+| Modelo de domínio (`src/seugado/core/models.py`) | pronto, com parâmetro por regime (ADR-014) |
+| Cálculos de forragem (`src/seugado/core/forragem.py`) | pronto, 196 testes passando |
+| Regras de manejo, satélite, otimizador, mensagem | **nada ainda** |
 
-Estamos na fundação. Duas fatias concluídas de 22. O que trava o avanço agora **não é código**:
-são números agronômicos que ainda não têm fonte confiável (ver `11-ESTADO-ATUAL.md`).
+Estamos na fundação: quatro fatias concluídas de 22 (F-000, F-001, F-001B, F-002), e a
+próxima — F-003, regras de manejo — está destravada. O que trava o avanço **não é código nem
+decisão**: são números agronômicos sem fonte confiável, que barram o uso em produção com
+cultivar real, não a implementação (ver `docs/11-ESTADO-ATUAL.md`).
 
 ## 3. Quem faz o quê
 
@@ -66,7 +69,7 @@ Na raiz fica apenas o `README.md` como guia do projeto, mais as configurações 
 
 ```
 docs/
-  00-INSTRUCOES    o texto que vai no campo de instruções do Project (não é Knowledge)
+  00-INSTRUCOES    o texto que vai no campo de instruções do Project + o protocolo de leitura
   01-VISAO         o que o produto é e o que está fora de escopo
   02-GLOSSARIO     o nome certo de cada coisa. Em dúvida de vocabulário, é aqui
   03-DOMINIO       a agronomia, explicada para quem não é da área
@@ -79,6 +82,7 @@ docs/
   10-ROTEIRO       as 22 fatias, na ordem
   11-ESTADO        ⬅ o que está feito, o que está travado, qual o próximo chat
   12-ADR           toda decisão fechada, com o porquê
+  13-HISTORICO     arqueologia: bloqueios fechados, handoffs antigos. NÃO se lê por padrão
 
 src/seugado/       o código do app (src-layout)
 tests/             core = testes do Muse · conformance = testes de conformidade
@@ -91,6 +95,10 @@ um comando rodado na raiz importe a pasta local em vez do pacote. O caminho de i
 muda — continua `from seugado.core...`.
 
 **Comece sempre pelo `docs/11-ESTADO-ATUAL.md`.** É o único que muda toda semana.
+
+**O Project Knowledge está vazio, de propósito.** Nada é enviado para lá. O Claude lê estes
+arquivos direto do disco, e por isso todo prompt precisa dizer quais arquivos ler — a tabela
+de leitura por etiqueta está em `docs/00-INSTRUCOES-CUSTOM-INSTRUCTIONS.md`.
 
 ## 6. Duas regras que explicam quase todas as decisões
 

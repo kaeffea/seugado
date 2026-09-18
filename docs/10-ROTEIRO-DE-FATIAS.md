@@ -11,8 +11,10 @@ ponto que funciona — não num ponto quebrado.
 ## Fase 0 — Fundação (sem código de produto)
 
 ### F-000 · Fundação do repositório ✅
-git, `pyproject.toml` (Python 3.12, pytest/ruff/mypy no grupo `dev`), `.gitignore`,
-`CLAUDE.md` e `uv.lock` versionado. Não é fatia do Muse Code — não há lógica de domínio.
+git, `pyproject.toml` (Python 3.12, pytest/ruff/mypy no grupo `dev`), `.gitignore`
+e `uv.lock` versionado. Não é fatia do Muse Code — não há lógica de domínio.
+(O `CLAUDE.md` também entregue nesta fatia foi removido com a aposentadoria do Claude Code;
+as regras de método que ele carregava vivem no `08` §7.)
 **Entrega:** diff verificável e critério "nenhuma dependência nova" auditável. Ver ADR-012.
 
 ### F-001 · Modelo de domínio

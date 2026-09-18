@@ -251,11 +251,13 @@ cumpre a spec: verificações estruturais, o caso canônico e ao menos um caso q
 mostra. **O Muse Code nunca o vê** — se visse, escreveria código para a checagem em vez de
 para o requisito (ADR-011).
 
-### Runbook
-Arquivo em `revisoes/RUNBOOK-<ID>.md` com a lista ordenada de comandos e verificações que o
-Claude Code executa. É o formato de toda ação que exige terminal: git, instalação de
-dependência, lint, tipos, testes.
+### Runbook — **termo aposentado (17/09/2026)**
+Era o arquivo `revisoes/RUNBOOK-<ID>.md` com a lista ordenada de comandos de terminal a
+executar. O fluxo ágil o eliminou: o Antigravity opera o terminal diretamente. O verbete fica
+aqui porque o termo aparece em relatórios e handoffs antigos. **Não escrever runbooks novos**
+(`00`, regra 3).
 
 ### Relatório de conformidade
-Saída do Claude Code em `revisoes/RELATORIO-<ID>.md`: veredicto, tabela de critérios com
-evidência, defeitos, e achados fora da implementação. Formato definido em `CLAUDE.md`.
+Saída do **Antigravity** em `revisoes/RELATORIO-<ID>.md`: veredicto, tabela de critérios com
+evidência, defeitos, e achados fora da implementação. É um único relatório final por fatia,
+conciso, entregue ao Arquiteto para fechamento do ciclo (`08` §7).

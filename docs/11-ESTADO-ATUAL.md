@@ -1,11 +1,13 @@
 # Estado Atual — SeuGado
 
-**Atualizado em:** 17/09/2026
+**Atualizado em:** 18/09/2026
 **Fase:** Fundação — F-000, F-001, **F-001B** e **F-002 concluídas**. F-003 é a próxima
 fatia de código, sem bloqueio de decisão nem de parâmetro.
 
 > Este é o registro único do estado operacional ativo e da fila de trabalho.
 > Mudanças históricas, handoffs antigos e discussões passadas foram arquivados em `13-HISTORICO.md`.
+> **A base de contexto vive no disco** (`C:\code\seugado\docs\`), não no Project Knowledge —
+> todo chat abre lendo os arquivos que o prompt indicar (protocolo no `00`).
 
 ---
 
@@ -134,7 +136,7 @@ Ver `12-REGISTRO-DE-DECISOES-ADR.md`.
 | Q9 | Pastejo líder-seguidor: ganho medido? | ideia futura no 01 | Fora da fila por decisão |
 | Q10 | Diferencial medido contínuo × rotacionado | ideia futura no 01 | Fora da fila por decisão |
 | Q11 | Fazenda-piloto acessível para validação? | nada no MVP | Fora da fila por decisão (contato humano) |
-| Q12 | Conectar GitHub como fonte do Knowledge? | nada | Respondida: não necessário no momento |
+| Q12 | Conectar GitHub como fonte do Knowledge? | nada | **Respondida e encerrada (18/09/2026): a pergunta perdeu objeto.** O Knowledge foi esvaziado; a base é lida do disco em `docs/`. Não há duas cópias para sincronizar |
 
 ### Duas raias, não uma fila
 - **Raia A (código, Sonnet):** F-001B ✅ → F-002 ✅ → **F-003 (próxima)** → `[ARQUITETURA] schema de eventos` → F-004. **Zero dependência de pesquisa.**
