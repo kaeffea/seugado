@@ -1,8 +1,8 @@
 # Estado Atual — SeuGado
 
 **Atualizado em:** 17/09/2026
-**Fase:** Fundação — F-000 e F-001 concluídas; F-001 **reaberta** pela ADR-014 (ver F-001B);
-spec da F-001B emitida (SPEC-002), aguardando Muse Code
+**Fase:** Fundação — F-000, F-001 e **F-001B concluídas**. F-002 e F-003 são as próximas
+fatias de código, sem bloqueio de decisão nem de parâmetro.
 
 > Este é o único arquivo do Knowledge que muda com frequência, e é por onde se começa.
 > O Arquiteto escreve este arquivo direto, no repositório e no Knowledge — você não cola nada.
@@ -11,28 +11,19 @@ spec da F-001B emitida (SPEC-002), aguardando Muse Code
 
 ## Situação
 
-O modelo de domínio existe, foi verificado por suíte independente e passa 157/157 testes.
-O repositório tem fundação (git, `pyproject.toml`, `CLAUDE.md`, ambiente declarado), está
-publicado no GitHub, e `ruff`, `mypy` e `pytest` estão todos limpos. Três ADRs novas
-(010, 011, 012) fecharam os quatro achados urgentes da revisão pós-F-001. O CT-135 da
-Embrapa resolveu a maior parte das alturas canônicas (B3).
+O modelo de domínio existe, foi verificado por suíte independente e passa **177/177 testes**.
+O repositório tem fundação (git, `pyproject.toml`, ambiente declarado), está publicado no GitHub,
+e `ruff`, `mypy` e `pytest` estão todos limpos.
 
-**A ADR-014 está fechada (17/09/2026).** Ela decide as cinco coisas que travavam B8 e mais:
-(1) altura deixa de ser da cultivar e passa a ser do par **cultivar × regime**, em blocos
-(`parametros_por_regime`), com a recusa por `TODO-PARAM` virando função pura de porta única,
-`resolver_parametros` — o que fecha **DT3**; (2) célula vazia não vira default conservador nem
-piquete recusado para sempre: o piquete fica `aguardando_parametro` e o **produtor informa a
-altura dele**, como parâmetro da fazenda, nunca do catálogo; (3) pastejo contínuo ganha laço
-**semanal** próprio, fora da variável `x[l,p,d]` do problema diário mas **dentro** da projeção
-de estado e da hierarquia do `07` §4 — a prescrição quantificada é a fatia nova **F-009B**,
-pós-MVP; (4) `peso_medio_kg` segue canônico e a tabela de UA vira **preenchimento** dele, o que
-rebaixa **B5** de bloqueio a refinamento; (5) **DT11** fechada — categoria compatível é
-distância ≤ 1 na escala de UA. Texto completo no `12`. Impacto aplicado em `01`, `02`, `03`,
-`05`, `06`, `07` e `10`.
+**F-001B concluída (17/09/2026).** A ADR-014 foi aplicada com sucesso em `models.py` (SPEC-002,
+commit `5a600c8`): `MetodoPastejo`, `ParametrosRegime`, `Cultivar.parametros_por_regime` e
+`Piquete.metodo_pastejo`.
 
-**O preço, registrado:** F-001 é reaberta. `models.py` estava intocada desde a aprovação e
-agora precisa de `MetodoPastejo`, `ParametrosRegime` e do campo novo em `Cultivar` — é a
-**F-001B**, primeira spec a mexer em arquivo já aceito, e ela vem antes do F-002.
+**Transição para o Fluxo Ágil:** A partir de 17/09/2026, o fluxo foi desburocratizado: Claude Code,
+runbooks manuais e manifestos SHA-256 foram aposentados. O **Antigravity (Gemini)** assumiu a
+execução de terminal, verificação no WSL, faxina de lints em testes e commits diretos no Git,
+entregando um relatório final conciso para fechamento no Claude Projects. F-002 e F-003 estão
+100% destravadas para implementação.
 
 O chat `[ARQUITETURA] Método de pastejo` não fechou ADR — e isso foi o resultado certo.
 Ele descobriu que a decisão depende de três perguntas empíricas (P1, P2, P3), criou o
@@ -88,7 +79,7 @@ fatias de código seguidas sem depender de nenhuma pesquisa.
 |---|---|
 | F-000 Fundação do repositório | ✅ concluída (ADR-012) |
 | F-001 Modelo de domínio | ✅ concluída — 13/13 critérios, 157 testes |
-| **F-001B Modelo de domínio: parâmetro por regime** | 🟨 **spec emitida** — `specs/SPEC-002-domain-model-regime.md` pronta para colar no Muse Code; kit em `revisoes/KIT-ACEITE-002.md` |
+| **F-001B Modelo de domínio: parâmetro por regime** | ✅ **concluída** — 14/14 critérios (RELATORIO-FATIA-001B), correção de anotação mypy aplicada (SPEC-002-CORRECAO-A), commit `5a600c8`, 177/177 testes |
 | F-002 Cálculos de forragem | ⬜ **implementável — não estava bloqueada.** Ver "Correção de 17/09/2026", abaixo. O que está bloqueado é **operar em produção** com cultivar real, não escrever e testar as funções |
 | F-003 Regras de manejo | ✅ **destravada pela ADR-014** — depende de F-001B, não mais de decisão |
 | F-004 Persistência e eventos | ⬜ não iniciada — exige `[ARQUITETURA] Schema de eventos` antes |
@@ -114,10 +105,11 @@ C:\code\seugado                git, main, publicado no GitHub (privado)
 ├── pyproject.toml             Python 3.12; dev: pytest, ruff, mypy strict; md fora do ruff
 ├── uv.lock                    versionado (ADR-012)
 ├── docs/                      00–12, a base de conhecimento (fonte de verdade)
-├── src/seugado/core/models.py 6 enums, 7 dataclasses frozen/slots — F-001, intocada
+├── src/seugado/core/models.py 7 enums, 8 dataclasses frozen/slots — F-001B, parâmetro por regime
 ├── tests/core/                suíte do Muse Code (fumaça)
 ├── tests/conformance/         suíte independente do Claude Code (verificação de registro)
-├── specs/                     SPEC-001-domain-model.md
+├── specs/                     SPEC-001-domain-model.md · SPEC-002-domain-model-regime.md ·
+│                              SPEC-002-CORRECAO-A-mypy-annotation.md
 └── revisoes/                  REV-*, KIT-ACEITE-*, RUNBOOK-*, RELATORIO-*
 ```
 
@@ -125,10 +117,12 @@ Commits: `73ff3af` fundação + F-001 · `d06880b` ADRs 010–012 · `354382b` u
 `3877064` dívida de lint zerada · `91d115c` ADR-013 (16 arquivos renomeados, 0 alterações) ·
 `a1ef54e` caminhos hardcoded de `tests/conformance` para o src-layout ·
 `e82f0b4` ADR-014, correção do status do F-002 e verificação por manifesto (RELATORIO-REV-009,
-aprovada 5/5).
+aprovada 5/5) · `94429cd` spec/runbook da F-001B (SPEC-002-CORRECAO-A,
+RUNBOOK-FATIA-001B-commit) · `5a600c8` F-001B — parâmetro de altura por regime em `models.py`
+(RELATORIO-FATIA-001B-commit, aprovada).
 Ambiente: `.venv` por `uv` no WSL Ubuntu. O Windows hospedeiro não tem Python.
 Versões medidas: Python 3.12.3, pytest 9.1.1, ruff 0.16.8, mypy 2.3.1.
-Estado das ferramentas: `ruff check`, `ruff format --check`, `mypy` e `pytest` limpos, 157/157.
+Estado das ferramentas: `ruff check`, `ruff format --check`, `mypy` e `pytest` limpos, 177/177.
 
 ---
 
@@ -195,7 +189,7 @@ como a pecuária brasileira funciona de fato não pode ser tomada antes de algu�
 | ~~2~~ | ~~`[ARQUITETURA] Método de pastejo: contínuo entra no escopo?`~~ | Opus | — | ✅ encerrado 17/09/2026 **sem ADR**. Produziu B8, P1–P3 e duas ideias registradas no `01`. Ver handoff |
 | ~~3~~ | ~~`[PESQUISA] Regime de pastejo na prática brasileira`~~ | Sonnet | **B8** (via P1, P2, P3) | ✅ concluído 17/09/2026. Ver handoff |
 | ~~4~~ | ~~`[ARQUITETURA] Método de pastejo — ADR-014`~~ | Opus | B8, ADR-014, DT3, DT11 | ✅ concluído 17/09/2026. Ver handoff |
-| **4B** | **`[FATIA-001B] Modelo de domínio: parâmetro por regime`** | Sonnet, médio | aplica a ADR-014 em `models.py` | **Criado pela ADR-014.** É modelo de dados, padrão conhecido — não precisa de Opus. Vem antes do F-002, porque muda o contrato que o F-002 consome |
+| ~~4B~~ | ~~`[FATIA-001B] Modelo de domínio: parâmetro por regime`~~ | Sonnet, médio | aplica a ADR-014 em `models.py` | ✅ concluído 17/09/2026 — commit `5a600c8`, 177/177 testes |
 | 5 | `[PESQUISA] Mercado e pecuária de Alagoas` | Sonnet | poda a fila de parâmetro | Desceu de #4. Decide **quais** cultivares valem pesquisa; roda depois da ADR-014, que já decidiu **quantas células** cada uma precisa |
 | **4C** | **`[FATIA-002] Cálculos de forragem`** | Sonnet, médio | — | **Adiantado em 17/09/2026.** Não depende do F-001B nem de pesquisa nenhuma: o contrato recebe floats e o caso canônico roda com os parâmetros neutralizados. Ver "Correção de 17/09/2026" |
 | 6 | `[PESQUISA] Densidade do dossel e eficiência de pastejo` | Sonnet | B1, B7 | Sem a densidade não existe ponte kg MS/ha ↔ cm. Continua necessária **para produção**, não para implementar o F-002 |
@@ -391,6 +385,25 @@ e a primeira parede de verdade é o **F-008**, que precisa do Q2.
 ## Log de handoffs
 
 _(Cole aqui o handoff de cada chat encerrado, mais recente no topo.)_
+
+**17/09/2026 — [FATIA-001B] Modelo de domínio: parâmetro por regime (encerrado)**
+Feito: **F-001B concluída.** SPEC-002 aplicou a ADR-014 em `models.py` — `MetodoPastejo`
+(3º enum), `ParametrosRegime` (2º dataclass, sem defaults), `Cultivar.parametros_por_regime`
+substituindo os campos planos de altura, `Piquete.metodo_pastejo`. RELATORIO-FATIA-001B:
+14/14 critérios, ✅ com uma ressalva de mypy (duas linhas de teste sem
+`# type: ignore[comparison-overlap]`, rule 11 do `06` §7). Ressalva **não** foi remendada
+direto: fui por spec de correção (SPEC-002-CORRECAO-A), como o método exige — conserto de
+código sempre por spec nova, nunca por mim nem pelo Claude Code editando por iniciativa
+própria. Reaplicada, reverificada, `mypy` limpo. Commit de código `5a600c8`
+(RELATORIO-FATIA-001B-commit, aprovada, 177/177 testes), commit auxiliar de documentação
+`94429cd`, push aceito.
+Erro de método capturado no caminho: ao regravar `RUNBOOK-FATIA-001B-commit.md` corrigido,
+reaproveitei o mesmo caminho de origem local e o disco ficou com a versão antiga — o próprio
+bug que o `08` §7.1 documenta. Peguei pelo hash (não bati com o que eu pretendia gravar),
+regravei com caminho novo, confirmei byte a byte antes de seguir.
+Pendente: nada bloqueando F-002 nem F-003 — as duas destravadas, sem dependência de pesquisa.
+Próximo: `[FATIA-002] Cálculos de forragem` ou `[FATIA-003] Regras de manejo`, as duas em
+Sonnet, esforço médio; ver "Ordem sugerida dos próximos chats".
 
 **17/09/2026 — [ARQUITETURA] Método de pastejo — ADR-014 (encerrado)**
 Feito: **ADR-014 escrita e aceita**, fechando B8, DT3 e DT11 e rebaixando B5. Cinco decisões:

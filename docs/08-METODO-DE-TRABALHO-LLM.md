@@ -8,12 +8,11 @@ Como três modelos com papéis distintos constroem um sistema sem se perder e se
 
 | Papel | Ferramenta | Recebe | Produz | Nunca faz |
 |---|---|---|---|---|
-| **Planejador / Arquiteto** | Claude (Opus/Sonnet) no Project | Knowledge + pedido do usuário | Specs, **kits de aceite**, **runbooks**, ADRs, análises, handoffs, e os próprios arquivos `00`–`12` | Escrever código de produção |
-| **Programador** | Muse Code (Muse Spark 1.3) | **Só a spec**, autocontida, em inglês | Código + testes próprios | Tomar decisão de arquitetura. Ver o kit de aceite |
-| **Testador / Executor** | Claude Code (Sonnet, esforço médio) | `CLAUDE.md` + kit de aceite ou runbook + código | Suíte independente, relatório de conformidade, execução de comando | Alterar spec, ADR ou documento `00`–`12` |
+| **Planejador / Arquiteto** | Claude (Opus/Sonnet) no Project | Knowledge + pedido do usuário | Specs, critérios de aceite, ADRs, pesquisas e atualizações de `docs/` | Escrever código de produção, gerar runbooks ou comandos de terminal |
+| **Programador** | Muse Code (Muse Spark 1.3) | **Só a spec**, autocontida, em inglês | Código em `src/` + testes próprios em `tests/core/` | Tomar decisão de arquitetura |
+| **Testador / Committer / Supervisor** | Antigravity (Gemini) | Código + spec + critérios | Execução de testes (WSL), correção direta de lints em testes, commits Git, relatório final e mentoria didática | Alterar regras de negócio ou inventar parâmetros |
 
-O Claude Code lê `CLAUDE.md`, na raiz do repositório, antes de agir: papel, ambiente WSL,
-checagens estruturais obrigatórias e formato do relatório de conformidade vivem lá.
+O Antigravity opera diretamente no ambiente WSL, testa, formata, resolve pequenos apontamentos de linter/tipagem em testes e realiza os commits no repositório.
 
 ### A regra de ouro
 
@@ -194,121 +193,36 @@ Um número plausível e falso passa despercebido e contamina tudo a jusante.
 ## 7. Ciclo completo de uma fatia
 
 ```
-1. [FATIA-NNN] no Claude
-   → lê Knowledge, produz DOIS artefatos:
-     · specs/SPEC-NNN-*.md          (vai para o Muse)
-     · revisoes/KIT-ACEITE-NNN.md   (só o Claude Code vê)
-   → você copia APENAS a spec
+1. [FATIA-NNN] no Claude Projects
+   → Lê o Knowledge e emite a spec autocontida em specs/SPEC-NNN-*.md
+   → Indica a ação manual em uma linha (pedir ao Muse Code para implementar)
+   → Para e aguarda
 
 2. Muse Code
-   → recebe SÓ a spec
-   → produz código + testes próprios
+   → Lê specs/SPEC-NNN-*.md no disco
+   → Produz código em src/seugado/ e testes em tests/core/
+   → Notifica o usuário
 
-3. Claude Code
-   → lê CLAUDE.md + o kit de aceite + o código
-   → escreve suíte independente em tests/conformance/, roda, relata em revisoes/RELATORIO-*
+3. Antigravity (Gemini)
+   → Roda as 4 ferramentas no WSL: ruff check, ruff format, mypy, pytest
+   → Corrige diretamente qualquer apontamento cosmético (lint, formatação, # type: ignore em testes)
+   → Executa/atualiza a suíte de conformidade em tests/conformance/
+   → Realiza o commit e push direto no Git: git commit -m "F-NNN: <título>"
+   → Gera UM único relatório final conciso de conformidade em revisoes/RELATORIO-<NNN>.md
 
-4. Se falhou:
-   [TRIAGEM] no Claude → diagnóstico → spec de correção → volta ao passo 2
-
-5. Se passou:
-   [FATIA-NNN] emite handoff e escreve ele mesmo os arquivos 00–12 alterados
-   → ação que exige shell (git, uv, lint) vai num revisoes/RUNBOOK-*.md
-   → você roda o runbook no Claude Code e abre a próxima fatia
+4. Fechamento no Claude Projects
+   → Lê o relatório final
+   → Registra a conclusão em docs/11-ESTADO-ATUAL.md (via edição cirúrgica)
+   → Se houver débitos técnicos secundários, anota para fatias futuras
+   → Encerra o ciclo e indica o próximo chat em prosa limpa
 ```
 
-**O que o usuário faz, e só ele:** colar a spec no Muse Code, aprovar ADR, rodar o runbook,
-e sincronizar o Knowledge. O Arquiteto escreve os documentos; ninguém pede que você redija.
+### 7.1. Edição cirúrgica de documentos
+Ao atualizar a base de conhecimento (`docs/`), modifique apenas as seções ou tabelas necessárias. Nunca reescreva arquivos inteiros de 500 linhas para alterar poucas linhas de texto — isso poupa tokens de saída e evita problemas de truncamento de disco.
 
----
-
-## 7.1. Como escrever runbook que não trava sozinho
-
-Dois runbooks foram reprovados por pré-condição que o próprio Arquiteto quebrou, não por erro
-do executor. A causa é a mesma nos dois: **o Arquiteto escreve documento entre a emissão do
-runbook e a execução dele.** Regras que saem daí, para quem escreve runbook:
-
-- **Nunca** restringir o diff a uma lista fechada de arquivos de `docs/`. O executor não tem
-  como saber quais documentos foram escritos depois. Restrição de arquivo vale para `src/` e
-  `tests/`, onde o autor é outro.
-- Todo runbook começa commitando o que estiver pendente em documentação, num commit próprio.
-- Nunca exigir "árvore limpa" sem antes dar ao executor o passo que a limpa.
-- Afirmar que um arquivo "já foi escrito" é uma premissa, não um fato: peça conferência de
-  **conteúdo** e trate a ausência como parada legítima. Escrita em disco pode não sobreviver;
-  aconteceu com `docs/05` em 17/09/2026, e só o testador pegou.
-- O Arquiteto confere as próprias escritas relistando o diretório depois de gravar. A
-  confirmação da ferramenta de escrita não é prova de que o arquivo ficou no disco.
-  **Mecanismo identificado em 17/09/2026:** reaproveitar o mesmo caminho de origem em
-  escritas sucessivas fazia a gravação repetir o conteúdo da primeira vez — o arquivo era
-  tocado, o tamanho ficava o antigo, e a ferramenta reportava sucesso. Foi o que apagou a
-  tabela do CT-135 do `docs/05` e o que engoliu duas edições do `CLAUDE.md`. Contorno:
-  **caminho de origem novo e único a cada gravação**, e conferir o tamanho no disco depois.
-  Enquanto esse contorno estiver em uso, todo runbook que dependa de um arquivo escrito pelo
-  Arquiteto deve checar tamanho ou conteúdo esperado antes de commitar.
-- Quando o runbook **é** o commit da documentação pendente, dizer isso na abertura e colocar
-  as checagens de conteúdo **antes** do passo de commit, não numa seção que o executor lê
-  depois. O passo zero do `CLAUDE.md` commita; se a conferência vier depois, ela conferiu um
-  commit em vez de evitá-lo.
-
-## 7.2. Runbook que move arquivo
-
-Reorganizar layout parece trivial e tem um ponto cego provado: a suíte de
-`tests/conformance/` lê o código-fonte por caminho literal (para checar estrutura via AST),
-então mover o pacote quebra a suíte sem quebrar nenhum import. Todo runbook que move arquivo
-inclui, obrigatoriamente:
-
-- um passo explícito de **atualizar caminho hardcoded em `tests/conformance/`**;
-- a exigência de que o commit de renomeação seja puro (`R` no status, zero inserções);
-- a correção de caminho num commit **separado**, que é do testador e não do Arquiteto.
-
-## 7.3. Verificação de escrita: manifesto, não número solto
-
-**Regra, a partir de 17/09/2026:** runbook **nunca** carrega tamanho esperado em bytes nem
-`grep` de conteúdo escrito à mão. Essas checagens existiam por causa da gravação que truncava
-em silêncio (REV-006/REV-007), e elas **falharam como remédio** — no REV-008 reprovaram um
-disco que estava correto, duas vezes, pelo mesmo motivo:
-
-1. O Arquiteto escreveu o tamanho de `docs/10` no runbook e **depois editou `docs/10` de novo**.
-   O número no runbook virou fóssil no instante da edição seguinte.
-2. O Arquiteto pediu `grep aguardando_parametro` em `docs/02`, mas escreveu no glossário o
-   verbete "Aguardando parâmetro", com acento e espaço. A premissa nunca existiu no arquivo.
-
-Os dois erros têm a mesma raiz: **o runbook afirmava um fato sobre o disco que o Arquiteto
-digitou de memória**, e o disco continua mudando depois que o runbook é emitido — o que o
-próprio `CLAUDE.md` já diz ser normal e assíncrono.
-
-### O que substitui
-
-O Arquiteto verifica a própria escrita **no momento em que grava**: relê o arquivo de volta do
-disco e compara byte a byte com o que pretendia escrever. Isso é estritamente mais forte que
-um tamanho no runbook, e não pode envelhecer, porque acontece antes de o runbook existir.
-
-Depois de gravar, o Arquiteto emite um **manifesto** — `revisoes/MANIFESTO-<ID>.sha256`,
-gerado a partir dos bytes que estão no disco, nunca digitado à mão. O runbook então carrega
-**uma linha**:
-
-```bash
-sha256sum -c revisoes/MANIFESTO-<ID>.sha256
-```
-
-Propriedades que isso compra:
-- Nenhum número no runbook é escrito de memória, então não há premissa falsa a envelhecer.
-- Detecta truncamento, edição parcial e corrupção — tudo que o tamanho detectava, e mais.
-- Se o Arquiteto editar um documento depois de emitir o manifesto, ele emite manifesto novo.
-  Falha de `sha256sum -c` passa a significar **uma coisa só**: o disco não é o que o Arquiteto
-  gravou. É sinal verdadeiro, não ruído.
-
-### O que o Claude Code faz quando falha
-
-Igual a antes: **pare e relate**, nomeando os arquivos que o `sha256sum -c` marcou como
-`FAILED`. Não commite. Mas agora a falha é informativa — ela aponta o arquivo, não uma
-divergência de contagem que pode ser só o Arquiteto tendo editado de novo.
-
-### O que continua valendo
-
-Verificar **presença** de arquivo, classificar a árvore de trabalho (passo zero) e conferir
-escopo de `src/`/`tests/` por `git diff --stat` seguem exatamente como estão. O que sai é só
-a checagem de conteúdo escrita à mão dentro do runbook.
+### 7.2. Fim de burocracias descartadas
+- **Runbooks e Manifestos SHA-256 estão abolidos:** Toda operação de terminal e integridade de arquivos é auditada pelo Antigravity diretamente via Git.
+- **Zero micro-specs para correções de lint:** Apontamentos simples de linter ou tipagem estrita em arquivos de teste são resolvidos diretamente pelo testador (Antigravity), sem necessidade de rodadas extras de spec para o Muse.
 
 ---
 

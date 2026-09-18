@@ -36,40 +36,29 @@ são números agronômicos que ainda não têm fonte confiável (ver `11-ESTADO-
 
 ## 3. Quem faz o quê
 
-Quatro participantes, e é importante não confundir:
+Três ferramentas com papéis claros, sem burocracia de terminal para o Arquiteto:
 
 | Quem | Faz | Nunca faz |
 |---|---|---|
-| **Você** | decide, aprova, cola a spec no Muse, roda o Claude Code | escrever documento à mão |
-| **Claude (Arquiteto)**, neste Project | decide arquitetura, escreve os documentos, as specs, os kits de aceite e os runbooks | escrever código de produção |
-| **Muse Code** | escreve o código, a partir de uma spec autocontida | decidir arquitetura; ver o kit de aceite |
-| **Claude Code**, no terminal | roda comando, escreve a suíte independente, relata conformidade | alterar spec, ADR ou documento |
+| **Você** | decide, aprova, aponta o Muse para a spec, cola o relatório final no Claude | escrever código ou documento à mão |
+| **Claude (Arquiteto)**, no Project | decide arquitetura, pesquisa agronomia, escreve as specs (`specs/`) e atualiza a documentação | escrever código de produção ou gerar runbooks de terminal |
+| **Muse Code** | escreve o código de produção em `src/seugado/` a partir da spec, e testes próprios em `tests/core/` | decidir arquitetura |
+| **Antigravity (Gemini)** | roda os testes no WSL, arruma lints/anotações de tipo simples, faz o commit/push no Git e entrega 1 relatório final | inventar parâmetros ou alterar regras de negócio |
 
-Por que o Muse não decide nada: ele é um modelo barato, de contexto curto. Se ele puder
-escolher, escolhe diferente a cada chamada, e o sistema fica incoerente.
-
-Por que quem escreve o código não é quem aprova: o Muse escreve testes próprios — é só um
-teste de fumaça, para o código ter rodado ao menos uma vez. A verificação que vale é do
-Claude Code, que **não vê** os números esperados da spec. Isso foi medido: plantaram-se 7
-defeitos no código e a suíte que veio junto com a spec deixou passar quase todos.
+Por que o Muse não decide arquitetura: ele é um modelo direto de contexto curto. Se puder escolher, escolhe diferente a cada chamada.
+Por que o Antigravity cuida de terminal e testes: ele opera diretamente no ambiente, resolve atritos simples de tipagem sem criar novas specs e poupa a cota de tokens do Claude Projects.
 
 ## 4. O ciclo de uma fatia
 
 ```
-1. Você abre um chat aqui:  [FATIA-002] Cálculos de forragem
-2. O Arquiteto escreve:     specs/SPEC-002-*.md         → o Muse Code lê este
-                            revisoes/KIT-ACEITE-002.md  → o Muse não deve abrir
-3. No Muse Code:            "leia specs/SPEC-002-*.md e implemente"
-4. No Claude Code:          "continue"
-                            (ele acha sozinho o que está pendente em revisoes/)
-5. Claude Code              → testa e escreve revisoes/RELATORIO-002.md
-6. Você volta aqui e diz    "relatório 002 gerado, leia"
-7. O Arquiteto atualiza os documentos e diz qual é o próximo chat
+1. No Claude Projects:       Gera a spec em specs/SPEC-NNN-*.md
+2. No Muse Code:             "Leia specs/SPEC-NNN-*.md e implemente"
+3. No Antigravity:           "Teste e commite a fatia" 
+                             (Ele roda ruff/mypy/pytest, arruma lints, commita e entrega o relatório)
+4. No Claude Projects:       Você cola o relatório final → Arquiteto fecha a fatia e abre a próxima!
 ```
 
-As suas ações, no total: **apontar o Muse para a spec, dizer "continue" ao Claude Code,
-avisar aqui que o relatório saiu.** Mais alguns comandos de git. Nada de redigir documento,
-nada de subir arquivo.
+Suas ações: **apontar o Muse para a spec, pedir para o Antigravity testar/commitar, e avisar o Claude Projects que terminou.** Zero runbooks manuais. Zero uploads de arquivos.
 
 ## 5. Onde fica cada coisa
 
