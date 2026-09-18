@@ -45,7 +45,6 @@
 | B1 | `densidade_kg_ha_por_cm` ausente para todas as cultivares | Produção real (F-002 implementado) | `[PESQUISA]` Q2 (`13` §6) |
 | B2 | RUE para gramínea C4 tropical ausente | F-006 | `[PESQUISA]` Q4 (`13` §6) |
 | B4 | `temperatura_base_c` ausente | F-007 | `[PESQUISA]` Q5 (`13` §6) |
-| B6 | Termos de uso atuais do Earth Engine | F-005 | `[PESQUISA]` Q1 (`13` §6) |
 | B7 | `eficiencia_pastejo` sem fonte (ADR-010) | Produção real (F-002 implementado) | `[PESQUISA]` Q2 (`13` §6) |
 
 ---

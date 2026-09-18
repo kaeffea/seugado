@@ -33,6 +33,26 @@ Mesmo assim o F-002 esteve marcado 🔒 no `11` desde a ADR-010.
 ## 2. Bloqueios e dívidas técnicas resolvidas
 
 ### Bloqueios superados
+- **~~B6~~ Termos de uso do Earth Engine:** ✅ **Resolvido em `[PESQUISA] Q1 — Termos de uso do
+  Earth Engine` (18/09/2026).** O tier gratuito (*noncommercial*) da Earth Engine cobre uso
+  acadêmico e de pesquisa sem fins lucrativos (indivíduos, estudantes/docentes de instituição
+  acadêmica, pesquisa sem fins lucrativos), mas **proíbe explicitamente** vender produto ou
+  serviço, cobrar ou receber taxa por aplicações/dados criados com o serviço, e qualquer
+  atividade do tipo *fee-for-service*. Como o SeuGado é explicitamente uma startup (mesmo
+  em fase de protótipo acadêmico agora), isto não bloqueia o desenvolvimento — o registro
+  noncommercial (tier "Community", 150 EECU-horas/mês) é legítimo enquanto o uso for
+  acadêmico/de desenvolvimento sem cobrança — mas **é uma aposta de arquitetura**: o produto
+  não pode ser monetizado (venda, assinatura, qualquer remuneração ligada ao dado do Earth
+  Engine) sem antes migrar o projeto para o tier comercial pago
+  (`earthengine.google.com/commercial`), sob risco de desativação da conta por uso comercial
+  não pago. Não há isenção específica para "startup em fase de validação" nos termos — a
+  Google oferece separadamente o Google for Startups Cloud Program (créditos), mas isso não
+  muda a obrigação de registro comercial no momento em que houver cobrança.
+  **Fontes:** [Earth Engine Terms of Service](https://earthengine.google.com/terms/),
+  [Noncommercial eligibility](https://earthengine.google.com/noncommercial/),
+  [Earth Engine Noncommercial Tiers](https://developers.google.com/earth-engine/guides/noncommercial_tiers),
+  [Transition to commercial projects](https://developers.google.com/earth-engine/guides/transition_to_commercial),
+  [Program Policies](https://explorer.earthengine.google.com/programpolicies).
 - **~~B3~~ Alturas canônicas — obter Comunicado Técnico 125 da Embrapa:** ✅ Resolvido em `[PESQUISA] Régua de Manejo Embrapa` (17/09/2026) — CT-135 cobre entrada+saída de Mombaça, Zuri, Tanzânia, Massai, Tamani, e máxima/mínima contínua de Xaraés, Piatã, Marandu, *B. decumbens*. Resíduo: entrada rotacional de Marandu/Xaraés virou B8.
 - **~~B5~~ Peso médio de bezerro ausente:** ✅ **Rebaixado de bloqueio a refinamento pela ADR-014** (17/09/2026). A tabela de UA preenche o peso ausente (`coeficiente × 450`, confiança média). Buscar o peso real segue valendo como precisão. Parcialmente informado em `[PESQUISA] Regime de pastejo`: peso de desmama 180–210 kg (fonte baixa confiança, blog comercial) não é o mesmo que peso médio da fase de cria inteira. A tabela de UA por categoria (ver `05`) permite calcular consumo de lote misto sem esse número.
 - **~~B8~~ Decisão de regime não tomada:** ✅ **RESOLVIDO 17/09/2026 — ADR-014 escrita e aceita.** Pesquisa (P1–P3) entregou o dado; a ADR decidiu schema por regime, comportamento na célula vazia, cadência do contínuo, fonte canônica de consumo e DT11. Ver `12`.
@@ -142,7 +162,7 @@ Fechada em 17/09/2026. Texto completo no `12-REGISTRO-DE-DECISOES-ADR.md`.
 
 | # | Pergunta | Trava o quê | Posição na fila |
 |---|---|---|---|
-| Q1 | Termos de uso atuais do Earth Engine permitem uso não-comercial? (B6) | F-005, arquitetura de F-006 | **Pesquisa 1.** Aposta de arquitetura |
+| ~~Q1~~ | Termos de uso atuais do Earth Engine permitem uso não-comercial? (B6) | F-005, arquitetura de F-006 | **Respondida e encerrada (18/09/2026):** tier noncommercial cobre uso acadêmico/protótipo, mas proíbe venda/monetização — migração paga é obrigatória antes de cobrar do produto. Ver §2 (B6) |
 | Q2 | `densidade_kg_ha_por_cm` por cultivar (B1) e `eficiencia_pastejo` (B7) | **F-008, o marco ⭐** | **Pesquisa 2.** Parede real do produto |
 | Q3 | Quais cultivares dominam a pecuária de Alagoas? | nada | **Pesquisa 3.** Poda a Q2 |
 | Q4 | RUE de gramínea C4 tropical (B2) | F-006 | **Pesquisa 4.** Estimativa de crescimento |
