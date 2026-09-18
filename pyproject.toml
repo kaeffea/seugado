@@ -3,7 +3,10 @@ name = "seugado"
 version = "0.1.0"
 description = "Sistema prescritivo de manejo de pastagens por satelite"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "psycopg[binary]>=3.3.5",
+    "pydantic>=2.13.5",
+]
 
 [dependency-groups]
 dev = [

@@ -533,7 +533,10 @@ def test_ac12_pyproject_has_no_dependencies_if_present():
     import tomllib
 
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-    assert not data.get("project", {}).get("dependencies")
+    deps = data.get("project", {}).get("dependencies", [])
+    # ADR-020 (F-004) authorized psycopg[binary] and pydantic
+    names = {d.split(">=")[0].split("==")[0].strip() for d in deps}
+    assert names <= {"psycopg[binary]", "pydantic"}
 
 
 def test_style_file_under_300_lines():

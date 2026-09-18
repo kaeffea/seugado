@@ -1,8 +1,8 @@
 # Estado Atual — SeuGado
 
 **Atualizado em:** 18/09/2026
-**Fase:** Fundação — F-000, F-001, **F-001B**, **F-002** e **F-003 concluídas**. F-004 tem
-`specs/SPEC-005` e `SPEC-006` emitidas, aguardando implementação do Muse Code.
+**Fase:** Fundação concluída (F-000, F-001, **F-001B**, **F-002**, **F-003** e **F-004 concluídas**).
+Próxima: **F-005 (Ingestão de satélite)**, dando início à Fase 1 ("Enxergar o pasto").
 
 > Este é o registro único do estado operacional ativo e da fila de trabalho.
 > Mudanças históricas, handoffs antigos e discussões passadas foram arquivados em `13-HISTORICO.md`.
@@ -31,8 +31,8 @@ O modelo de domínio e os cálculos de forragem estão implementados e cobertos 
 | **F-001B Modelo de domínio: parâmetro por regime** | ✅ **concluída** — 14/14 critérios, commit `5a600c8`, 177/177 testes |
 | **F-002 Cálculos de forragem** | ✅ **concluída** — `core/forragem.py`, commit `d76c7f6`, 196/196 testes |
 | **F-003 Regras de manejo** | ✅ **concluída** — `core/regras.py`, commit `0248cad`, 215/215 testes |
-| F-004 Persistência e eventos | 🟨 **specs emitidas** (`SPEC-005-persistencia-eventos.md`, `SPEC-006-projecao-eventos.md`) — aguarda Muse Code |
-| F-005 Ingestão de satélite | ⬜ não iniciada |
+| **F-004 Persistência e eventos** | ✅ **concluída** — `core/projecao.py`, `persistencia/eventos.py`, SQL migration, 254 testes (+2 skipped) |
+| F-005 Ingestão de satélite | ⬜ não iniciada — próxima fatia (início da Fase 1) |
 | F-006 Modelo SAFER | 🔒 bloqueada (`rue_max_g_por_mj` C4) |
 | F-007 Clima e graus-dia | 🔒 bloqueada (`temperatura_base_c`) |
 | F-008 ⭐ Projeção de estado | ⬜ não iniciada |
@@ -50,13 +50,17 @@ Layout da ADR-013, aplicado e verificado:
 ```
 C:\code\seugado                git, main, publicado no GitHub (privado)
 ├── README.md                  mapa simples do projeto — ler primeiro
-├── pyproject.toml             Python 3.12; dev: pytest, ruff, mypy strict; md fora do ruff
+├── pyproject.toml             Python 3.12; dev: pytest, ruff, mypy strict; psycopg, pydantic
 ├── uv.lock                    versionado (ADR-012)
+├── db/migrations/             0001_evento_e_derivadas.sql — migração SQL pura (ADR-020)
 ├── docs/                      00–13, a base de conhecimento (fonte de verdade)
-├── src/seugado/core/models.py   7 enums, 8 dataclasses frozen/slots — F-001B, parâmetro por regime
+├── src/seugado/core/models.py   7 enums, 8 dataclasses frozen/slots — F-001B/F-004
 ├── src/seugado/core/forragem.py 7 funções puras — F-002, cálculos de forragem
 ├── src/seugado/core/regras.py   5 funções puras — F-003, regras de manejo e resolução
+├── src/seugado/core/projecao.py dobra pura de eventos — F-004 (SPEC-006)
+├── src/seugado/persistencia/eventos.py gateway de escrita validado com Pydantic — F-004 (SPEC-005)
 ├── tests/core/                suíte do Muse Code (fumaça)
+├── tests/persistencia/        suíte de persistência do Muse Code
 ├── tests/conformance/         suíte de conformidade independente (Antigravity)
 ├── specs/                     SPEC-001 a SPEC-006
 └── revisoes/                  relatórios finais de fatia (arquivo/ contém o legado)
@@ -64,7 +68,7 @@ C:\code\seugado                git, main, publicado no GitHub (privado)
 
 Ambiente: `.venv` por `uv` no WSL Ubuntu.
 Versões medidas: Python 3.12.3, pytest 9.1.1, ruff 0.16.8, mypy 2.3.1.
-Estado das ferramentas: `ruff check`, `ruff format --check`, `mypy` e `pytest` limpos, 215/215.
+Estado das ferramentas: `ruff check`, `ruff format --check`, `mypy` e `pytest` limpos, 254 passed (2 skipped).
 
 ---
 
