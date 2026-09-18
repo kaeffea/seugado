@@ -8,11 +8,11 @@ Como três modelos com papéis distintos constroem um sistema sem se perder e se
 
 | Papel | Ferramenta | Recebe | Produz | Nunca faz |
 |---|---|---|---|---|
-| **Planejador / Arquiteto** | Claude (Opus/Sonnet) no Project | `docs/` lido do disco + pedido do usuário | Specs, critérios de aceite, ADRs, pesquisas e atualizações de `docs/` | Escrever código de produção, gerar runbooks ou comandos de terminal |
+| **Planejador / Arquiteto** | Claude (Opus/Sonnet) no Project | `docs/` lido do disco + pedido do usuário | Specs, critérios de aceite, ADRs, pesquisas e documentação de domínio | Escrever código de produção, gerar runbooks ou reescrever o doc 11 |
 | **Programador** | Muse Code (Muse Spark 1.3) | **Só a spec**, autocontida, em inglês | Código em `src/` + testes próprios em `tests/core/` | Tomar decisão de arquitetura |
-| **Testador / Committer / Supervisor** | Antigravity (Gemini) | Código + spec + critérios | Execução de testes (WSL), correção direta de lints em testes, commits Git, relatório final e mentoria didática | Alterar regras de negócio ou inventar parâmetros |
+| **Testador / Committer / Supervisor** | Antigravity (Gemini) | Código + spec + critérios | Execução de testes (WSL), correção direta de lints em testes, commits Git, atualização do painel operacional (`11-ESTADO-ATUAL.md`), relatório final e mentoria | Alterar regras de negócio ou inventar parâmetros |
 
-O Antigravity opera diretamente no ambiente WSL, testa, formata, resolve pequenos apontamentos de linter/tipagem em testes e realiza os commits no repositório.
+O Antigravity opera diretamente no ambiente WSL, testa, formata, resolve pequenos apontamentos de linter/tipagem em testes, atualiza o painel operacional enxuto e realiza os commits no repositório.
 
 ### A regra de ouro
 
@@ -213,14 +213,14 @@ Um número plausível e falso passa despercebido e contamina tudo a jusante.
    → Roda as 4 ferramentas no WSL: ruff check, ruff format, mypy, pytest
    → Corrige diretamente qualquer apontamento cosmético (lint, formatação, # type: ignore em testes)
    → Executa/atualiza a suíte de conformidade em tests/conformance/
+   → Atualiza o painel operacional enxuto em docs/11-ESTADO-ATUAL.md
    → Realiza o commit e push direto no Git: git commit -m "F-NNN: <título>"
    → Gera UM único relatório final conciso de conformidade em revisoes/RELATORIO-<NNN>.md
 
 4. Fechamento no Claude Projects
-   → Lê o relatório final
-   → Registra a conclusão em docs/11-ESTADO-ATUAL.md (via edição cirúrgica)
-   → Se houver débitos técnicos secundários, anota para fatias futuras
-   → Encerra o ciclo e indica o próximo chat em prosa limpa
+   → Opcional: lê o relatório final
+   → Encerra o ciclo e indica o próximo chat em prosa limpa (modelo, esforço e linha Leia:)
+   → NUNCA reescreve o doc 11 nem anexa handoffs longos
 ```
 
 ### 7.1. Edição cirúrgica de documentos

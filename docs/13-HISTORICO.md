@@ -87,6 +87,21 @@ Fechada em 17/09/2026. Texto completo no `12-REGISTRO-DE-DECISOES-ADR.md`.
 
 ## 5. Arquivo de handoffs anteriores
 
+### 18/09/2026 — [FATIA-004] Persistência e eventos (concluída)
+- **Feito:** F-004 concluída e dividida em duas specs: `SPEC-006` (projeção pura em `core/projecao.py`, dobra `projetar()`, commit `02afb79`) e `SPEC-005` (persistência em `persistencia/eventos.py` com Pydantic, migração SQL `0001_evento_e_derivadas.sql`, commit `32d06bf`). Suíte com 254 testes passando (+2 skipped de integração de banco). ADR-020 aceita.
+
+### 18/09/2026 — [ARQUITETURA] Schema de eventos (ADR-018 e ADR-019)
+- **Feito:** ADR-018 e ADR-019 aceitas. Tabela `evento` append-only por triggers e REVOKE. Releitura por `(ocorrido_em, sequencia)`. Tabelas derivadas materializadas. Confiança combinada pelo mínimo e obrigatória.
+
+### 18/09/2026 — [ARQUITETURA] Custo espacial e triagem de brainstorming (ADR-016)
+- **Feito:** ADR-016 aceita. Matriz de distância entre centroides no modelo e penalidade no otimizador.
+
+### 18/09/2026 — [FATIA-003] Regras de manejo (concluída)
+- **Feito:** SPEC-004 implementada em `core/regras.py` com 5 funções puras: `resolver_parametros`, `apto_para_entrada`, `precisa_sair`, `urgencia` e `descanso_cumprido`. 215 testes passando. Commit `0248cad`.
+
+### 17/09/2026 — [FATIA-002] Cálculos de forragem (concluída)
+- **Feito:** F-002 implementada em `core/forragem.py` com 7 funções puras (`massa_para_altura`, `altura_para_massa`, `consumo_lote_kg_ms_dia`, `dias_ocupacao`, `taxa_utilizacao`, `consumo_individual_kg_ms_dia`, `consumo_pct_pv`). 196 testes passando. Commit `d76c7f6`.
+
 ### 17/09/2026 — [FATIA-001B] Modelo de domínio: parâmetro por regime (encerrado)
 - **Feito:** F-001B concluída. SPEC-002 aplicou a ADR-014 em `models.py` — `MetodoPastejo` (3º enum), `ParametrosRegime` (2º dataclass, sem defaults), `Cultivar.parametros_por_regime` substituindo os campos planos de altura, `Piquete.metodo_pastejo`. RELATORIO-FATIA-001B: 14/14 critérios, correção de anotação mypy (SPEC-002-CORRECAO-A). Commit de código `5a600c8`, commit de documentação `94429cd`. 177/177 testes.
 - **Pendente:** Nada bloqueando F-002 nem F-003.
@@ -117,3 +132,41 @@ Fechada em 17/09/2026. Texto completo no `12-REGISTRO-DE-DECISOES-ADR.md`.
 
 ### 17/09/2026 — Configuração inicial
 - **Feito:** Base de conhecimento completa (13 arquivos), stack definida, roteiro de 22 fatias, método de trabalho com 3 papéis estabelecido.
+
+---
+
+## 6. Fila de pesquisas agronômicas (Q1–Q15)
+
+> Arquivo de consulta para chats com etiqueta `[PESQUISA]`. Não deve ser lido em chats de código ou arquitetura rotineira.
+
+| # | Pergunta | Trava o quê | Posição na fila |
+|---|---|---|---|
+| Q1 | Termos de uso atuais do Earth Engine permitem uso não-comercial? (B6) | F-005, arquitetura de F-006 | **Pesquisa 1.** Aposta de arquitetura |
+| Q2 | `densidade_kg_ha_por_cm` por cultivar (B1) e `eficiencia_pastejo` (B7) | **F-008, o marco ⭐** | **Pesquisa 2.** Parede real do produto |
+| Q3 | Quais cultivares dominam a pecuária de Alagoas? | nada | **Pesquisa 3.** Poda a Q2 |
+| Q4 | RUE de gramínea C4 tropical (B2) | F-006 | **Pesquisa 4.** Estimativa de crescimento |
+| Q5 | `temperatura_base_c` de gramínea tropical (B4) | F-007 | **Pesquisa 5.** Barato e isolado |
+| Q6 | Fonte climática: INMET ou reanálise? | F-007 | **Pesquisa 5, junto com Q5.** |
+| Q7 | `descanso_min/max_dias` por cultivar e `taxa_senescencia` | nada | **Pesquisa 6**, opcional |
+| Q8 | Faixa de entrada rotacional do Marandu (19–30 cm) pode estreitar? | nada | Fora da fila por decisão (ADR-014 aceita faixa) |
+| Q9 | Pastejo líder-seguidor: ganho medido? | ideia futura no 01 | Fora da fila por decisão |
+| Q10 | Diferencial medido contínuo × rotacionado | ideia futura no 01 | Fora da fila por decisão |
+| Q11 | Fazenda-piloto acessível para validação? | nada no MVP | Fora da fila por decisão (contato humano) |
+| **Q13** | R6 deve ser assimétrica? Limite superior duro (3 dias, dano agronômico) e inferior *soft* (1 dia, incômodo operacional)? | risco de **inviabilidade** do modelo em fazenda de lotes grandes e piquetes pequenos | **Decidir na `[ARQUITETURA]` de pesos da função objetivo**, antes do F-009 |
+| ~~Q14~~ | Parâmetro de cultivar precisa de `confianca` própria, e como compor com a da estimativa? | — | **Respondida e encerrada (18/09/2026) pela ADR-019:** composição é o **mínimo** numa escala ordenada sobre três fatores, com `motivo_confianca` obrigatório |
+| **Q15** | Lookahead de horizonte fixo (`k ≤ 2` dias) no guloso do F-009, aproveitando a projeção do F-008? | nada; melhoria opcional do F-009 | Fora da fila até a validação mostrar que o guloso é curto demais |
+| ~~Q12~~ | Conectar GitHub como fonte do Knowledge? | nada | **Respondida e encerrada (18/09/2026):** Knowledge esvaziado; a base é lida do disco em `docs/` |
+
+---
+
+## 7. Registro de dívidas técnicas ativas (não bloqueiam)
+
+| # | Item | Onde | Destino |
+|---|---|---|---|
+| DT2 | Contratos de `06` §3 divergem do modelo implementado (`Literal` vs enum, `list` vs `tuple`, frozen não declarado) | `06` §3 | ADR-015 |
+| DT4 | Convenções de enum e de entidade como chave de dict | `06` §7 | ADR-017 confirma |
+| DT5 | Comentário `Monday first` ambíguo em `models.py` | `models.py` | próxima spec que tocar o arquivo |
+| DT8 | `SPEC-001` contém arquivo de teste pronto, o que a ADR-011 passou a proibir | `specs/` | histórico; não reescrever |
+| DT9 | Mitigação do kit de aceite não estar fisicamente escondido do Muse Code | método | avaliar se commita kit pós-Muse |
+| DT10 | Caminhos legados sem `src/` em registros datados | specs/docs | decidido: não corrigir registros históricos |
+
