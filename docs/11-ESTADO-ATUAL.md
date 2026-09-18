@@ -1,9 +1,8 @@
 # Estado Atual — SeuGado
 
 **Atualizado em:** 17/09/2026
-**Fase:** Fundação — F-000, F-001 e **F-001B concluídas**. **F-002 em andamento**
-(SPEC-003-forragem.md emitida). F-003 é a próxima fatia de código, sem bloqueio de decisão
-nem de parâmetro.
+**Fase:** Fundação — F-000, F-001, **F-001B** e **F-002 concluídas**. F-003 é a próxima
+fatia de código, sem bloqueio de decisão nem de parâmetro.
 
 > Este é o único arquivo do Knowledge que muda com frequência, e é por onde se começa.
 > O Arquiteto escreve este arquivo direto, no repositório e no Knowledge — você não cola nada.
@@ -81,7 +80,7 @@ fatias de código seguidas sem depender de nenhuma pesquisa.
 | F-000 Fundação do repositório | ✅ concluída (ADR-012) |
 | F-001 Modelo de domínio | ✅ concluída — 13/13 critérios, 157 testes |
 | **F-001B Modelo de domínio: parâmetro por regime** | ✅ **concluída** — 14/14 critérios (RELATORIO-FATIA-001B), correção de anotação mypy aplicada (SPEC-002-CORRECAO-A), commit `5a600c8`, 177/177 testes |
-| F-002 Cálculos de forragem | 🟨 **em andamento** — SPEC-003-forragem.md emitida (17/09/2026), kit de aceite em `revisoes/KIT-ACEITE-003.md`, aguardando implementação pelo Muse Code. Ver "Correção de 17/09/2026", abaixo. O que segue bloqueado é **operar em produção** com cultivar real, não escrever e testar as funções |
+| F-002 Cálculos de forragem | ✅ **concluída** — SPEC-003-forragem.md, RELATORIO-FATIA-002 (aprovada sem ressalvas), 196/196 testes, `mypy` strict e `ruff` limpos, commit `d76c7f6`. O que segue bloqueado é **operar em produção** com cultivar real (B1, B7), não as funções em si |
 | F-003 Regras de manejo | ✅ **destravada pela ADR-014** — depende de F-001B, não mais de decisão |
 | F-004 Persistência e eventos | ⬜ não iniciada — exige `[ARQUITETURA] Schema de eventos` antes |
 | F-005 Ingestão de satélite | ⬜ não iniciada |
@@ -105,12 +104,12 @@ C:\code\seugado                git, main, publicado no GitHub (privado)
 ├── pyproject.toml             Python 3.12; dev: pytest, ruff, mypy strict; md fora do ruff
 ├── uv.lock                    versionado (ADR-012)
 ├── docs/                      00–12, a base de conhecimento (fonte de verdade)
-├── src/seugado/core/models.py 7 enums, 8 dataclasses frozen/slots — F-001B, parâmetro por regime
+├── src/seugado/core/models.py   7 enums, 8 dataclasses frozen/slots — F-001B, parâmetro por regime
+├── src/seugado/core/forragem.py 7 funções puras — F-002, cálculos de forragem
 ├── tests/core/                suíte do Muse Code (fumaça)
 ├── tests/conformance/         suíte de conformidade independente (Antigravity)
 ├── specs/                     SPEC-001-domain-model.md · SPEC-002-domain-model-regime.md ·
-│                              SPEC-002-CORRECAO-A-mypy-annotation.md ·
-│                              SPEC-003-forragem.md (emitida, aguardando Muse Code)
+│                              SPEC-002-CORRECAO-A-mypy-annotation.md · SPEC-003-forragem.md
 └── revisoes/                  relatórios finais de fatia (arquivo/ contém o legado)
 ```
 
@@ -120,10 +119,11 @@ Commits: `73ff3af` fundação + F-001 · `d06880b` ADRs 010–012 · `354382b` u
 `e82f0b4` ADR-014, correção do status do F-002 e verificação por manifesto (RELATORIO-REV-009,
 aprovada 5/5) · `94429cd` spec/runbook da F-001B (SPEC-002-CORRECAO-A,
 RUNBOOK-FATIA-001B-commit) · `5a600c8` F-001B — parâmetro de altura por regime em `models.py`
-(RELATORIO-FATIA-001B-commit, aprovada).
+(RELATORIO-FATIA-001B-commit, aprovada) · `d76c7f6` F-002 — cálculos de forragem em
+`core/forragem.py` (RELATORIO-FATIA-002, aprovada sem ressalvas, 196/196 testes).
 Ambiente: `.venv` por `uv` no WSL Ubuntu. O Windows hospedeiro não tem Python.
 Versões medidas: Python 3.12.3, pytest 9.1.1, ruff 0.16.8, mypy 2.3.1.
-Estado das ferramentas: `ruff check`, `ruff format --check`, `mypy` e `pytest` limpos, 177/177.
+Estado das ferramentas: `ruff check`, `ruff format --check`, `mypy` e `pytest` limpos, 196/196.
 
 ---
 
@@ -131,13 +131,13 @@ Estado das ferramentas: `ruff check`, `ruff format --check`, `mypy` e `pytest` l
 
 | # | Bloqueio | Bloqueia | Resolver em |
 |---|---|---|---|
-| B1 | `densidade_kg_ha_por_cm` ausente para todas as cultivares | **produção** do F-002, não a implementação | `[PESQUISA]` |
+| B1 | `densidade_kg_ha_por_cm` ausente para todas as cultivares | **produção** com cultivar real (F-002 já implementado, recebe o parâmetro por argumento) | `[PESQUISA]` |
 | B2 | RUE para gramínea C4 tropical ausente (paper usa 2,45 g/MJ de C3) | F-006 | `[PESQUISA]` |
 | ~~B3~~ | ~~Alturas canônicas — obter Comunicado Técnico 125 da Embrapa~~ | — | ✅ resolvido em `[PESQUISA] Régua de Manejo Embrapa` (17/09/2026) — CT-135 cobre entrada+saída de Mombaça, Zuri, Tanzânia, Massai, Tamani, e máxima/mínima contínua de Xaraés, Piatã, Marandu, *B. decumbens*. Resíduo: entrada rotacional de Marandu/Xaraés virou B8 |
 | B4 | `temperatura_base_c` ausente | F-007 | `[PESQUISA]` |
 | ~~B5~~ | ~~Peso médio de bezerro ausente~~ **Rebaixado de bloqueio a refinamento pela ADR-014** (17/09/2026): a tabela de UA preenche o peso ausente (`coeficiente × 450`, confiança média). Buscar o peso real segue valendo, como precisão | ~~F-002~~ | `[PESQUISA]` — parcialmente informado em `[PESQUISA] Regime de pastejo` (17/09/2026): peso de desmama 180–210 kg (fonte baixa confiança, blog comercial) não é o mesmo que peso médio da fase de cria inteira. A tabela de UA por categoria (ver `05`) permite calcular consumo de lote misto sem esse número — pode absorver o bloqueio na prática, decisão cabe à ADR-014 |
 | B6 | Termos de uso atuais do Earth Engine não verificados | F-005 | `[PESQUISA]` |
-| B7 | `eficiencia_pastejo` sem fonte — a faixa 0,40–0,50 mede outra grandeza (ADR-010) | **produção** do F-002, não a implementação | `[PESQUISA]` |
+| B7 | `eficiencia_pastejo` sem fonte — a faixa 0,40–0,50 mede outra grandeza (ADR-010) | **produção** com cultivar real (F-002 já implementado, recebe o parâmetro por argumento) | `[PESQUISA]` |
 | ~~B8~~ | ~~Decisão de regime não tomada~~ ✅ **RESOLVIDO 17/09/2026 — ADR-014 escrita e aceita.** Pesquisa (P1–P3) entregou o dado; a ADR decidiu schema por regime, comportamento na célula vazia, cadência do contínuo, fonte canônica de consumo e DT11. Ver `12` | — | ✅ |
 
 ---
@@ -192,7 +192,7 @@ como a pecuária brasileira funciona de fato não pode ser tomada antes de algu�
 | ~~4~~ | ~~`[ARQUITETURA] Método de pastejo — ADR-014`~~ | Opus | B8, ADR-014, DT3, DT11 | ✅ concluído 17/09/2026. Ver handoff |
 | ~~4B~~ | ~~`[FATIA-001B] Modelo de domínio: parâmetro por regime`~~ | Sonnet, médio | aplica a ADR-014 em `models.py` | ✅ concluído 17/09/2026 — commit `5a600c8`, 177/177 testes |
 | 5 | `[PESQUISA] Mercado e pecuária de Alagoas` | Sonnet | poda a fila de parâmetro | Desceu de #4. Decide **quais** cultivares valem pesquisa; roda depois da ADR-014, que já decidiu **quantas células** cada uma precisa |
-| **4C** | **`[FATIA-002] Cálculos de forragem`** | Sonnet, médio | — | **Adiantado em 17/09/2026.** Não depende do F-001B nem de pesquisa nenhuma: o contrato recebe floats e o caso canônico roda com os parâmetros neutralizados. Ver "Correção de 17/09/2026" |
+| ~~4C~~ | ~~`[FATIA-002] Cálculos de forragem`~~ | Sonnet, médio | — | ✅ concluído 17/09/2026 — commit `d76c7f6`, 196/196 testes, aprovada sem ressalvas |
 | 6 | `[PESQUISA] Densidade do dossel e eficiência de pastejo` | Sonnet | B1, B7 | Sem a densidade não existe ponte kg MS/ha ↔ cm. Continua necessária **para produção**, não para implementar o F-002 |
 | 7 | `[PESQUISA] Peso por categoria animal e temperatura base` | Sonnet | B5 (resíduo), B4 | Encolheu: a tabela de UA absorveu a maior parte de B5. Sobra o peso médio da fase de cria e a temperatura base |
 | 8 | `[PESQUISA] RUE de gramíneas C4 tropicais` | Sonnet | B2 | O mais difícil e o mais consequente: errar aqui enviesa toda estimativa de crescimento |
@@ -358,8 +358,8 @@ confiança baixa. Peso médio de bezerro (B5) deixou de bloquear — a tabela de
 Pesquisa espera o mundo; código não espera nada. Enquanto as duas dividiram a mesma fila,
 pareceu que nada andava.
 
-- **Raia A (código, Sonnet):** F-001B → F-002 → F-003 → `[ARQUITETURA] schema de eventos` →
-  F-004. **Zero dependência de pesquisa.**
+- **Raia A (código, Sonnet):** F-001B ✅ → F-002 ✅ → **F-003 (próxima)** →
+  `[ARQUITETURA] schema de eventos` → F-004. **Zero dependência de pesquisa.**
 - **Raia B (pesquisa, Sonnet):** Q1 → Q2 (+Q3) → Q4 → Q5 (+Q6). Um chat entre fatias.
 
 As duas raias só se encontram no **F-005**. Até lá, nenhuma pesquisa bloqueia nenhum código —
