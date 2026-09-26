@@ -82,8 +82,8 @@ def test_imports_whitelist_in_eventos():
 
 
 def test_payload_models_exist_and_forbid_extra():
-    """Verify all 12 TipoEvento values have a Pydantic model with extra='forbid'."""
-    assert len(eventos.PAYLOAD_POR_TIPO) == 12
+    """Verify all 13 TipoEvento values have a Pydantic model with extra='forbid'."""
+    assert len(eventos.PAYLOAD_POR_TIPO) == 13
     for tipo in TipoEvento:
         assert tipo in eventos.PAYLOAD_POR_TIPO, f"Missing payload model for {tipo}"
         model = eventos.PAYLOAD_POR_TIPO[tipo]
@@ -123,12 +123,11 @@ def test_case_given_in_spec_leitura_satelite():
         "piquete_id": uuid.uuid4(),
         "data": date(2026, 9, 10),
         "ndvi": 0.72,
-        "origem_ndvi": "sentinel-2",
+        "refletancia_red": 0.05,
+        "refletancia_nir": 0.35,
+        "origem_ndvi": "optico",
         "pct_nuvem": 5.0,
         "pixels_validos": 120,
-        "massa_kg_ms_ha": 4000.0,
-        "taxa_acumulo_kg_ms_ha_dia": 50.0,
-        "confianca": "alta",
     }
     validated = eventos.PayloadLeituraSatelite.model_validate(valid_payload)
     assert validated.ndvi == 0.72
@@ -142,10 +141,14 @@ def test_case_given_in_spec_leitura_satelite():
 def test_hidden_case_1_invalid_composition():
     """Hidden Case 1: ComposicaoPayload with n_animais=0 must raise ValidationError."""
     with pytest.raises(ValidationError):
-        eventos.ComposicaoPayload(categoria="adulto", n_animais=0, peso_medio_kg=450.0)
+        eventos.ComposicaoPayload(
+            categoria="adulto", n_animais=0, peso_medio_kg=450.0, origem_peso="produtor"
+        )
 
     # Valid composition
-    comp = eventos.ComposicaoPayload(categoria="adulto", n_animais=10, peso_medio_kg=450.0)
+    comp = eventos.ComposicaoPayload(
+        categoria="adulto", n_animais=10, peso_medio_kg=450.0, origem_peso="produtor"
+    )
     assert comp.n_animais == 10
 
 
@@ -187,6 +190,10 @@ def test_hidden_case_3_idempotency_with_db():
             "cultivar_id": uuid.uuid4(),
             "metodo_pastejo": "rotacionado",
             "ativo": True,
+            "geometria_geojson": {
+                "type": "Polygon",
+                "coordinates": [[[0.0, 0.0], [0.0, 1.0], [1.0, 1.0], [0.0, 0.0]]],
+            },
         }
 
         id_1 = eventos.registrar_evento(

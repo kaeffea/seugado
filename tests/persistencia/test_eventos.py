@@ -7,6 +7,8 @@ from pydantic import ValidationError
 
 from seugado.core.models import OrigemEvento, TipoEvento
 from seugado.persistencia.eventos import (
+    PAYLOAD_POR_TIPO,
+    PayloadAlturaMedida,
     PayloadFotoValidacao,
     PayloadLeituraSatelite,
     PayloadLoteAlterado,
@@ -22,6 +24,10 @@ from seugado.persistencia.eventos import (
     registrar_evento,
 )
 
+GEOMETRIA = {
+    "type": "Polygon",
+    "coordinates": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]],
+}
 PIQUETE = {
     "entidade_id": uuid.uuid4(),
     "nome": "Piquete 7",
@@ -29,11 +35,19 @@ PIQUETE = {
     "cultivar_id": uuid.uuid4(),
     "metodo_pastejo": "rotacionado",
     "ativo": True,
+    "geometria_geojson": GEOMETRIA,
 }
 LOTE = {
     "entidade_id": uuid.uuid4(),
     "nome": "Lote A",
-    "composicao": [{"categoria": "adulto", "n_animais": 20, "peso_medio_kg": 450.0}],
+    "composicao": [
+        {
+            "categoria": "adulto",
+            "n_animais": 20,
+            "peso_medio_kg": 450.0,
+            "origem_peso": "produtor",
+        }
+    ],
     "indissoluvel": False,
 }
 
@@ -43,7 +57,17 @@ CASOS = [
     (
         PayloadLoteCriado,
         LOTE,
-        {**LOTE, "composicao": [{"categoria": "adulto", "n_animais": 0, "peso_medio_kg": 450.0}]},
+        {
+            **LOTE,
+            "composicao": [
+                {
+                    "categoria": "adulto",
+                    "n_animais": 0,
+                    "peso_medio_kg": 450.0,
+                    "origem_peso": "produtor",
+                }
+            ],
+        },
     ),
     (
         PayloadLoteAlterado,
@@ -51,7 +75,14 @@ CASOS = [
         {
             **LOTE,
             "ativo": True,
-            "composicao": [{"categoria": "adulto", "n_animais": 20, "peso_medio_kg": -1.0}],
+            "composicao": [
+                {
+                    "categoria": "adulto",
+                    "n_animais": 20,
+                    "peso_medio_kg": -1.0,
+                    "origem_peso": "produtor",
+                }
+            ],
         },
     ),
     (PayloadLoteDissolvido, {"entidade_id": uuid.uuid4()}, {}),
@@ -104,12 +135,14 @@ CASOS = [
         PayloadManejoDivergente,
         {
             "entidade_id": uuid.uuid4(),
+            "lote_id": uuid.uuid4(),
             "piquete_real_id": uuid.uuid4(),
             "data_execucao": "2026-09-10",
             "observacao": None,
         },
         {
             "entidade_id": uuid.uuid4(),
+            "lote_id": uuid.uuid4(),
             "piquete_real_id": uuid.uuid4(),
             "data_execucao": "2026-09-10",
         },
@@ -121,24 +154,39 @@ CASOS = [
             "piquete_id": uuid.uuid4(),
             "data": "2026-09-10",
             "ndvi": 0.62,
+            "refletancia_red": 0.08,
+            "refletancia_nir": 0.35,
             "origem_ndvi": "optico",
             "pct_nuvem": 5.0,
             "pixels_validos": 340,
-            "massa_kg_ms_ha": 3200.0,
-            "taxa_acumulo_kg_ms_ha_dia": 45.0,
-            "confianca": "alta",
         },
         {
             "entidade_id": uuid.uuid4(),
             "piquete_id": uuid.uuid4(),
             "data": "2026-09-10",
             "ndvi": 0.62,
+            "refletancia_red": 0.08,
+            "refletancia_nir": 0.35,
             "origem_ndvi": "optico",
             "pct_nuvem": 5.0,
             "pixels_validos": 0,
-            "massa_kg_ms_ha": 3200.0,
-            "taxa_acumulo_kg_ms_ha_dia": 45.0,
-            "confianca": "alta",
+        },
+    ),
+    (
+        PayloadAlturaMedida,
+        {
+            "entidade_id": uuid.uuid4(),
+            "piquete_id": uuid.uuid4(),
+            "data": "2026-09-10",
+            "altura_cm": 28.0,
+            "meio": "bot",
+        },
+        {
+            "entidade_id": uuid.uuid4(),
+            "piquete_id": uuid.uuid4(),
+            "data": "2026-09-10",
+            "altura_cm": 0.0,
+            "meio": "bot",
         },
     ),
     (
@@ -191,6 +239,55 @@ def test_modelo_aceita_valido_rejeita_invalido(modelo, valido, invalido):
     modelo.model_validate(valido)
     with pytest.raises(ValidationError):
         modelo.model_validate(invalido)
+
+
+def test_payload_por_tipo_has_thirteen_entries():
+    assert len(PAYLOAD_POR_TIPO) == 13
+    assert PAYLOAD_POR_TIPO[TipoEvento.ALTURA_MEDIDA] is PayloadAlturaMedida
+
+
+def test_leitura_has_exactly_nine_fields():
+    assert set(PayloadLeituraSatelite.model_fields) == {
+        "entidade_id",
+        "piquete_id",
+        "data",
+        "ndvi",
+        "refletancia_red",
+        "refletancia_nir",
+        "origem_ndvi",
+        "pct_nuvem",
+        "pixels_validos",
+    }
+
+
+def test_geometria_rejects_non_polygon_and_short_ring():
+    bad_type = {**PIQUETE, "geometria_geojson": {"type": "Point", "coordinates": [0, 0]}}
+    with pytest.raises(ValidationError):
+        PayloadPiqueteCriado.model_validate(bad_type)
+    short_ring = {
+        **PIQUETE,
+        "geometria_geojson": {"type": "Polygon", "coordinates": [[[0, 0], [0, 1], [1, 1]]]},
+    }
+    with pytest.raises(ValidationError):
+        PayloadPiqueteCriado.model_validate(short_ring)
+    with pytest.raises(ValidationError):
+        PayloadPiqueteAlterado.model_validate(short_ring)
+
+
+def test_leitura_rejects_non_positive_ndvi():
+    base = {
+        "entidade_id": uuid.uuid4(),
+        "piquete_id": uuid.uuid4(),
+        "data": "2026-09-10",
+        "ndvi": 0.0,
+        "refletancia_red": 0.08,
+        "refletancia_nir": 0.35,
+        "origem_ndvi": "optico",
+        "pct_nuvem": 5.0,
+        "pixels_validos": 10,
+    }
+    with pytest.raises(ValidationError):
+        PayloadLeituraSatelite.model_validate(base)
 
 
 @pytest.mark.skipif(

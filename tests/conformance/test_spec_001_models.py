@@ -43,6 +43,10 @@ ENUMS = {
         "SATELITE": "satelite",
         "SAR_INFERIDO": "sar_inferido",
     },
+    "OrigemPeso": {
+        "PRODUTOR": "produtor",
+        "UA_TABELA": "ua_tabela",
+    },
     "TipoEvento": {
         "PIQUETE_CRIADO": "piquete_criado",
         "PIQUETE_ALTERADO": "piquete_alterado",
@@ -56,6 +60,7 @@ ENUMS = {
         "LEITURA_SATELITE": "leitura_satelite",
         "FOTO_VALIDACAO": "foto_validacao",
         "PARAMETRO_ALTERADO": "parametro_alterado",
+        "ALTURA_MEDIDA": "altura_medida",
     },
 }
 
@@ -104,6 +109,7 @@ DATACLASSES = {
         ("categoria", "CategoriaAnimal", NO_DEFAULT),
         ("n_animais", "int", NO_DEFAULT),
         ("peso_medio_kg", "float", NO_DEFAULT),
+        ("origem_peso", "OrigemPeso", "OrigemPeso.PRODUTOR"),
     ],
     "Lote": [
         ("id", "UUID", NO_DEFAULT),
@@ -271,8 +277,8 @@ def test_ac3_enum_has_no_helper_methods(name):
 
 
 def test_ac4_tipo_evento_has_exactly_twelve_members():
-    assert len(models.TipoEvento) == 12
-    assert len(models.TipoEvento.__members__) == 12
+    assert len(models.TipoEvento) == 13
+    assert len(models.TipoEvento.__members__) == 13
 
 
 def test_r2_confianca_and_qualidade_base_are_distinct_types():
@@ -324,7 +330,12 @@ def test_r3_r8_fields_match_spec_exactly(name):
     for s in node.body:
         if isinstance(s, ast.AnnAssign):
             assert isinstance(s.target, ast.Name)
-            default = NO_DEFAULT if s.value is None else ast.literal_eval(s.value)
+            if s.value is None:
+                default = NO_DEFAULT
+            elif isinstance(s.value, ast.Attribute):
+                default = ast.unparse(s.value)
+            else:
+                default = ast.literal_eval(s.value)
             actual.append((s.target.id, ast.unparse(s.annotation), default))
     assert actual == DATACLASSES[name]
 

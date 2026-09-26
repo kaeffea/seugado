@@ -2,7 +2,16 @@
 
 from dataclasses import dataclass
 
-from seugado.core.models import Cultivar, MetodoPastejo, ParametrosRegime
+from seugado.core.models import Confianca, Cultivar, MetodoPastejo, ParametrosRegime
+
+_ORDEM_CONFIANCA = {Confianca.BAIXA: 0, Confianca.MEDIA: 1, Confianca.ALTA: 2}
+
+
+def combinar_confianca(*fatores: Confianca) -> Confianca:
+    """Return the weakest confidence among the factors (minimum on an ordered scale)."""
+    if len(fatores) == 0:
+        raise ValueError("combinar_confianca needs at least one factor")
+    return min(fatores, key=lambda f: _ORDEM_CONFIANCA[f])
 
 
 @dataclass(frozen=True, slots=True)

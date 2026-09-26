@@ -1,8 +1,8 @@
 # Estado Atual — SeuGado
 
-**Atualizado em:** 18/09/2026
-**Fase:** Fase 0 (Fundação) 100% concluída.
-**Próxima:** Fase 1 ("Enxergar o pasto") — **F-005 (Ingestão de satélite)**.
+**Atualizado em:** 26/09/2026
+**Fase:** MVP — **F-MVP-007 concluída**.
+**Próxima:** **F-MVP-008 (Banco do MVP — SPEC-008)**.
 
 > **Painel Operacional Conciso.** Este documento é mantido exclusivamente pelo **Antigravity** após a conclusão e commit de cada fatia. Modelos no Claude Projects apenas o consultam como ponteiro rápido.
 > Arquivo de memória, pesquisas detalhadas e handoffs passados vivem em `13-HISTORICO.md`. Decisões fechadas vivem em `12-REGISTRO-DE-DECISOES-ADR.md`.
@@ -11,50 +11,33 @@
 
 ## Situação do Repositório
 
-- **Fase 0 (Fundação):** F-000, F-001, F-001B, F-002, F-003 e F-004 concluídas e integradas.
-- **Suíte de Testes:** **254 testes passando** (+2 skipped de integração de banco), `ruff` e `mypy --strict` 100% limpos.
+- **Fundação & MVP:** F-000 até F-004 e F-MVP-007 concluídas e integradas.
+- **Suíte de Testes:** **281 testes passando** (+2 skipped de integração de banco), `ruff` e `mypy --strict` 100% limpos.
 - **Últimos commits:** 
   - `0248cad` (F-003: regras de manejo em `core/regras.py`)
   - `02afb79` (F-004a: projeção pura de eventos em `core/projecao.py` - SPEC-006)
   - `32d06bf` (F-004b: persistência e migração SQL em `persistencia/eventos.py` - SPEC-005)
+  - F-MVP-007 (SPEC-007: modelos, payloads e projeção estendidos para MVP)
 
 ---
 
-## Progresso das Fatias
+## Progresso das Fatias do MVP
 
 | Fatia | Status | Resumo / Commit |
 |---|---|---|
-| F-000 Fundação do repositório | ✅ concluída | ADR-012 |
-| F-001 Modelo de domínio | ✅ concluída | 13/13 critérios, 157 testes |
-| F-001B Parâmetro por regime | ✅ concluída | commit `5a600c8`, 177 testes |
-| F-002 Cálculos de forragem | ✅ concluída | commit `d76c7f6`, 196 testes |
-| F-003 Regras de manejo | ✅ concluída | commit `0248cad`, 215 testes |
-| F-004 Persistência e eventos | ✅ concluída | commits `02afb79` / `32d06bf`, 254 testes |
-| **F-005 Ingestão de satélite** | ⬜ **próxima** | Início da Fase 1 (Earth Engine / Sentinel-2) |
-| F-006 Modelo SAFER | 🔒 bloqueada | Aguarda B2 (`rue_max_g_por_mj`) |
-| F-007 Clima e graus-dia | 🔒 bloqueada | Aguarda B4 (`temperatura_base_c`) |
-| F-008 ⭐ Projeção de estado | ⬜ não iniciada | Marco da Fase 1 |
-| F-009 a F-022 | ⬜ não iniciadas | Fase 2 em diante |
-
----
-
-## Bloqueios Ativos
-
-| # | Bloqueio | Bloqueia | Resolver em |
-|---|---|---|---|
-| B1 | `densidade_kg_ha_por_cm` ausente para todas as cultivares | Produção real (F-002 implementado) | `[PESQUISA]` Q2 (`13` §6) |
-| B2 | RUE para gramínea C4 tropical ausente | F-006 | `[PESQUISA]` Q4 (`13` §6) |
-| B4 | `temperatura_base_c` ausente | F-007 | `[PESQUISA]` Q5 (`13` §6) |
-| B7 | `eficiencia_pastejo` sem fonte (ADR-010) | Produção real (F-002 implementado) | `[PESQUISA]` Q2 (`13` §6) |
+| F-000 a F-004 | ✅ concluídas | Fundação, domínio, regras e persistência inicial |
+| **F-MVP-007 Eventos do MVP** | ✅ **concluída** | SPEC-007: OrigemPeso, AlturaMedida, Leitura raw, GeoJSON, 281 testes |
+| **F-MVP-008 Banco do MVP** | ⬜ **próxima** | SPEC-008: migração `0002_mvp.sql`, `reconstruir_projecao`, catálogo |
+| F-MVP-009 Contratos do MVP | ⬜ não iniciada | SPEC-009: `contratos.py` e fixtures |
+| F-MVP-010 Ingestão de satélite | ⬜ não iniciada | SPEC-010: Earth Engine HLS S30 |
+| F-MVP-011 Clima e graus-dia | ⬜ não iniciada | SPEC-011: Open-Meteo histórico e previsão |
+| F-MVP-012 Modelo SAFER | ⬜ não iniciada | SPEC-012: biomassa e evapotranspiração |
+| F-MVP-013 Estado projetado | ⬜ não iniciada | SPEC-013: união de sensoriamento, clima e SAFER |
+| F-MVP-014 API do núcleo | ⬜ não iniciada | SPEC-014: FastAPI, rotas e autenticação |
 
 ---
 
 ## Próximo Passo Imediato
 
-- **Chat:** `[FATIA-005] Ingestão de satélite (Earth Engine)`
-- **Modelo:** Claude Sonnet (esforço médio)
-- **Prompt:**
-  ```text
-  [FATIA-005] Ingestão de satélite
-  Leia: docs/11, docs/09, docs/06 §3, docs/10 (entrada F-005), docs/12 (ADR-018 e ADR-020).
-  ```
+- **Ação:** Entregar `specs/SPEC-008-banco-mvp.md` para implementação pelo Muse Code.
+- **A seguir:** Testar com `revisoes/KIT-ACEITE-008.md` e commitar como `F-MVP-008: ...`.

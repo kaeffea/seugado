@@ -20,6 +20,7 @@ from seugado.core.models import (
     TipoEvento,
 )
 from seugado.core.projecao import (
+    AlturaMedida,
     EstadoFazenda,
     EstadoLote,
     EstadoPiquete,
@@ -48,6 +49,7 @@ EXPECTED_PUBLIC_NAMES = {
     "EstadoPiquete",
     "EstadoLote",
     "Leitura",
+    "AlturaMedida",
     "EstadoFazenda",
     "projetar",
 }
@@ -96,7 +98,7 @@ def test_situacao_piquete_enum():
 
 
 def test_dataclasses_frozen_and_slotted():
-    for cls in (EstadoPiquete, EstadoLote, Leitura, EstadoFazenda):
+    for cls in (EstadoPiquete, EstadoLote, Leitura, AlturaMedida, EstadoFazenda):
         assert is_dataclass(cls)
         assert getattr(cls, "__slots__", None) is not None, f"{cls} missing __slots__"
 
@@ -110,6 +112,7 @@ def test_estado_piquete_fields_exact():
         "cultivar_id",
         "metodo_pastejo",
         "ativo",
+        "geometria_geojson",
         "situacao",
         "lote_atual_id",
         "desde",
@@ -136,6 +139,11 @@ CULTIVAR_ID = uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
 P1_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 L1_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 
+DEFAULT_GEOJSON = {
+    "type": "Polygon",
+    "coordinates": [[[0.0, 0.0], [0.0, 1.0], [1.0, 1.0], [0.0, 0.0]]],
+}
+
 
 def _make_evento(
     tipo: TipoEvento,
@@ -145,13 +153,16 @@ def _make_evento(
     evento_id: uuid.UUID | None = None,
     corrige_id: uuid.UUID | None = None,
 ) -> Evento:
+    p = dict(payload)
+    if tipo in (TipoEvento.PIQUETE_CRIADO, TipoEvento.PIQUETE_ALTERADO):
+        p.setdefault("geometria_geojson", DEFAULT_GEOJSON)
     return Evento(
         id=evento_id or uuid.uuid4(),
         fazenda_id=FAZENDA_ID,
         tipo=tipo,
         ocorrido_em=ocorrido_em,
         registrado_em=ocorrido_em,
-        payload=payload,
+        payload=p,
         origem=OrigemEvento.PRODUTOR,
         sequencia=sequencia,
         corrige_evento_id=corrige_id,

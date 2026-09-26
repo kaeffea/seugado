@@ -4,17 +4,23 @@ from typing import Any
 
 import pytest
 
-from seugado.core.models import Evento, OrigemEvento, TipoEvento
+from seugado.core.models import Evento, OrigemEvento, OrigemPeso, TipoEvento
 from seugado.core.projecao import SituacaoPiquete, projetar
 
 FAZENDA = uuid.UUID("11111111-1111-1111-1111-111111111111")
 P1 = uuid.UUID("33333333-3333-3333-3333-333333333333")
+P2 = uuid.UUID("33333333-3333-3333-3333-333333333334")
 L1 = uuid.UUID("44444444-4444-4444-4444-444444444444")
 C1 = uuid.UUID("22222222-2222-2222-2222-222222222222")
 M1 = uuid.UUID("55555555-5555-5555-5555-555555555555")
 E1 = uuid.UUID("66666666-0000-0000-0000-000000000001")
 E2 = uuid.UUID("66666666-0000-0000-0000-000000000002")
 E3 = uuid.UUID("66666666-0000-0000-0000-000000000003")
+
+GEOMETRIA = {
+    "type": "Polygon",
+    "coordinates": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]],
+}
 
 
 def _evento(
@@ -38,19 +44,20 @@ def _evento(
     )
 
 
-def _piquete_criado() -> Evento:
+def _piquete_criado(piquete_id: uuid.UUID = P1, evento_id: uuid.UUID = E1) -> Evento:
     return _evento(
-        E1,
+        evento_id,
         TipoEvento.PIQUETE_CRIADO,
         1,
         1,
         {
-            "entidade_id": P1,
+            "entidade_id": piquete_id,
             "nome": "Piquete 7",
             "area_ha": 5.81,
             "cultivar_id": C1,
             "metodo_pastejo": "rotacionado",
             "ativo": True,
+            "geometria_geojson": dict(GEOMETRIA),
         },
     )
 
@@ -93,6 +100,8 @@ def test_canonical_fold_occupies_piquete():
     assert estado.piquetes[P1].dias_descanso == 0
     assert estado.lotes[L1].piquete_atual_id == P1
     assert estado.lotes[L1].peso_vivo_total_kg == 9000.0
+    assert estado.piquetes[P1].geometria_geojson["type"] == "Polygon"
+    assert estado.lotes[L1].composicao[0].origem_peso == OrigemPeso.PRODUTOR
 
 
 def test_correction_applies_at_original_position():
@@ -108,12 +117,14 @@ def test_correction_applies_at_original_position():
             "cultivar_id": C1,
             "metodo_pastejo": "rotacionado",
             "ativo": True,
+            "geometria_geojson": dict(GEOMETRIA),
         },
         corrige_evento_id=E1,
     )
     estado = projetar([_piquete_criado(), _lote_criado(), _manejo_confirmado(), corretivo])
     assert estado.piquetes[P1].area_ha == 6.02
     assert estado.piquetes[P1].situacao == SituacaoPiquete.OCUPADO
+    assert estado.piquetes[P1].geometria_geojson["type"] == "Polygon"
 
 
 def test_dissolution_frees_piquete_with_rest_days():
@@ -137,12 +148,11 @@ def test_latest_reading_wins_and_no_effect_events_are_skipped():
             "piquete_id": P1,
             "data": "2026-09-05",
             "ndvi": 0.5,
-            "origem_ndvi": "sentinel",
+            "refletancia_red": 0.1,
+            "refletancia_nir": 0.3,
+            "origem_ndvi": "optico",
             "pct_nuvem": 10.0,
             "pixels_validos": 100,
-            "massa_kg_ms_ha": 3000.0,
-            "taxa_acumulo_kg_ms_ha_dia": 20.0,
-            "confianca": "media",
         },
     )
     leitura_nova = _evento(
@@ -155,18 +165,103 @@ def test_latest_reading_wins_and_no_effect_events_are_skipped():
             "piquete_id": P1,
             "data": "2026-09-10",
             "ndvi": 0.6,
-            "origem_ndvi": "sentinel",
+            "refletancia_red": 0.08,
+            "refletancia_nir": 0.35,
+            "origem_ndvi": "optico",
             "pct_nuvem": 5.0,
             "pixels_validos": 120,
-            "massa_kg_ms_ha": 4000.0,
-            "taxa_acumulo_kg_ms_ha_dia": 25.0,
-            "confianca": "alta",
         },
     )
     foto = _evento(uuid.uuid4(), TipoEvento.FOTO_VALIDACAO, 10, 6, {})
     estado = projetar([_piquete_criado(), leitura_antiga, leitura_nova, foto])
-    assert estado.leituras[P1].massa_kg_ms_ha == 4000.0
+    assert estado.leituras[P1].ndvi == 0.6
+    assert estado.leituras[P1].refletancia_nir == 0.35
     assert estado.leituras[P1].data == date(2026, 9, 10)
+
+
+def test_manejo_divergente_moves_lote_and_rests_previous():
+    divergente = _evento(
+        uuid.uuid4(),
+        TipoEvento.MANEJO_DIVERGENTE,
+        12,
+        4,
+        {
+            "entidade_id": M1,
+            "lote_id": L1,
+            "piquete_real_id": P2,
+            "data_execucao": "2026-09-12",
+            "observacao": None,
+        },
+    )
+    estado = projetar(
+        [
+            _piquete_criado(),
+            _piquete_criado(P2, uuid.uuid4()),
+            _lote_criado(),
+            _manejo_confirmado(),
+            divergente,
+        ]
+    )
+    assert estado.piquetes[P2].situacao == SituacaoPiquete.OCUPADO
+    assert estado.piquetes[P2].lote_atual_id == L1
+    assert estado.piquetes[P1].situacao == SituacaoPiquete.DESCANSANDO
+    assert estado.lotes[L1].piquete_atual_id == P2
+
+
+def test_altura_medida_keeps_latest():
+    antiga = _evento(
+        uuid.uuid4(),
+        TipoEvento.ALTURA_MEDIDA,
+        5,
+        4,
+        {
+            "entidade_id": uuid.uuid4(),
+            "piquete_id": P1,
+            "data": "2026-09-05",
+            "altura_cm": 20.0,
+            "meio": "bot",
+        },
+    )
+    nova = _evento(
+        uuid.uuid4(),
+        TipoEvento.ALTURA_MEDIDA,
+        10,
+        5,
+        {
+            "entidade_id": uuid.uuid4(),
+            "piquete_id": P1,
+            "data": "2026-09-10",
+            "altura_cm": 28.0,
+            "meio": "web",
+        },
+    )
+    estado = projetar([_piquete_criado(), antiga, nova])
+    assert estado.alturas[P1].altura_cm == 28.0
+    assert estado.alturas[P1].data == date(2026, 9, 10)
+
+
+def test_composicao_with_ua_tabela_origin():
+    lote = _evento(
+        uuid.uuid4(),
+        TipoEvento.LOTE_CRIADO,
+        5,
+        2,
+        {
+            "entidade_id": L1,
+            "nome": "Lote A",
+            "composicao": [
+                {
+                    "categoria": "novilho",
+                    "n_animais": 40,
+                    "peso_medio_kg": 337.5,
+                    "origem_peso": "ua_tabela",
+                }
+            ],
+            "indissoluvel": False,
+        },
+    )
+    estado = projetar([_piquete_criado(), lote])
+    assert estado.lotes[L1].composicao[0].origem_peso == OrigemPeso.UA_TABELA
 
 
 def test_validation_errors():
@@ -209,3 +304,33 @@ def test_validation_errors():
         projetar([_piquete_criado(), duplo_a, duplo_b])
     with pytest.raises(ValueError):
         projetar([_lote_criado(), _manejo_confirmado()])
+    ruim_lote = _evento(
+        uuid.uuid4(),
+        TipoEvento.MANEJO_DIVERGENTE,
+        12,
+        4,
+        {
+            "entidade_id": M1,
+            "lote_id": uuid.uuid4(),
+            "piquete_real_id": P1,
+            "data_execucao": "2026-09-12",
+            "observacao": None,
+        },
+    )
+    with pytest.raises(ValueError):
+        projetar([_piquete_criado(), _lote_criado(), ruim_lote])
+    ruim_piquete = _evento(
+        uuid.uuid4(),
+        TipoEvento.MANEJO_DIVERGENTE,
+        12,
+        4,
+        {
+            "entidade_id": M1,
+            "lote_id": L1,
+            "piquete_real_id": uuid.uuid4(),
+            "data_execucao": "2026-09-12",
+            "observacao": None,
+        },
+    )
+    with pytest.raises(ValueError):
+        projetar([_piquete_criado(), _lote_criado(), ruim_piquete])

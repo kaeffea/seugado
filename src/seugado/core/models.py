@@ -60,6 +60,13 @@ class OrigemEvento(StrEnum):
     SAR_INFERIDO = "sar_inferido"
 
 
+class OrigemPeso(StrEnum):
+    """Where a category's mean live weight came from."""
+
+    PRODUTOR = "produtor"
+    UA_TABELA = "ua_tabela"
+
+
 class TipoEvento(StrEnum):
     """Kind of occurrence recorded in the event log."""
 
@@ -75,6 +82,7 @@ class TipoEvento(StrEnum):
     LEITURA_SATELITE = "leitura_satelite"
     FOTO_VALIDACAO = "foto_validacao"
     PARAMETRO_ALTERADO = "parametro_alterado"
+    ALTURA_MEDIDA = "altura_medida"
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +151,7 @@ class ComposicaoLote:
     categoria: CategoriaAnimal
     n_animais: int
     peso_medio_kg: float
+    origem_peso: OrigemPeso = OrigemPeso.PRODUTOR
 
 
 @dataclass(frozen=True, slots=True)

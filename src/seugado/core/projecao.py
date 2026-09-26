@@ -10,9 +10,9 @@ from uuid import UUID
 from seugado.core.models import (
     CategoriaAnimal,
     ComposicaoLote,
-    Confianca,
     Evento,
     MetodoPastejo,
+    OrigemPeso,
     TipoEvento,
 )
 
@@ -35,6 +35,7 @@ class EstadoPiquete:
     cultivar_id: UUID
     metodo_pastejo: MetodoPastejo
     ativo: bool
+    geometria_geojson: dict[str, Any]
     situacao: SituacaoPiquete
     lote_atual_id: UUID | None
     desde: date
@@ -63,12 +64,22 @@ class Leitura:
     piquete_id: UUID
     data: date
     ndvi: float
+    refletancia_red: float
+    refletancia_nir: float
     origem_ndvi: str
     pct_nuvem: float
     pixels_validos: int
-    massa_kg_ms_ha: float
-    taxa_acumulo_kg_ms_ha_dia: float
-    confianca: Confianca
+
+
+@dataclass(frozen=True, slots=True)
+class AlturaMedida:
+    """Most recent ruler measurement projected for one piquete."""
+
+    id: UUID
+    piquete_id: UUID
+    data: date
+    altura_cm: float
+    meio: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +90,7 @@ class EstadoFazenda:
     piquetes: dict[UUID, EstadoPiquete]
     lotes: dict[UUID, EstadoLote]
     leituras: dict[UUID, Leitura]
+    alturas: dict[UUID, AlturaMedida]
 
 
 def _as_uuid(value: UUID | str) -> UUID:
@@ -98,6 +110,7 @@ def _composicao(payload_composicao: list[dict[str, Any]]) -> tuple[ComposicaoLot
             categoria=CategoriaAnimal(item["categoria"]),
             n_animais=item["n_animais"],
             peso_medio_kg=item["peso_medio_kg"],
+            origem_peso=OrigemPeso(item.get("origem_peso", "produtor")),
         )
         for item in payload_composicao
     )
@@ -144,19 +157,23 @@ def projetar(eventos: Sequence[Evento]) -> EstadoFazenda:
     piquetes: dict[UUID, EstadoPiquete] = {}
     lotes: dict[UUID, EstadoLote] = {}
     leituras: dict[UUID, Leitura] = {}
+    alturas: dict[UUID, AlturaMedida] = {}
     for original in ordenados:
         corretivo = corrigidos.get(original.id)
         payload = corretivo.payload if corretivo is not None else original.payload
-        _aplicar(original, payload, piquetes, lotes, leituras, data_referencia)
-    return EstadoFazenda(fazenda_id=fazenda_id, piquetes=piquetes, lotes=lotes, leituras=leituras)
+        _aplicar(original, payload, piquetes, lotes, leituras, alturas, data_referencia)
+    return EstadoFazenda(
+        fazenda_id=fazenda_id, piquetes=piquetes, lotes=lotes, leituras=leituras, alturas=alturas
+    )
 
 
-def _aplicar(  # noqa: PLR0912, PLR0913, PLR0917
+def _aplicar(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     evento: Evento,
     payload: dict[str, Any],
     piquetes: dict[UUID, EstadoPiquete],
     lotes: dict[UUID, EstadoLote],
     leituras: dict[UUID, Leitura],
+    alturas: dict[UUID, AlturaMedida],
     data_referencia: date,
 ) -> None:
     """Apply one event's effective content to the folded state."""
@@ -171,6 +188,7 @@ def _aplicar(  # noqa: PLR0912, PLR0913, PLR0917
                 cultivar_id=_as_uuid(payload["cultivar_id"]),
                 metodo_pastejo=MetodoPastejo(payload["metodo_pastejo"]),
                 ativo=payload["ativo"],
+                geometria_geojson=payload["geometria_geojson"],
                 situacao=SituacaoPiquete.DESCANSANDO,
                 lote_atual_id=None,
                 desde=desde,
@@ -187,6 +205,7 @@ def _aplicar(  # noqa: PLR0912, PLR0913, PLR0917
                 cultivar_id=_as_uuid(payload["cultivar_id"]),
                 metodo_pastejo=MetodoPastejo(payload["metodo_pastejo"]),
                 ativo=payload["ativo"],
+                geometria_geojson=payload["geometria_geojson"],
             )
         case TipoEvento.LOTE_CRIADO:
             composicao = _composicao(payload["composicao"])
@@ -223,13 +242,18 @@ def _aplicar(  # noqa: PLR0912, PLR0913, PLR0917
                     evento.ocorrido_em.date(),
                     data_referencia,
                 )
-        case TipoEvento.MANEJO_CONFIRMADO:
+        case TipoEvento.MANEJO_CONFIRMADO | TipoEvento.MANEJO_DIVERGENTE:
             lote_id = _as_uuid(payload["lote_id"])
-            destino_id = _as_uuid(payload["piquete_destino_id"])
+            chave = (
+                "piquete_destino_id"
+                if evento.tipo == TipoEvento.MANEJO_CONFIRMADO
+                else "piquete_real_id"
+            )
+            destino_id = _as_uuid(payload[chave])
             if lote_id not in lotes:
-                raise ValueError("manejo_confirmado for an unknown lote")
+                raise ValueError(f"{evento.tipo.value} for an unknown lote")
             if destino_id not in piquetes:
-                raise ValueError("manejo_confirmado for an unknown piquete")
+                raise ValueError(f"{evento.tipo.value} for an unknown piquete")
             data_execucao = _as_date(payload["data_execucao"])
             lote = lotes[lote_id]
             if lote.piquete_atual_id is not None and lote.piquete_atual_id in piquetes:
@@ -250,15 +274,25 @@ def _aplicar(  # noqa: PLR0912, PLR0913, PLR0917
                 piquete_id=_as_uuid(payload["piquete_id"]),
                 data=_as_date(payload["data"]),
                 ndvi=payload["ndvi"],
+                refletancia_red=payload["refletancia_red"],
+                refletancia_nir=payload["refletancia_nir"],
                 origem_ndvi=payload["origem_ndvi"],
                 pct_nuvem=payload["pct_nuvem"],
                 pixels_validos=payload["pixels_validos"],
-                massa_kg_ms_ha=payload["massa_kg_ms_ha"],
-                taxa_acumulo_kg_ms_ha_dia=payload["taxa_acumulo_kg_ms_ha_dia"],
-                confianca=Confianca(payload["confianca"]),
             )
             atual = leituras.get(leitura.piquete_id)
             if atual is None or leitura.data >= atual.data:
                 leituras[leitura.piquete_id] = leitura
+        case TipoEvento.ALTURA_MEDIDA:
+            medida = AlturaMedida(
+                id=_as_uuid(payload["entidade_id"]),
+                piquete_id=_as_uuid(payload["piquete_id"]),
+                data=_as_date(payload["data"]),
+                altura_cm=payload["altura_cm"],
+                meio=payload["meio"],
+            )
+            atual_altura = alturas.get(medida.piquete_id)
+            if atual_altura is None or medida.data >= atual_altura.data:
+                alturas[medida.piquete_id] = medida
         case _:
             pass  # R7: valid events with no projection effect in this fatia

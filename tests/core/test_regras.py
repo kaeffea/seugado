@@ -11,6 +11,7 @@ from seugado.core.models import (
 )
 from seugado.core.regras import (
     apto_para_entrada,
+    combinar_confianca,
     descanso_cumprido,
     precisa_sair,
     resolver_parametros,
@@ -132,3 +133,14 @@ def test_validation_errors():
         descanso_cumprido(-1, 21)
     with pytest.raises(ValueError):
         descanso_cumprido(21, 0)
+
+
+def test_combinar_confianca_returns_weakest():
+    assert combinar_confianca(Confianca.ALTA, Confianca.MEDIA, Confianca.ALTA) == Confianca.MEDIA
+    assert combinar_confianca(Confianca.ALTA) == Confianca.ALTA
+    assert combinar_confianca(Confianca.MEDIA, Confianca.BAIXA) == Confianca.BAIXA
+
+
+def test_combinar_confianca_rejects_empty():
+    with pytest.raises(ValueError):
+        combinar_confianca()

@@ -15,6 +15,7 @@ from seugado.core.models import (
     Manejo,
     MetodoPastejo,
     OrigemEvento,
+    OrigemPeso,
     ParametrosRegime,
     Piquete,
     QualidadeBase,
@@ -141,8 +142,31 @@ def test_evento_payload_is_opaque():
     assert e.ocorrido_em < e.registrado_em
 
 
-def test_tipo_evento_has_twelve_members():
-    assert len(list(TipoEvento)) == 12
+def test_tipo_evento_has_thirteen_members():
+    assert len(list(TipoEvento)) == 13
+    assert TipoEvento.ALTURA_MEDIDA.value == "altura_medida"
+
+
+def test_origem_peso_has_two_members():
+    assert list(OrigemPeso) == [OrigemPeso.PRODUTOR, OrigemPeso.UA_TABELA]
+    assert OrigemPeso.PRODUTOR.value == "produtor"
+    assert OrigemPeso.UA_TABELA.value == "ua_tabela"
+
+
+def test_composicao_defaults_origem_peso_last():
+    import dataclasses
+
+    fields = [f.name for f in dataclasses.fields(ComposicaoLote)]
+    assert fields[-1] == "origem_peso"
+    c = ComposicaoLote(categoria=CategoriaAnimal.NOVILHO, n_animais=40, peso_medio_kg=337.5)
+    assert c.origem_peso == OrigemPeso.PRODUTOR
+    custom = ComposicaoLote(
+        categoria=CategoriaAnimal.NOVILHO,
+        n_animais=40,
+        peso_medio_kg=337.5,
+        origem_peso=OrigemPeso.UA_TABELA,
+    )
+    assert custom.origem_peso == OrigemPeso.UA_TABELA
 
 
 def test_fazenda_preferred_days_are_immutable():

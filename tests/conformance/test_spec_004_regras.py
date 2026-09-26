@@ -34,6 +34,7 @@ EXPECTED_PUBLIC_NAMES = {
     "precisa_sair",
     "urgencia",
     "descanso_cumprido",
+    "combinar_confianca",
 }
 
 

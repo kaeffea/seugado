@@ -7,7 +7,7 @@ from uuid import UUID
 import psycopg
 from psycopg.errors import UniqueViolation
 from psycopg.types.json import Json
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from seugado.core.models import OrigemEvento, TipoEvento
 
@@ -24,6 +24,23 @@ class ComposicaoPayload(_PayloadBase):
     categoria: Literal["bezerro", "novilho", "adulto"]
     n_animais: int = Field(gt=0)
     peso_medio_kg: float = Field(gt=0)
+    origem_peso: Literal["produtor", "ua_tabela"]
+
+
+_MIN_POSICOES_ANEL = 4
+
+
+def _validar_poligono(value: dict[str, Any]) -> dict[str, Any]:
+    """Check that a GeoJSON dict is a Polygon with a closed-enough outer ring."""
+    if value.get("type") != "Polygon":
+        raise ValueError("geometria_geojson must have type Polygon")
+    coordinates = value.get("coordinates")
+    if not isinstance(coordinates, list) or len(coordinates) == 0:
+        raise ValueError("geometria_geojson must carry a coordinates list")
+    ring = coordinates[0]
+    if not isinstance(ring, list) or len(ring) < _MIN_POSICOES_ANEL:
+        raise ValueError("geometria_geojson first ring needs at least 4 positions")
+    return value
 
 
 class PayloadPiqueteCriado(_PayloadBase):
@@ -33,6 +50,12 @@ class PayloadPiqueteCriado(_PayloadBase):
     cultivar_id: UUID
     metodo_pastejo: Literal["continuo", "rotacionado"]
     ativo: bool
+    geometria_geojson: dict[str, Any]
+
+    @field_validator("geometria_geojson")
+    @classmethod
+    def _check_geometria(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return _validar_poligono(value)
 
 
 class PayloadPiqueteAlterado(_PayloadBase):
@@ -42,6 +65,12 @@ class PayloadPiqueteAlterado(_PayloadBase):
     cultivar_id: UUID
     metodo_pastejo: Literal["continuo", "rotacionado"]
     ativo: bool
+    geometria_geojson: dict[str, Any]
+
+    @field_validator("geometria_geojson")
+    @classmethod
+    def _check_geometria(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return _validar_poligono(value)
 
 
 class PayloadLoteCriado(_PayloadBase):
@@ -89,6 +118,7 @@ class PayloadManejoRecusado(_PayloadBase):
 
 class PayloadManejoDivergente(_PayloadBase):
     entidade_id: UUID
+    lote_id: UUID
     piquete_real_id: UUID
     data_execucao: date
     observacao: str | None
@@ -98,13 +128,12 @@ class PayloadLeituraSatelite(_PayloadBase):
     entidade_id: UUID
     piquete_id: UUID
     data: date
-    ndvi: float
-    origem_ndvi: str
+    ndvi: float = Field(gt=0, le=1)
+    refletancia_red: float = Field(ge=0, le=1)
+    refletancia_nir: float = Field(ge=0, le=1)
+    origem_ndvi: Literal["optico"]
     pct_nuvem: float = Field(ge=0, le=100)
     pixels_validos: int = Field(gt=0)
-    massa_kg_ms_ha: float = Field(gt=0)
-    taxa_acumulo_kg_ms_ha_dia: float
-    confianca: Literal["alta", "media", "baixa"]
 
 
 class PayloadFotoValidacao(_PayloadBase):
@@ -125,6 +154,14 @@ class PayloadParametroAlterado(_PayloadBase):
     confianca: Literal["alta", "media", "baixa"]
 
 
+class PayloadAlturaMedida(_PayloadBase):
+    entidade_id: UUID
+    piquete_id: UUID
+    data: date
+    altura_cm: float = Field(gt=0, le=400)
+    meio: Literal["cadastro", "bot", "web"]
+
+
 PAYLOAD_POR_TIPO: dict[TipoEvento, type[BaseModel]] = {
     TipoEvento.PIQUETE_CRIADO: PayloadPiqueteCriado,
     TipoEvento.PIQUETE_ALTERADO: PayloadPiqueteAlterado,
@@ -138,6 +175,7 @@ PAYLOAD_POR_TIPO: dict[TipoEvento, type[BaseModel]] = {
     TipoEvento.LEITURA_SATELITE: PayloadLeituraSatelite,
     TipoEvento.FOTO_VALIDACAO: PayloadFotoValidacao,
     TipoEvento.PARAMETRO_ALTERADO: PayloadParametroAlterado,
+    TipoEvento.ALTURA_MEDIDA: PayloadAlturaMedida,
 }
 
 _INSERT_EVENTO = (
