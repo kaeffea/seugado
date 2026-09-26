@@ -729,6 +729,143 @@ com um teste que precisa de banco de verdade.
 
 ---
 
+## ADR-022 — MVP em equipe: divisão por módulo, contratos fixos e infraestrutura gratuita
+**Data:** 26/09/2026 · **Status:** aceita
+
+**Contexto.** O MVP será apresentado na terça (29/09) por uma equipe de cinco pessoas: Kauê,
+Ezequiel, João, Leandro e Leo. Até aqui, o repositório foi construído por uma pessoa só, com
+Muse Code e Antigravity. Cada um dos outros quatro trabalha com a própria IA, em paralelo e
+em um único dia. Sem fronteiras e contratos fixos, o resultado é conflito de merge e integração
+quebrada na segunda.
+
+**Decisão.**
+1. **Dono por módulo, fronteira por arquivo.** Kauê: sensoriamento, estado projetado,
+   banco/eventos, contratos e esqueletos. João: `planner/otimizador.py`,
+   `planner/confianca.py`, `persistencia/planos.py`. Ezequiel: piquetes (API + mapa). Leandro:
+   fazenda, lotes, login, plano na web, pipeline e deploy. Leo: `delivery/` e bot do Telegram.
+   A tabela de arquivos por dono fica em `docs/equipe/` e **ninguém edita arquivo de outro dono**.
+2. **Contratos fixos em `src/seugado/contratos.py`** (SPEC-009) e em `frontend/src/lib/tipos.ts`
+   (SPEC-010), com as fixtures `tests/fixtures/estado_projetado_exemplo.json` e
+   `plano_exemplo.json`. **Isto reabre o `06` §3, de forma declarada**: `PlanoManejo` ganha
+   `id`, `fazenda_id`, `data_inicio` e `piquetes` (resumo para o mapa); `data_geracao` passa a
+   ser `datetime`; as coleções viram tuplas; `Movimentacao` ganha id e nomes para a mensagem.
+   Motivo: o contrato antigo não carregava o que o bot e o mapa precisam mostrar.
+3. **Escrita por evento, leitura pelas derivadas.** Todo cadastro de piquete e lote, toda
+   resposta do bot e toda medição de altura passam por `registrar_evento`, seguido de
+   `reconstruir_projecao(conn, fazenda_id)` e `conn.commit()`. As telas leem `estado_piquete`,
+   `estado_lote` e `altura_atual`. **Exceção declarada:** `fazenda` é tabela de configuração
+   (funcionários, dias preferenciais, Telegram), editada por `UPDATE`, porque configuração não
+   é história de manejo.
+4. **Infraestrutura, toda gratuita:** Supabase (Postgres + PostGIS + Auth), API FastAPI no
+   Render, frontend React + Vite no Vercel, ciclo semanal no GitHub Actions, Telegram por
+   webhook na própria API. A API valida o token chamando `GET /auth/v1/user` do Supabase, em vez
+   de verificar JWT localmente, porque isso funciona com qualquer tipo de chave do projeto. O
+   Telegram é chamado com `httpx`, sem biblioteca de bot. A API do Supabase fica fechada por
+   RLS: só o backend, com a conexão de dono, lê e escreve.
+5. **Novas dependências** (regra 7 do `06` §7): `fastapi`, `uvicorn[standard]`, `httpx`,
+   `earthengine-api`. No frontend: `react-router`, `@supabase/supabase-js`, `leaflet`,
+   `react-leaflet`, `@geoman-io/leaflet-geoman-free`.
+
+**Alternativas.** (a) *Cada um cria a própria estrutura* — gera conflito certo na segunda.
+(b) *CRUD mutável para piquete e lote* — segunda fonte de verdade, contra a ADR-007.
+(c) *Biblioteca python-telegram-bot* — é assíncrona e tem o próprio ciclo de vida, o que briga
+com o webhook do FastAPI; `httpx` basta para as quatro chamadas usadas.
+
+**Consequências.** A integração de segunda vira a troca das fixtures pelos dados reais. O
+preço é que o Kauê precisa entregar o esqueleto e os contratos antes de os outros começarem.
+
+---
+
+## ADR-023 — Estoque ancorado na régua; satélite e clima dão só a taxa de crescimento
+**Data:** 26/09/2026 · **Status:** aceita
+
+**Contexto.** O SAFER entrega **taxa de acúmulo** (kg MS/ha/dia), não estoque. O payload de
+`leitura_satelite` exigia `massa_kg_ms_ha`, número que ninguém sabia calcular sem uma relação
+NDVI→massa com fonte, e o projeto não tem essa relação. Faltava também a fonte de clima, e o
+catálogo do Earth Engine mostrou que a parte Landsat do HLS (`HLSL30`) parou de ser atualizada
+em 15/10/2025, enquanto a `HLSS30` segue em dia.
+
+**Decisão.**
+1. **Âncora = altura medida com régua**, novo evento `altura_medida` (payload: `piquete_id`,
+   `data`, `altura_cm`, `meio`: `cadastro` | `bot` | `web`). A massa na data da medição é
+   `altura × densidade`. Dali em diante, a cada dia: `+ taxa SAFER − consumo ÷ eficiência ÷ área`
+   (SPEC-014).
+2. **`leitura_satelite` guarda a observação, não número derivado:** NDVI, refletância do
+   vermelho e do infravermelho próximo, % de nuvem, pixels válidos. Massa e taxa são calculadas
+   na hora da projeção.
+3. **Entre passagens**, o SAFER roda todo dia com o clima do dia e a última observação limpa
+   mantida constante. Para os 14 dias seguintes, usa a previsão do tempo. **Não** se repete um
+   BIO diário (o erro de 50% do `04` §5).
+4. **Pedido de validação no MVP = altura medida com régua pelo bot.** A foto com escala fica
+   para a F-017.
+5. **Fontes:** HLS (`HLSS30` + `HLSL30`, buffer −15 m, máscara Fmask de nuvem, borda de nuvem,
+   sombra, neve e água) e **Open-Meteo** (previsão com `past_days=92` e `forecast_days=16`;
+   histórico ERA5; ET₀ FAO-56 já calculada; sem chave). Não se usa INMET no MVP.
+6. **`HIPOTESE-CALIBRAR`**, a calibrar em validação de campo: buffer −15 m; mínimo de 3 pixels
+   válidos; janela de 30 dias de satélite; faixas de confiança da estimativa (imagem ≤5/6–15/>15
+   dias; régua ≤14/15–42/>42 dias; pixels ≥9/3–8; posição assumida por omissão → média).
+
+**Alternativas.** (a) *NDVI→massa por regressão* — sem fonte, contra a regra 1. (b) *Estoque
+só pelo clima, sem medição* — acumula erro desde o zero, sem âncora. (c) *INMET* — a densidade
+de estações em Alagoas é irregular e não há previsão; o Open-Meteo resolve histórico e previsão
+em uma chamada.
+
+**Consequências.** Todo piquete precisa de uma medição inicial de altura. O cadastro pede, e,
+enquanto não houver, o piquete aparece como `altura_inicial` em `faltantes`. O erro do estoque
+cresce com o tempo desde a última régua, e isso entra na confiança. O Open-Meteo gratuito é
+não comercial, o que serve para o MVP acadêmico e deve ser revisto antes de haver cliente
+pagante. As suítes de conformidade da SPEC-005/006 mudam junto com o payload de leitura.
+
+---
+
+## ADR-024 — Ciclo semanal e otimizador guloso semanal no MVP
+**Data:** 26/09/2026 · **Status:** aceita
+
+**Contexto.** Na call de 26/09, a equipe decidiu que o MVP entrega recomendações
+**semanalmente**, sempre em dias de manejo preferenciais do produtor. O `07` foi escrito para
+um laço diário. Ainda estavam abertos a hierarquia de fallback, a matriz de distância e os
+parâmetros que faltavam para o Marandu.
+
+**Decisão.**
+1. **Ciclo semanal:** GitHub Actions toda segunda às 05:00 (America/Fortaleza), mais o botão
+   "Gerar plano agora" e o recálculo quando o produtor responde "não fiz", "fiz diferente" ou
+   registra uma movimentação pelo bot (recálculo **sem** nova ingestão de satélite). Ordem do
+   ciclo: confirmação por omissão → ingestão → reconstrução da projeção → estado projetado →
+   plano → gravação → envio.
+2. **Guloso semanal (F-009 adaptado):** horizonte de 7 dias, simulado dia a dia com a física da
+   SPEC-014. Só nos dias preferenciais, sai o lote que ficaria abaixo da altura de saída **antes
+   do próximo dia de manejo**. A prioridade segue `urgencia()` sobre a altura prevista nesse dia.
+   O limite de movimentos é `funcionarios × manejos_por_funcionario_dia` por dia. O destino é
+   escolhido pelo `07` §5: apto (altura ≥ entrada e descanso cumprido), mais próximo do alvo de
+   entrada, desempate pela menor distância.
+3. **Fallback do MVP** (subconjunto do `07` §4): nível 2, piquete com altura ≥ **0,9 × entrada**
+   e descanso cumprido (`HIPOTESE-CALIBRAR`); se não houver, o lote fica e o alerta
+   `sem_piquete_apto` é gerado (níveis 3 e 5). A fusão de lotes (nível 4) segue na F-022.
+4. **Distância por Haversine entre centroides**, em Python, em vez da tabela `piquete_distancia`
+   da ADR-018 §5. A garantia de "não cruzar rotas" da ADR-016 vale igual. A tabela volta quando
+   houver o CP-SAT.
+5. **R6 (1–3 dias de ocupação) não é imposta no MVP:** com manejo só em dias preferenciais, o
+   intervalo entre dias de manejo manda. Fica registrada a relação com Q13.
+6. **Parâmetros escolhidos (com fonte no `05`):** Marandu rotacionado entrada 30 cm / saída
+   15 cm (Andrade 2008, fonte única com valor único, confiança média; a faixa 19–30 segue
+   registrada); RUE de *B. brizantha* 2,31 g/MJ (Almeida et al. 2023, medido na Piatã;
+   para o Marandu é extrapolação dentro da espécie, confiança baixa); temperatura base do
+   Marandu e do Tanzânia 15,0 °C e da *B. decumbens* 16,7 °C (Mendonça, Rassini & Villa Nova
+   2005); peso de reserva do novilho pela linha de 2–3 anos da tabela de UA (0,75 UA =
+   337,5 kg), porque o erro por peso baixo empurra para o superpastejo, que é o erro caro
+   (ADR-014 §4).
+
+**Alternativas.** (a) *Plano diário* — contra a decisão da equipe e com mais fricção para o
+produtor. (b) *CP-SAT já* — contra a ADR-008. (c) *Tabela PostGIS de distância* — um passo a
+mais no pipeline sem ganho com poucas dezenas de piquetes.
+
+**Consequências.** Pode sair mais de um movimento por lote na mesma semana, sempre em dia
+preferencial. A frequência maior ou personalizada fica para depois do MVP, como a equipe
+combinou. No MVP, só o Marandu tem todos os parâmetros; as outras cultivares aparecem como
+`aguardando_parametro`.
+
+---
+
 ## Template para novas ADRs
 
 ```markdown

@@ -225,15 +225,15 @@ entre todas as cultivares — usar como caso de validação do motor.
 
 | Parâmetro | Onde é usado | Prioridade | Notas |
 |---|---|---|---|
-| `densidade_kg_ha_por_cm` (todas cultivares) | ponte massa↔altura | 🔴 crítica | Ver §"Como obter", abaixo |
-| `rue_max_g_por_mj` para C4 tropical | eq. 11 do SAFER | 🔴 crítica | Paper usa 2,45 g/MJ **para C3**. C4 é maior |
-| `temperatura_base_c` | graus-dia | 🟠 alta | Gramíneas tropicais param abaixo de ~15 °C |
+| `densidade_kg_ha_por_cm` (todas cultivares) | ponte massa↔altura | 🔴 crítica | **Marandu resolvido (18/09/2026, confiança média, 110 kg MS/ha/cm)**. Demais cultivares seguem `TODO-PARAM`, Mombaça já buscado sem sucesso. Ver §"Como obter", abaixo |
+| `rue_max_g_por_mj` para C4 tropical | eq. 11 do SAFER | 🔴 crítica | **_B. brizantha_ resolvida (26/09/2026): 2,31 g/MJ** — Piatã (fonte direta) e Marandu (mesma espécie, confiança baixa). Demais cultivares `TODO-PARAM`. Ver "Achado 26/09/2026" |
+| `temperatura_base_c` | graus-dia | 🟠 alta | **Resolvida (26/09/2026) para Marandu e Tanzânia (15,0 °C) e _B. decumbens_ (16,7 °C)**. Demais `TODO-PARAM` |
 | `altura_entrada_cm` rotacional — Xaraés, *B. decumbens* | regra de entrada | 🟠 alta | `[PESQUISA] Regime de pastejo` (17/09/2026) não encontrou fonte para estas duas — Marandu e Piatã já têm faixa (confiança média/baixa), ver Tabela B2. **Não bloqueia o produto desde a ADR-014**: piquete nessa combinação fica `aguardando_parametro` e o produtor informa a altura dele, com confiança baixa |
 | `altura_maxima/minima_cm` contínuo — *B. humidicola* | regra de contínuo | 🟡 média | CT-135 não cobre; cultivar retirada da edição revisada. Buscar fonte alternativa se a cultivar entrar em produção |
 | altura contínua — Massai, Zuri, Tamani | regra de contínuo | 🟡 média | `[PESQUISA] Regime de pastejo` (17/09/2026) resolveu Tanzânia e Mombaça (Tabela A2); estas três seguem sem fonte. Mesmo tratamento: `aguardando_parametro` + pergunta ao produtor (ADR-014) |
 | `descanso_min/max_dias` por cultivar | limites de segurança | 🟡 média | Faixa geral 21–45 conhecida |
 | `taxa_senescencia` | balanço de massa | 🟡 média | Aproximação declarada aceita no MVP |
-| `eficiencia_pastejo` (ingestão ÷ massa acima do resíduo) | dias de ocupação | 🔴 crítica | ADR-010. A faixa 0,40–0,50 mede taxa de utilização |
+| `eficiencia_pastejo` (ingestão ÷ massa acima do resíduo) | dias de ocupação | 🟠 alta | **Marandu resolvido (22/09/2026, confiança baixa, 0,72)**. Demais cultivares `TODO-PARAM`. ADR-021 aberta |
 
 ### Como obter `densidade_kg_ha_por_cm` sem ir a campo
 
@@ -249,6 +249,92 @@ na base). MVP: linear com intercepto. Se o erro for alto, evoluir para curva.
 **4.000 kg MS/ha** e pós-pastejo de **2.240 kg MS/ha**. Se a cultivar e as alturas desse
 caso forem identificadas, já são dois pontos reais.
 
+### Achado (18/09/2026 — `[PESQUISA] Q2`, resolve parte de B1) — densidade parcialmente resolvida
+
+✅ **Marandu tem fonte primária com equação de regressão altura×massa, sob pastejo
+rotacionado.**
+
+> BRAGA, G. J.; PEDREIRA, C. G. S.; HERLING, V. R.; LUZ, P. H. C.; MARCHESIN, W. A.;
+> MACEDO, F. B. **Quantifying herbage mass on rotationally stocked palisadegrass pastures
+> using indirect methods**. *Scientia Agricola*, Piracicaba, v. 66, n. 1, p. 127–131, 2009.
+
+Estudo dedicado a *Brachiaria brizantha* cv. Marandu sob lotação rotativa (ciclo de 35 dias:
+28 de descanso + 7 de pastejo), medindo simultaneamente altura do dossel (SSH) e massa de
+forragem (kg MS/ha) mês a mês. As equações não são estáveis ao longo do ano — os autores
+destacam que a época do ano altera intercepto e inclinação — mas a inclinação (o coeficiente
+de densidade propriamente dito) varia numa faixa estreita:
+
+| Mês (pré-pastejo) | Intercepto (kg MS/ha) | Inclinação (kg MS/ha por cm) | R² |
+|---|---|---|---|
+| Jan/2004 | 507,4 | 105,1 | 0,93 |
+| Fev/2004 | 1.098,6 | 99,4 | 0,90 |
+| Mar/2004 | 622,5 | 132,2 | 0,90 |
+
+**Confiança: média.** Fonte primária, específica para Marandu e para pastejo rotacionado —
+mas o coeficiente muda de mês para mês (99,4 a 132,2), então não há um valor único, e o MVP
+precisa escolher entre usar a média da faixa (~112 kg MS/ha/cm) ou reintroduzir sazonalidade
+(fora de escopo do MVP, ver `01`).
+
+**Corroboração independente (mistura de cultivares de braquiária, não só Marandu):**
+- RIGHI, [et al.]. **Estimativa de massa de forragem de braquiárias por meio da altura do
+  pasto**. In: *II Congresso Brasileiro de Produção Animal e Vegetal: Inovações e
+  Atualidades*, v. 2, 2022. DOI: [10.53934/9786585062039-24](https://doi.org/10.53934/9786585062039-24).
+  Meta-análise + coleta de campo (130 pontos): **102,4 kg MS/ha por cm** para *U. brizantha*
+  (mistura de cultivares, Marandu incluída mas não isolada), R² = 0,92.
+- BARIONI, L. G.; FERREIRA, A. C. **Monitoramento da massa de forragem e altura para
+  ajustes de taxa de lotação em fazenda agropecuária na região do Cerrado**. Planaltina, DF:
+  Embrapa Cerrados, 2007. (Boletim de Pesquisa e Desenvolvimento, 191). Amostragem de campo
+  (Marandu, Basilisk e Xaraés agrupadas): **≈111 kg MS/ha por cm** (H = 0,009·MF − 1,59;
+  R² = 0,71).
+
+As três fontes convergem na faixa **100–112 kg MS/ha/cm** como valor típico para
+braquiárias do grupo Marandu/Xaraés, com o estudo dedicado ao Marandu (Braga et al. 2009)
+mostrando que a faixa real por época do ano é mais larga (99–132). **Recomendação para o
+`06`:** usar **110 kg MS/ha/cm** como default de Marandu (média das três fontes,
+confiança média), documentado como aproximação estática — não captura variação sazonal.
+
+❌ **Mombaça segue `TODO-PARAM`.** Esta pesquisa não localizou nenhuma fonte que meça
+simultaneamente altura e massa de forragem para *Panicum maximum* cv. Mombaça (nem para
+Tanzânia, cultivar irmã) — os estudos localizados sobre Mombaça (Silva et al. 2009,
+Scientia Agricola 66(1), DOI [10.1590/S0103-90162009000100002](https://doi.org/10.1590/S0103-90162009000100002))
+relacionam altura a interceptação luminosa e manejo, não a massa. Regra 1 proíbe extrapolar
+de Marandu (gênero diferente, *Brachiaria* × *Panicum*) sem fonte própria. Prioridade para
+pesquisa dedicada futura.
+
+### Achado (26/09/2026 — `[ARQUITETURA]` MVP em equipe, ADRs 023 e 024) — RUE, temperatura base e alvo único do Marandu
+
+**RUE de _Brachiaria (Urochloa) brizantha_ = 2,31 g/MJ.**
+> ALMEIDA, S. L. H. et al. **Forage Mass Estimation in Silvopastoral and Full Sun Systems:
+> Evaluation through Proximal Remote Sensing Applied to the SAFER Model**. *Remote Sensing*,
+> v. 15, n. 3, 815, 2023. DOI: [10.3390/rs15030815](https://doi.org/10.3390/rs15030815).
+
+Os autores aplicam o SAFER à *U. brizantha* cv. BRS Piatã com ε_max = 2,31 g/MJ (valor da ref. 28
+do artigo, não localizada nesta pesquisa). Confiança **baixa**: fonte única, e para o Marandu é
+extrapolação **dentro da mesma espécie**, declarada na ADR-024. Substitui, para esta espécie, o
+2,45 g/MJ de C3 do `04` §3. Resultado de acurácia relatado no artigo: R² 0,88 (silvipastoril),
+RMSE 290 kg/ha.
+
+**Temperatura base inferior.**
+> MENDONÇA, F. C.; RASSINI, J. B.; VILLA NOVA, N. A. **Determinação da temperatura-base inferior
+> de plantas forrageiras com o uso de unidades fototérmicas**. São Carlos: Embrapa Pecuária
+> Sudeste, 2005. ([PDF](https://www.alice.cnptia.embrapa.br/alice/bitstream/doc/47231/1/PROCIFCM2005.00168.pdf))
+
+| Cultivar | T_base (°C) | Confiança |
+|---|---|---|
+| Marandu (*B. brizantha*) | 15,0 | média |
+| Tanzânia (*P. maximum*) | 15,0 | média |
+| *B. decumbens* | 16,7 | média |
+| Capim-elefante (*P. purpureum*) | 13,9 | média (fora das 8 cultivares-alvo) |
+
+Uma fonte institucional, medida em São Carlos (SP), 1999/2000. Por isso a confiança é média,
+não alta.
+
+**Marandu rotacionado: alvo único 30 / 15 cm.** A Tabela B2 registra a faixa de entrada de 19
+a 30 cm. Para operar, o MVP precisa de um valor, e usa o **único par entrada/saída publicado por
+uma mesma fonte**: Andrade (2008, Embrapa Acre), com entrada de 30 cm e saída de 15 cm e
+confiança média. O limite inferior de 19 cm (Gomes, ESALQ) é pesquisa de intensificação e segue
+só como registro. Decisão na ADR-024.
+
 ---
 
 ## Parâmetros zootécnicos (independentes de cultivar)
@@ -262,11 +348,57 @@ caso forem identificadas, já são dois pontos reais.
 | `taxa_utilizacao_min` | 0,40 | alta | Faixa real em fazenda (grandeza descritiva) |
 | `taxa_utilizacao_max` | 0,50 | alta | Faixa real em fazenda (grandeza descritiva) |
 | `taxa_utilizacao_caso_canonico` | 0,44 | alta | 1.760 ÷ 4.000 |
-| `eficiencia_pastejo` | `TODO-PARAM` | ausente | Base distinta — ver ADR-010. Não usar 0,44 |
+| `eficiencia_pastejo` | Marandu rotacionado: 0,72 · demais: `TODO-PARAM` | baixa | Função da oferta de forragem, não constante. Escolha do nível = `HIPOTESE-CALIBRAR` (ADR-021). Ver "Achado 22/09/2026" |
 | `ocupacao_min_dias` | 1 | alta | Faixa usual rotacionado |
 | `ocupacao_max_dias` | 3 | média | Faixa usual; casos reais usam até 4 |
 | `descanso_min_dias` (geral) | 21 | alta | Faixa geral da literatura |
 | `descanso_max_dias` (geral) | 45 | alta | Faixa geral da literatura |
+
+### Achado (18/09/2026 — `[PESQUISA] Q2`, resolve parte de B7) — eficiência de pastejo ainda sem valor numérico
+
+Buscando respeitar a distinção da ADR-010 (`eficiencia_pastejo` = fração da massa **acima
+do resíduo** que vira ingestão; ≠ `taxa_utilizacao`), localizei duas fontes que medem essa
+grandeza corretamente — mas nenhuma delas, isoladamente, é fonte própria para Marandu ou
+Mombaça com valor único, então o `TODO-PARAM` **permanece**.
+
+**1. Fonte dedicada a Marandu, só com dado qualitativo acessível nesta pesquisa:**
+
+> BRAGA, G. J.; PEDREIRA, C. G. S.; HERLING, V. R. et al. **Eficiência de pastejo de
+> capim-marandu submetido a diferentes ofertas de forragem**. *Pesquisa Agropecuária
+> Brasileira*, Brasília, v. 42, n. 11, p. 1641–1649, 2007.
+
+Título e escopo batem exatamente com o parâmetro que falta. Não consegui abrir o texto
+completo (SciELO recusou a conexão nesta pesquisa); uma revisão que cita o artigo relata
+apenas o achado qualitativo: **perdas de 25% a 74% da forragem** (pisoteio, fezes,
+senescência) — ou seja, eficiência de pastejo entre **26% e 75%** — **crescentes com o
+aumento da oferta de forragem** (mais oferta, mais desperdício, menos eficiência). Sem o
+valor por nível de oferta, não dá para fixar um default. **Confiança: baixa** (citação
+indireta, via CASTAGNARA, D. D. et al. [et al.]. *Oferta de forragem, características da
+pastagem e desempenho animal*, revisão técnica, UFMS/FAMEZ). Ação futura: obter o PDF
+original (PAB é acesso aberto; tentar via DOI ou repositório institucional da Embrapa).
+
+**2. Fonte com valor numérico exato, mas para Tanzânia, não Marandu/Mombaça:**
+
+> DIFANTE, G. S.; EUCLIDES, V. P. B.; NASCIMENTO JÚNIOR, D.; SILVA, S. C. da; BARBOSA, R. A.;
+> TORRES JÚNIOR, R. A. A. **Desempenho e conversão alimentar de novilhos de corte em
+> capim-tanzânia submetido a duas intensidades de pastejo sob lotação rotativa**. *Revista
+> Brasileira de Zootecnia*, v. 39, n. 1, p. 33–41, 2010.
+
+Compara dois resíduos pós-pastejo em *Panicum maximum* cv. Tanzânia (prima próxima do
+Mombaça, mesma espécie): resíduo de **50 cm → eficiência de pastejo 50%**; resíduo de
+**25 cm → eficiência de pastejo 90%**. Confirma numericamente o mecanismo (resíduo mais
+baixo = mais eficiente) e dá o primeiro valor numérico real de `eficiencia_pastejo` na base
+de conhecimento do projeto. **Confiança: baixa para uso direto** — é Tanzânia, não Mombaça
+nem Marandu; regra 1 proíbe usar como default de outra cultivar sem fonte própria.
+
+**Conclusão — `eficiencia_pastejo` segue `TODO-PARAM` para as 8 cultivares-alvo.** O que
+esta pesquisa muda: (a) confirma que a grandeza certa (ADR-010) tem literatura própria e é
+mensurável; (b) mostra que ela **depende do resíduo-alvo escolhido**, não é uma constante
+por cultivar — o que sugere que `eficiencia_pastejo` pode precisar ser modelada como função
+de `altura_saida_cm`, não como parâmetro fixo. Isto é uma hipótese de modelagem, não um
+número — levar para discussão de arquitetura (`06`/`07`) antes de codificar. Próximo passo
+de pesquisa: obter o texto completo de Braga et al. (2007) para extrair os valores por
+oferta de forragem, que é a fonte certa para Marandu.
 
 ### Tabela de Unidade Animal (UA) por categoria — achado novo (17/09/2026, resolve P3 de `11`)
 
@@ -303,6 +435,12 @@ opcional: ela é simplesmente o `peso_medio_kg` informado.
    `≤ 1` é `HIPOTESE-CALIBRAR` (ADR de fusão de lotes, antes do F-022).
 3. **Não** substitui a cadeia do `03` §6.1. Consumo continua sendo
    Σ(`n_animais` × `peso_medio_kg` × `pct_consumo`).
+
+**Escolhas do MVP (ADR-024, 26/09/2026).** A categoria `novilho` cobre duas linhas da tabela.
+Sem peso informado, usa a de **2–3 anos (0,75 UA = 337,5 kg)**: o peso maior superestima o
+consumo e erra na direção do subpastejo, que é o erro barato. `pct_consumo` por categoria:
+novilho 2,2 % e adulto 2,4 % (tabela de pesos abaixo); bezerro sem valor próprio usa o
+`consumo_pct_pv_default` de 2,4 %.
 
 ⚠️ **Direção do erro, registrada na ADR-014.** Bezerro por esta tabela dá 0,25 × 450 =
 **112,5 kg**, abaixo do peso de desmama registrado adiante (180–210 kg, confiança baixa).
@@ -351,6 +489,11 @@ arquitetura decida modelar por evento (nascimento → desmama → recria) em vez
 | `a_F`, `b_F` (fRFA) | 1,257 / −0,161 | 9 |
 | fator de conversão | 0,864 | 11 |
 | `ET₀` de referência (denominador) | 5 mm/dia | 7 |
+| `a_L = d·Ta − e` (Slob) | d = 6,99 · e = 39,93 (Ta em °C) | 3 — Teixeira et al. (2010, 2012), via Ramos (dissertação UNIVASF) |
+| Forma do albedo | α₀ = a + b·ρ_vermelho + c·ρ_NIR | 2 — coeficientes calibrados para as bandas 1–2 do MODIS; aplicados às bandas vermelho/NIR do HLS (aproximação declarada, ADR-023) |
+
+**Unidade de T₀ na eq. 7:** °C. Com T₀ em kelvin, o termo `b_sf·T₀/(α₀·NDVI)` fica da ordem de −17
+e o ETf cai para ≈ 0, fora da faixa de sanidade. Verificado numericamente em 26/09/2026 (SPEC-012).
 
 ---
 
@@ -423,7 +566,8 @@ mombaca:
       altura_minima_cm: 50
       confianca: media
       fonte: "Kill-Silveira (2020), Rev. Vet. Zootec. 27, DOI 10.35172/rvz.2020.v27.421"
-  densidade_kg_ha_por_cm: null      # TODO-PARAM — não é por regime
+  densidade_kg_ha_por_cm: null      # TODO-PARAM — buscado em 18/09/2026, sem fonte
+                                     # altura×massa para Mombaça (nem Tanzânia); ver achado
   rue_max_g_por_mj: null            # TODO-PARAM (C4) — não é por regime
   temperatura_base_c: null          # TODO-PARAM — não é por regime
   descanso_min_dias: 21
@@ -445,16 +589,21 @@ marandu:
       confianca: alta
       fonte: "Embrapa Gado de Corte, CT-135, Costa & Queiroz (ed. rev. 2017)"
     - metodo: rotacionado
-      altura_entrada_cm: null         # sem valor único
+      altura_entrada_cm: 30           # valor único de Andrade (2008) — ADR-024
       altura_entrada_faixa: [19, 30]
       altura_saida_cm: 15
       confianca: media
       fonte: >
         Andrade (2008, Embrapa Acre, via citação secundária em Soares et al. 2021);
         Gomes (ESALQ/USP, orient. Sila C. da Silva) — ver Tabela B2
-  densidade_kg_ha_por_cm: null       # TODO-PARAM
-  rue_max_g_por_mj: null             # TODO-PARAM (C4)
-  temperatura_base_c: null           # TODO-PARAM
+      eficiencia_pastejo: 0.72        # confianca: baixa — Braga et al. 2007, 1−P na oferta 5%;
+                                       # HIPOTESE-CALIBRAR (ADR-021)
+  densidade_kg_ha_por_cm: 110         # confianca: media — Braga et al. 2009 (Sci. Agr. 66(1),
+                                       # 99,4-132,2 por época do ano) + Righi et al. 2022
+                                       # (102,4) + Barioni & Ferreira 2007 (~111). Ver
+                                       # "Achado 18/09/2026" acima.
+  rue_max_g_por_mj: 2.31             # confianca: baixa — Almeida et al. 2023 (Piatã, mesma espécie)
+  temperatura_base_c: 15.0           # confianca: media — Mendonça, Rassini & Villa Nova 2005
   descanso_min_dias: 21
   descanso_max_dias: 45
   qualidade_base: alta

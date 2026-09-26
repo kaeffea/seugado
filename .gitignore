@@ -6,3 +6,6 @@ __pycache__/
 .ruff_cache/
 .env
 *.log
+# chaves de conta de servico
+seugado-*.json
+*-service-account*.json

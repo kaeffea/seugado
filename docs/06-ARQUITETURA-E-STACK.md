@@ -26,7 +26,10 @@ Tecnologia obscura custa mais em retrabalho do agente do que economiza em elegâ
 | Hospedagem front | **Vercel** (free) | Deploy por git push |
 | Hospedagem API | **Fly.io** ou **Render** (free tier) | Avaliar em ADR na fatia de deploy |
 | Jobs agendados | **GitHub Actions** (cron) | Gratuito, sem servidor, versionado |
-| Mensageria MVP | **Telegram Bot API** | 100% gratuito, sem template aprovado, sem CNPJ |
+| Mensageria MVP | **Telegram Bot API** (webhook na API, via `httpx`) | 100% gratuito, sem template aprovado, sem CNPJ |
+| Clima | **Open-Meteo** (histórico ERA5 + previsão 16 dias, ET₀ pronta) | Gratuito para uso não comercial, sem chave (ADR-023) |
+| Hospedagem API (MVP) | **Render** (free) | Decidido na ADR-022 |
+| Desenho de piquetes | **Leaflet-Geoman** (free) + imagem Esri World Imagery | Desenho de polígono sobre satélite (ADR-022) |
 | Mensageria futura | WhatsApp Cloud API | Atrás de uma interface abstrata desde o dia 1 |
 | ML (gap-filling) | **scikit-learn** / **XGBoost** | Literatura de referência usa exatamente estes |
 | Testes | **pytest** | Padrão |
@@ -94,6 +97,11 @@ e devolve dados. Consequências, todas desejáveis:
 ## 3. Contratos entre módulos
 
 Definir **antes** de implementar. São eles que permitem trabalhar módulos isoladamente.
+
+> **Vigente desde 26/09/2026 (ADR-022):** os contratos entre módulos estão em código, em
+> `src/seugado/contratos.py` (SPEC-009) e `frontend/src/lib/tipos.ts` (SPEC-010), com exemplos em
+> `tests/fixtures/`. Eles substituem `EstimativaForragem`, `PlanoManejo` e `Movimentacao` do bloco
+> abaixo, que fica como registro histórico. Divisão de arquivos por pessoa: `docs/equipe/`.
 
 ```python
 # sensing → planner
@@ -218,6 +226,12 @@ Por que vale o esforço arquitetural:
 ---
 
 ## 5. Modelo de dados essencial
+
+> **Atualizado em 26/09/2026:** o esquema vigente é `db/migrations/0001` + `0002_mvp.sql`
+> (SPEC-008). Mudanças: `fazenda` completa e editada por `UPDATE` (configuração); `fazenda_usuario`;
+> `cultivar` com seed; derivadas `estado_piquete` (com geometria), `estado_lote` (com composição),
+> `leitura` (observação, sem massa) e `altura_atual`; `plano`; `telegram_conversa`; RLS em todas as
+> tabelas. `piquete_distancia` foi adiada: a distância é calculada por Haversine (ADR-024).
 
 ```
 fazenda      (id, nome, timezone, funcionarios_disponiveis,
