@@ -119,24 +119,23 @@ def test_frontend_package_json_dependencies() -> None:
 # ==============================================================================
 
 
-def test_hidden_case_1_exigir_fazenda_403(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Caso 1: exigir_fazenda com fazenda_do_usuario diferente levanta 403."""
+def test_hidden_case_1_exigir_fazenda_404() -> None:
+    """Caso 1: exigir_fazenda com UUID inexistente dá 404; com existente dá id (ADR-025)."""
     mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cur
+    mock_cur.fetchone.return_value = None
     path_fazenda_id = uuid4()
-    other_fazenda_id = uuid4()
     usuario = auth.UsuarioAtual(id=uuid4(), email="user@test.com")
-
-    # Monkeypatch fazenda_do_usuario to return another UUID
-    monkeypatch.setattr(auth, "fazenda_do_usuario", lambda conn, uid: other_fazenda_id)
 
     with pytest.raises(HTTPException) as exc_info:
         auth.exigir_fazenda(path_fazenda_id, usuario, mock_conn)
 
-    assert exc_info.value.status_code == 403
-    assert exc_info.value.detail == "Sem acesso a esta fazenda"
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "Fazenda não encontrada"
 
-    # When it matches, it succeeds and returns the UUID
-    monkeypatch.setattr(auth, "fazenda_do_usuario", lambda conn, uid: path_fazenda_id)
+    # When it exists in the database, it succeeds and returns the UUID
+    mock_cur.fetchone.return_value = (1,)
     res = auth.exigir_fazenda(path_fazenda_id, usuario, mock_conn)
     assert res == path_fazenda_id
 

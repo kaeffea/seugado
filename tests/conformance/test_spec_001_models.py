@@ -27,7 +27,15 @@ TREE = ast.parse(SOURCE)
 ALLOWED_IMPORTS = {"dataclasses", "datetime", "enum", "typing", "uuid"}
 
 ENUMS = {
-    "CategoriaAnimal": {"BEZERRO": "bezerro", "NOVILHO": "novilho", "ADULTO": "adulto"},
+    "CategoriaAnimal": {
+        "BEZERRO": "bezerro",
+        "BEZERRA": "bezerra",
+        "NOVILHO": "novilho",
+        "NOVILHA": "novilha",
+        "VACA": "vaca",
+        "BOI": "boi",
+        "TOURO": "touro",
+    },
     "QualidadeBase": {"ALTA": "alta", "MEDIA": "media", "BAIXA": "baixa"},
     "MetodoPastejo": {"CONTINUO": "continuo", "ROTACIONADO": "rotacionado"},
     "Confianca": {"ALTA": "alta", "MEDIA": "media", "BAIXA": "baixa"},
@@ -72,8 +80,10 @@ DATACLASSES = {
         ("nome", "str", NO_DEFAULT),
         ("timezone", "str", NO_DEFAULT),
         ("funcionarios_disponiveis", "int", NO_DEFAULT),
-        ("manejos_por_funcionario_dia", "int", NO_DEFAULT),
+        ("animais_por_funcionario_dia", "int", NO_DEFAULT),
         ("dias_preferenciais_manejo", "tuple[int, ...]", NO_DEFAULT),
+        ("envio_plano_dia", "int", NO_DEFAULT),
+        ("envio_plano_hora", "int", NO_DEFAULT),
         ("ativo", "bool", True),
     ],
     "ParametrosRegime": [
@@ -157,12 +167,12 @@ def _classes() -> dict[str, ast.ClassDef]:
 
 def _sample(name: str) -> typing.Any:
     """Build one valid instance of each dataclass with arbitrary fixture values."""
-    comp = models.ComposicaoLote(models.CategoriaAnimal.ADULTO, 1, 1.0)
+    comp = models.ComposicaoLote(models.CategoriaAnimal.VACA, 1, 1.0)
     regime = models.ParametrosRegime(
         models.MetodoPastejo.ROTACIONADO, 1.0, 1.0, None, None, models.Confianca.ALTA, "f"
     )
     builders: dict[str, typing.Callable[[], typing.Any]] = {
-        "Fazenda": lambda: models.Fazenda(U, "f", "America/Fortaleza", 1, 1, (0,)),
+        "Fazenda": lambda: models.Fazenda(U, "f", "America/Fortaleza", 1, 1, (0,), 0, 6),
         "ParametrosRegime": lambda: regime,
         "Cultivar": lambda: models.Cultivar(
             U, "s", "n", (regime,), 1.0, 1.0, 1.0, models.QualidadeBase.ALTA
@@ -604,7 +614,7 @@ def test_finding_evento_is_never_hashable():
 def test_finding_types_are_not_enforced_so_lists_slip_in():
     # No validation by design: a list passes where tuple is annotated,
     # leaving a mutable collection inside a "frozen" entity.
-    f = models.Fazenda(U, "f", "tz", 1, 1, [0, 1])  # type: ignore[arg-type]
+    f = models.Fazenda(U, "f", "tz", 1, 1, [0, 1], 0, 6)  # type: ignore[arg-type]
     assert isinstance(f.dias_preferenciais_manejo, list)
     f.dias_preferenciais_manejo.append(2)
     assert f.dias_preferenciais_manejo == [0, 1, 2]

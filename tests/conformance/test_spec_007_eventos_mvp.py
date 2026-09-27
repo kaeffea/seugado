@@ -57,7 +57,7 @@ def test_composicao_lote_origem_peso_field():
 
     # Default constructor works without specifying origem_peso
     c = ComposicaoLote(
-        categoria=CategoriaAnimal.ADULTO,
+        categoria=CategoriaAnimal.VACA,
         n_animais=10,
         peso_medio_kg=450.0,
     )

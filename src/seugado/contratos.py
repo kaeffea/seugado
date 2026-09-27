@@ -29,6 +29,21 @@ class TipoAlerta(StrEnum):
     CONTINUO_ABAIXO_MINIMA = "continuo_abaixo_minima"
     LOTE_SEM_PIQUETE = "lote_sem_piquete"
     SEM_DIA_DE_MANEJO = "sem_dia_de_manejo"
+    PASSANDO_DO_PONTO = "passando_do_ponto"
+
+
+@dataclass(frozen=True, slots=True)
+class PassoPlano:
+    data: date
+    piquete_destino_nome: str
+
+
+@dataclass(frozen=True, slots=True)
+class DiferencaLote:
+    lote_id: UUID
+    lote_nome: str
+    antes: tuple[PassoPlano, ...]
+    depois: tuple[PassoPlano, ...]
 
 
 @dataclass(frozen=True, slots=True)

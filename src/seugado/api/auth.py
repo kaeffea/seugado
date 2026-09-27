@@ -61,9 +61,13 @@ def fazenda_do_usuario(conn: psycopg.Connection[Any], usuario_id: UUID) -> UUID 
 
 
 def exigir_fazenda(fazenda_id: UUID, usuario: Usuario, conn: Conexao) -> UUID:
-    """Ensure the user owns the farm from the path."""
-    if fazenda_do_usuario(conn, usuario.id) != fazenda_id:
-        raise HTTPException(status_code=403, detail="Sem acesso a esta fazenda")
+    """Ensure the farm exists; every authenticated user is an admin."""
+    _ = usuario  # required dependency so anonymous calls still get 401
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM fazenda WHERE id = %s", (fazenda_id,))
+        row = cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Fazenda não encontrada")
     return fazenda_id
 
 

@@ -52,7 +52,7 @@ def test_forbidden_imports():
 
 
 def test_tipo_alerta_members():
-    """TipoAlerta has exactly 8 members and exact string values."""
+    """TipoAlerta has exactly 9 members and exact string values."""
     expected = {
         "SEM_PIQUETE_APTO": "sem_piquete_apto",
         "CAPACIDADE_EXCEDIDA": "capacidade_excedida",
@@ -62,10 +62,11 @@ def test_tipo_alerta_members():
         "CONTINUO_ABAIXO_MINIMA": "continuo_abaixo_minima",
         "LOTE_SEM_PIQUETE": "lote_sem_piquete",
         "SEM_DIA_DE_MANEJO": "sem_dia_de_manejo",
+        "PASSANDO_DO_PONTO": "passando_do_ponto",
     }
     actual = {m.name: m.value for m in contratos.TipoAlerta}
     assert actual == expected
-    assert len(contratos.TipoAlerta) == 8
+    assert len(contratos.TipoAlerta) == 9
 
 
 def test_all_dataclasses_frozen_slotted_no_methods():
@@ -195,7 +196,7 @@ def test_canonical_plano_exemplo_fixture_roundtrip():
 
     plano = contratos.plano_de_dict(data)
     assert len(plano.movimentacoes) == 3
-    assert len(plano.alertas) == 3
+    assert len(plano.alertas) == 2
     assert len(plano.pedidos_validacao) == 1
     assert len(plano.piquetes) == 8
 
@@ -203,8 +204,8 @@ def test_canonical_plano_exemplo_fixture_roundtrip():
     first_mov = plano.movimentacoes[0]
     assert first_mov.data == date(2026, 9, 28)
     assert first_mov.lote_nome == "Recria"
-    assert first_mov.piquete_destino_nome == "Piquete 1"
-    assert first_mov.dias_previstos == 3
+    assert first_mov.piquete_destino_nome == "Piquete 6"
+    assert first_mov.dias_previstos == 7
     assert first_mov.confianca is Confianca.MEDIA
 
     # Round trip dict

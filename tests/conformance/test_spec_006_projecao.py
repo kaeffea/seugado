@@ -191,7 +191,7 @@ def test_canonical_case():
             "entidade_id": L1_ID,
             "nome": "L1",
             "composicao": [
-                {"categoria": "adulto", "n_animais": 20, "peso_medio_kg": 450.0},
+                {"categoria": "vaca", "n_animais": 20, "peso_medio_kg": 450.0},
             ],
             "indissoluvel": False,
         },
@@ -245,7 +245,7 @@ def test_correction_case_applies_at_original_position():
             "entidade_id": L1_ID,
             "nome": "L1",
             "composicao": [
-                {"categoria": "adulto", "n_animais": 20, "peso_medio_kg": 450.0},
+                {"categoria": "vaca", "n_animais": 20, "peso_medio_kg": 450.0},
             ],
             "indissoluvel": False,
         },

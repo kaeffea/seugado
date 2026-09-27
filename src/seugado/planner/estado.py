@@ -8,14 +8,22 @@ from seugado.core.regras import combinar_confianca
 
 CONSUMO_FRACAO_PV: dict[CategoriaAnimal, float] = {
     CategoriaAnimal.BEZERRO: 0.024,
+    CategoriaAnimal.BEZERRA: 0.024,
     CategoriaAnimal.NOVILHO: 0.022,
-    CategoriaAnimal.ADULTO: 0.024,
+    CategoriaAnimal.NOVILHA: 0.022,
+    CategoriaAnimal.VACA: 0.024,
+    CategoriaAnimal.BOI: 0.024,
+    CategoriaAnimal.TOURO: 0.024,
 }
 
 UA_POR_CATEGORIA: dict[CategoriaAnimal, float] = {
     CategoriaAnimal.BEZERRO: 0.25,
+    CategoriaAnimal.BEZERRA: 0.25,
     CategoriaAnimal.NOVILHO: 0.75,
-    CategoriaAnimal.ADULTO: 1.00,
+    CategoriaAnimal.NOVILHA: 0.75,
+    CategoriaAnimal.VACA: 1.00,
+    CategoriaAnimal.BOI: 1.00,
+    CategoriaAnimal.TOURO: 1.25,
 }
 
 UNIDADE_ANIMAL_KG = 450.0

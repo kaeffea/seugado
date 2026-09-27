@@ -55,6 +55,53 @@ def test_usuario_atual_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     assert usuario.email == "a@b.c"
 
 
+class _CursorFalso:
+    """Minimal cursor stub: execute is a no-op, fetchone returns one fixed row."""
+
+    def __init__(self, linha: tuple[int, ...] | None) -> None:
+        self._linha = linha
+
+    def __enter__(self) -> "_CursorFalso":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def execute(self, *args: object) -> None:
+        return None
+
+    def fetchone(self) -> tuple[int, ...] | None:
+        return self._linha
+
+
+class _ConexaoFalsa:
+    """Minimal connection stub exposing cursor()."""
+
+    def __init__(self, linha: tuple[int, ...] | None) -> None:
+        self._linha = linha
+
+    def cursor(self) -> _CursorFalso:
+        return _CursorFalso(self._linha)
+
+
+def test_exigir_fazenda_existente_retorna_id() -> None:
+    """Any existing farm is returned; every authenticated user is an admin."""
+    fazenda_id = uuid.uuid4()
+    usuario = auth.UsuarioAtual(id=uuid.uuid4(), email=None)
+    assert (
+        auth.exigir_fazenda(fazenda_id, usuario, _ConexaoFalsa((1,)))  # type: ignore[arg-type]
+        == fazenda_id
+    )
+
+
+def test_exigir_fazenda_desconhecida_retorna_404() -> None:
+    """Unknown farm id raises 404."""
+    usuario = auth.UsuarioAtual(id=uuid.uuid4(), email=None)
+    with pytest.raises(HTTPException) as excinfo:
+        auth.exigir_fazenda(uuid.uuid4(), usuario, _ConexaoFalsa(None))  # type: ignore[arg-type]
+    assert excinfo.value.status_code == 404
+
+
 def test_usuario_atual_token_invalido(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

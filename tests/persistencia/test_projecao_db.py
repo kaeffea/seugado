@@ -124,7 +124,7 @@ def test_carregar_eventos_ordena_e_mapeia():
                 "nome": "Cedo",
                 "composicao": [
                     {
-                        "categoria": "adulto",
+                        "categoria": "vaca",
                         "n_animais": 10,
                         "peso_medio_kg": 450.0,
                         "origem_peso": "produtor",

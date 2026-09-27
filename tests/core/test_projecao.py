@@ -71,7 +71,7 @@ def _lote_criado() -> Evento:
         {
             "entidade_id": L1,
             "nome": "Lote A",
-            "composicao": [{"categoria": "adulto", "n_animais": 20, "peso_medio_kg": 450}],
+            "composicao": [{"categoria": "vaca", "n_animais": 20, "peso_medio_kg": 450}],
             "indissoluvel": False,
         },
     )

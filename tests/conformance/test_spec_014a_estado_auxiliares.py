@@ -66,13 +66,21 @@ def test_constants_values() -> None:
     assert estado.UNIDADE_ANIMAL_KG == 450.0
     assert estado.CONSUMO_FRACAO_PV == {
         CategoriaAnimal.BEZERRO: 0.024,
+        CategoriaAnimal.BEZERRA: 0.024,
         CategoriaAnimal.NOVILHO: 0.022,
-        CategoriaAnimal.ADULTO: 0.024,
+        CategoriaAnimal.NOVILHA: 0.022,
+        CategoriaAnimal.VACA: 0.024,
+        CategoriaAnimal.BOI: 0.024,
+        CategoriaAnimal.TOURO: 0.024,
     }
     assert estado.UA_POR_CATEGORIA == {
         CategoriaAnimal.BEZERRO: 0.25,
+        CategoriaAnimal.BEZERRA: 0.25,
         CategoriaAnimal.NOVILHO: 0.75,
-        CategoriaAnimal.ADULTO: 1.00,
+        CategoriaAnimal.NOVILHA: 0.75,
+        CategoriaAnimal.VACA: 1.00,
+        CategoriaAnimal.BOI: 1.00,
+        CategoriaAnimal.TOURO: 1.25,
     }
 
 
@@ -169,7 +177,7 @@ def test_hidden_case_4_confianca_imagem_de_hoje() -> None:
 def test_hidden_case_5_confianca_peso_mista() -> None:
     """Caso 5: confianca_peso com um item PRODUTOR e um UA_TABELA -> MEDIA tabela."""
     comp = (
-        ComposicaoLote(CategoriaAnimal.ADULTO, 10, 450.0, OrigemPeso.PRODUTOR),
+        ComposicaoLote(CategoriaAnimal.VACA, 10, 450.0, OrigemPeso.PRODUTOR),
         ComposicaoLote(CategoriaAnimal.BEZERRO, 5, 112.5, OrigemPeso.UA_TABELA),
     )
     nivel, frase = estado.confianca_peso(comp)

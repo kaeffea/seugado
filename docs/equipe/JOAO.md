@@ -305,6 +305,8 @@ o Kauê.
 
 ## 3. Preparar o ambiente
 
+> **Guia completo de instalação e comandos (Windows e Mac/Linux, token para o `/docs`, testes, Git e problemas comuns): `docs/equipe/COMO-RODAR.md`.** Não rode migrações nem nada no Supabase: o banco já está pronto e é compartilhado.
+
 > **Importante:** o Python não lê o `.env` sozinho. Todo comando `uv run` local leva `--env-file .env` (como nos exemplos abaixo); sem isso a API responde erro 500 e os testes de banco são pulados.
 
 1. Instale Git e **uv** (docs.astral.sh/uv). Clone o repositório e crie a sua branch:

@@ -1,6 +1,8 @@
 """Smoke checks for cross-module contracts."""
 
 import json
+import uuid
+from dataclasses import FrozenInstanceError
 from datetime import date
 from pathlib import Path
 from typing import Any, cast
@@ -8,6 +10,9 @@ from typing import Any, cast
 import pytest
 
 from seugado.contratos import (
+    DiferencaLote,
+    PassoPlano,
+    TipoAlerta,
     estado_de_dict,
     estado_para_dict,
     plano_de_dict,
@@ -36,14 +41,14 @@ def test_plano_fixture_roundtrip() -> None:
     data = _fixture("plano_exemplo.json")
     plano = plano_de_dict(data)
     assert len(plano.movimentacoes) == 3
-    assert len(plano.alertas) == 3
+    assert len(plano.alertas) == 2
     assert len(plano.pedidos_validacao) == 1
     assert len(plano.piquetes) == 8
     first = plano.movimentacoes[0]
     assert first.data == date(2026, 9, 28)
     assert first.lote_nome == "Recria"
-    assert first.piquete_destino_nome == "Piquete 1"
-    assert first.dias_previstos == 3
+    assert first.piquete_destino_nome == "Piquete 6"
+    assert first.dias_previstos == 7
     assert first.confianca is Confianca.MEDIA
     assert plano_para_dict(plano) == data
     assert plano_de_dict(plano_para_dict(plano)) == plano
@@ -70,3 +75,18 @@ def test_estado_rejects_bad_uuid() -> None:
     bad = dict(data, fazenda_id="not-a-uuid")
     with pytest.raises(ValueError):
         estado_de_dict(bad)
+
+
+def test_alerta_has_nine_members_and_diff_dataclasses_are_frozen() -> None:
+    assert len(TipoAlerta) == 9
+    assert TipoAlerta.PASSANDO_DO_PONTO.value == "passando_do_ponto"
+    passo = PassoPlano(data=date(2026, 9, 28), piquete_destino_nome="Piquete 1")
+    diff = DiferencaLote(
+        lote_id=uuid.uuid4(), lote_nome="Recria", antes=(), depois=(passo,)
+    )
+    assert not hasattr(passo, "__dict__")
+    assert not hasattr(diff, "__dict__")
+    with pytest.raises(FrozenInstanceError):
+        passo.piquete_destino_nome = "x"  # type: ignore[misc]  # intentional: verifying frozen raises
+    with pytest.raises(FrozenInstanceError):
+        diff.lote_nome = "y"  # type: ignore[misc]  # intentional: verifying frozen raises

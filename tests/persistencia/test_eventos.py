@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from seugado.core.models import OrigemEvento, TipoEvento
 from seugado.persistencia.eventos import (
     PAYLOAD_POR_TIPO,
+    ComposicaoPayload,
     PayloadAlturaMedida,
     PayloadFotoValidacao,
     PayloadLeituraSatelite,
@@ -42,7 +43,7 @@ LOTE = {
     "nome": "Lote A",
     "composicao": [
         {
-            "categoria": "adulto",
+            "categoria": "vaca",
             "n_animais": 20,
             "peso_medio_kg": 450.0,
             "origem_peso": "produtor",
@@ -61,7 +62,7 @@ CASOS = [
             **LOTE,
             "composicao": [
                 {
-                    "categoria": "adulto",
+                    "categoria": "vaca",
                     "n_animais": 0,
                     "peso_medio_kg": 450.0,
                     "origem_peso": "produtor",
@@ -77,7 +78,7 @@ CASOS = [
             "ativo": True,
             "composicao": [
                 {
-                    "categoria": "adulto",
+                    "categoria": "vaca",
                     "n_animais": 20,
                     "peso_medio_kg": -1.0,
                     "origem_peso": "produtor",
@@ -272,6 +273,18 @@ def test_geometria_rejects_non_polygon_and_short_ring():
         PayloadPiqueteCriado.model_validate(short_ring)
     with pytest.raises(ValidationError):
         PayloadPiqueteAlterado.model_validate(short_ring)
+
+
+def test_composicao_rejects_removed_adulto_category():
+    with pytest.raises(ValidationError):
+        ComposicaoPayload.model_validate(
+            {
+                "categoria": "adulto",
+                "n_animais": 20,
+                "peso_medio_kg": 450.0,
+                "origem_peso": "produtor",
+            }
+        )
 
 
 def test_leitura_rejects_non_positive_ndvi():

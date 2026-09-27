@@ -15,8 +15,12 @@ class CategoriaAnimal(StrEnum):
     """Animal category of a cattle group member."""
 
     BEZERRO = "bezerro"
+    BEZERRA = "bezerra"
     NOVILHO = "novilho"
-    ADULTO = "adulto"
+    NOVILHA = "novilha"
+    VACA = "vaca"
+    BOI = "boi"
+    TOURO = "touro"
 
 
 class QualidadeBase(StrEnum):
@@ -93,8 +97,10 @@ class Fazenda:
     nome: str
     timezone: str  # IANA name
     funcionarios_disponiveis: int
-    manejos_por_funcionario_dia: int
+    animais_por_funcionario_dia: int
     dias_preferenciais_manejo: tuple[int, ...]  # weekday numbers, Monday first
+    envio_plano_dia: int  # weekday number, Monday first
+    envio_plano_hora: int  # farm's local time
     ativo: bool = True
 
 

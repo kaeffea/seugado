@@ -142,12 +142,12 @@ def test_hidden_case_1_invalid_composition():
     """Hidden Case 1: ComposicaoPayload with n_animais=0 must raise ValidationError."""
     with pytest.raises(ValidationError):
         eventos.ComposicaoPayload(
-            categoria="adulto", n_animais=0, peso_medio_kg=450.0, origem_peso="produtor"
+            categoria="vaca", n_animais=0, peso_medio_kg=450.0, origem_peso="produtor"
         )
 
     # Valid composition
     comp = eventos.ComposicaoPayload(
-        categoria="adulto", n_animais=10, peso_medio_kg=450.0, origem_peso="produtor"
+        categoria="vaca", n_animais=10, peso_medio_kg=450.0, origem_peso="produtor"
     )
     assert comp.n_animais == 10
 

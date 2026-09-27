@@ -101,7 +101,7 @@ def test_lote_holds_composition_as_tuple():
         nome="Lote A",
         composicao=(
             ComposicaoLote(categoria=CategoriaAnimal.BEZERRO, n_animais=3, peso_medio_kg=1.0),
-            ComposicaoLote(categoria=CategoriaAnimal.ADULTO, n_animais=20, peso_medio_kg=1.0),
+            ComposicaoLote(categoria=CategoriaAnimal.VACA, n_animais=20, peso_medio_kg=1.0),
         ),
     )
     assert isinstance(lote.composicao, tuple)
@@ -175,8 +175,10 @@ def test_fazenda_preferred_days_are_immutable():
         nome="Fazenda Fixture",
         timezone="America/Fortaleza",
         funcionarios_disponiveis=1,
-        manejos_por_funcionario_dia=1,
+        animais_por_funcionario_dia=30,
         dias_preferenciais_manejo=(0, 2, 4),
+        envio_plano_dia=0,
+        envio_plano_hora=6,
     )
     assert isinstance(f.dias_preferenciais_manejo, tuple)
 
@@ -202,3 +204,31 @@ def test_parametros_regime_continuo_uses_max_min_heights():
     assert pr.altura_maxima_cm == 1.0
     with pytest.raises(FrozenInstanceError):
         pr.fonte = "other"  # type: ignore[misc]  # intentional: verifying frozen mutation raises at runtime
+
+
+def test_categoria_animal_has_seven_sex_aware_members():
+    assert [c.value for c in CategoriaAnimal] == [
+        "bezerro",
+        "bezerra",
+        "novilho",
+        "novilha",
+        "vaca",
+        "boi",
+        "touro",
+    ]
+
+
+def test_fazenda_has_agenda_fields_in_order():
+    import dataclasses
+
+    assert [f.name for f in dataclasses.fields(Fazenda)] == [
+        "id",
+        "nome",
+        "timezone",
+        "funcionarios_disponiveis",
+        "animais_por_funcionario_dia",
+        "dias_preferenciais_manejo",
+        "envio_plano_dia",
+        "envio_plano_hora",
+        "ativo",
+    ]

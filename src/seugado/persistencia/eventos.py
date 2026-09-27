@@ -21,7 +21,7 @@ class _PayloadBase(BaseModel):
 class ComposicaoPayload(_PayloadBase):
     """One category group within a lote payload."""
 
-    categoria: Literal["bezerro", "novilho", "adulto"]
+    categoria: Literal["bezerro", "bezerra", "novilho", "novilha", "vaca", "boi", "touro"]
     n_animais: int = Field(gt=0)
     peso_medio_kg: float = Field(gt=0)
     origem_peso: Literal["produtor", "ua_tabela"]
