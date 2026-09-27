@@ -4,8 +4,12 @@ version = "0.1.0"
 description = "Sistema prescritivo de manejo de pastagens por satelite"
 requires-python = ">=3.12"
 dependencies = [
+    "earthengine-api>=1.7.45",
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
     "psycopg[binary]>=3.3.5",
     "pydantic>=2.13.5",
+    "uvicorn[standard]>=0.54.0",
 ]
 
 [dependency-groups]
@@ -46,3 +50,7 @@ mypy_path = "src"
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = ["ee", "ee.*"]
+ignore_missing_imports = true
