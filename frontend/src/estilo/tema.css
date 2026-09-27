@@ -1,0 +1,15 @@
+:root {
+  --cor-primaria: #2f6b3a;
+  --cor-fundo: #f7f6f2;
+  --cor-texto: #1d1d1b;
+  --cor-alerta: #b54708;
+  --cor-erro: #b42318;
+  --raio: 8px;
+  --fonte: system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--cor-fundo);
+  color: var(--cor-texto);
+  font-family: var(--fonte);
+}
