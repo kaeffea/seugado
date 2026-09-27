@@ -23,6 +23,11 @@ _RODAPE_ALTURAS = (
     " medida com régua. Quando terminar, toque em Refazer o plano."
 )
 
+# Short bot replies (plain text, no names inside).
+CANDIDATO_VENCIDO = "Essa atualização não vale mais."
+CANDIDATO_JA_EM_USO = "Você já está usando esse plano. Toque em /plano para vê-lo."
+PLANO_MANTIDO = "Combinado, seguimos com o plano que você já tem."
+
 
 def _h(texto: str) -> str:
     """Escape names and planner sentences for parse_mode HTML (button labels are plain)."""
@@ -201,6 +206,16 @@ def botoes_candidato(plano_id: UUID) -> list[list[Botao]]:
     """See the changes or keep the current plan."""
     return [
         [Botao("👀 Ver mudanças", f"pv:{plano_id}"), Botao("👍 Manter meu plano", f"pk:{plano_id}")]
+    ]
+
+
+def botoes_diferencas(plano_id: UUID) -> list[list[Botao]]:
+    """After seeing the changes: switch to the candidate or keep the current plan."""
+    return [
+        [
+            Botao("✅ Usar o plano novo", f"pu:{plano_id}"),
+            Botao("↩️ Manter o anterior", f"pk:{plano_id}"),
+        ]
     ]
 
 
