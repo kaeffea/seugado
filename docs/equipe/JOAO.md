@@ -88,14 +88,16 @@ o Kauê.
 
 ## 3. Preparar o ambiente
 
+> **Importante:** o Python não lê o `.env` sozinho. Todo comando `uv run` local leva `--env-file .env` (como nos exemplos abaixo); sem isso a API responde erro 500 e os testes de banco são pulados.
+
 1. Instale Git e **uv** (docs.astral.sh/uv). Clone o repositório e crie a sua branch:
    `feat/joao-otimizador`.
 2. `uv sync --group dev`.
-3. Rode `uv run pytest` para confirmar que tudo passa antes de você mexer.
+3. Rode `uv run --env-file .env pytest` para confirmar que tudo passa antes de você mexer.
 4. Para `persistencia/planos.py` (tarefa J5), crie o `.env` a partir de `.env.example` com o
    `DATABASE_URL` e o `SEUGADO_TEST_DATABASE_URL` que o Kauê manda em privado.
 
-**Antes do PR:** `uv run ruff check .`, `uv run mypy` e `uv run pytest` sem erro.
+**Antes do PR:** `uv run ruff check .`, `uv run mypy` e `uv run --env-file .env pytest` sem erro.
 
 ---
 
@@ -341,7 +343,7 @@ def carregar_plano(conn, plano_id: UUID) -> PlanoManejo | None
 1. `tests/planner/test_otimizador.py` com todos os critérios de J3. Monte estados pequenos
    direto em Python (2 a 4 piquetes) para os casos isolados, além do teste da fixture.
 2. `tests/planner/test_confianca.py` e `tests/persistencia/test_planos.py`.
-3. `uv run ruff check .`, `uv run mypy`, `uv run pytest`.
+3. `uv run ruff check .`, `uv run mypy`, `uv run --env-file .env pytest`.
 4. PR `feat/joao-otimizador` → `main`, com a saída do plano de exemplo no texto do PR.
 
 ---

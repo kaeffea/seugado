@@ -34,13 +34,14 @@ You may read (not modify), to import from them: `src/seugado/core/models.py`,
 `src/seugado/sensing/safer.py`.
 
 ## Files to create or modify
-- CREATE `src/seugado/planner/estado.py`
+- MODIFY `src/seugado/planner/estado.py` (R1 and R2 below **already exist** there; keep them
+  unchanged and add R3)
 - CREATE `src/seugado/planner/carga.py`
-- CREATE `tests/planner/test_estado.py`
+- MODIFY `tests/planner/test_estado.py` (add tests for R3)
 
 ## Requirements
 
-### R1 — Constants and small pure helpers (`estado.py`)
+### R1 — Constants and small pure helpers (`estado.py`, already implemented — reference only)
 ```python
 CONSUMO_FRACAO_PV: dict[CategoriaAnimal, float] = {
     CategoriaAnimal.BEZERRO: 0.024, CategoriaAnimal.NOVILHO: 0.022, CategoriaAnimal.ADULTO: 0.024,
@@ -73,7 +74,7 @@ def avancar_massa_um_dia(
 `eficiencia_pastejo` must be in `(0, 1]` (else `ValueError`) and the result is
 `max(0.0, massa + taxa − consumo / (eficiencia · area_ha))`. `area_ha <= 0` → `ValueError`.
 
-### R2 — Estimate confidence (`estado.py`)
+### R2 — Estimate confidence (`estado.py`, already implemented — reference only)
 ```python
 def confianca_estimativa(
     dias_desde_imagem: int | None,

@@ -73,6 +73,8 @@ escrever um novo adaptador, sem tocar no resto.
 
 ## 3. Preparar o ambiente
 
+> **Importante:** o Python não lê o `.env` sozinho. Todo comando `uv run` local leva `--env-file .env` (como nos exemplos abaixo); sem isso a API responde erro 500 e os testes de banco são pulados.
+
 1. Instale Git e **uv** (docs.astral.sh/uv). Clone e crie a branch `feat/leo-telegram`.
    `uv sync --group dev`.
 2. **Crie dois bots** no Telegram com o **@BotFather** (`/newbot`):
@@ -87,9 +89,9 @@ escrever um novo adaptador, sem tocar no resto.
    `TELEGRAM_BOT_TOKEN` e `TELEGRAM_BOT_USERNAME` (do bot **Dev**, localmente) e
    `TELEGRAM_WEBHOOK_SECRET` (qualquer texto aleatório longo). Mande os dados do bot de
    **produção** ao Leandro, em privado, para o deploy.
-5. Rode local com polling: `uv run python scripts/telegram_polling.py`.
+5. Rode local com polling: `uv run --env-file .env python scripts/telegram_polling.py`.
 
-**Antes do PR:** `uv run ruff check .`, `uv run mypy` e `uv run pytest` sem erro.
+**Antes do PR:** `uv run ruff check .`, `uv run mypy` e `uv run --env-file .env pytest` sem erro.
 
 ---
 
@@ -181,6 +183,13 @@ executar_ciclo(conn, fazenda_id, ingerir_satelite=False, atualizado=True)
 ---
 
 ## 7. Tarefas (na ordem)
+
+**Módulos que ainda não estão na sua branch.** `executar_ciclo` (Leandro) e
+`carregar_plano_atual` (João) só chegam na `main` na integração de segunda. **Importe-os dentro
+das funções que os usam**, não no topo do arquivo, e nos testes injete módulos falsos com
+`monkeypatch.setitem(sys.modules, "seugado.jobs.ciclo", modulo_falso)` (idem para
+`seugado.persistencia.planos`). Para desenvolver com dados, carregue o plano de
+`tests/fixtures/plano_exemplo.json` com `plano_de_dict`.
 
 ### T1: Interface e canal Telegram (`canais/base.py`, `canais/telegram.py`)
 

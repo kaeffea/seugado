@@ -159,6 +159,12 @@ instala as dependências.
 `Ação manual: Peça ao Antigravity para criar frontend/ com o template Vite "react-ts", instalar react-router, @supabase/supabase-js, leaflet, react-leaflet, @geoman-io/leaflet-geoman-free e @types/leaflet (dev), e adicionar ao pyproject fastapi, uvicorn[standard], httpx e earthengine-api, com override do mypy ignore_missing_imports para o módulo "ee".`
 `Ação manual: Depois, abra o Muse Code e peça para implementar specs/SPEC-010-esqueleto-api-frontend.md. Por fim, o Antigravity testa com revisoes/KIT-ACEITE-010.md e commita.`
 
+**A4b. SPEC-014A: auxiliares do estado (antes de mandar os documentos).** Cria
+`planner/estado.py` só com as funções que o João (`avancar_massa_um_dia`) e o Leandro
+(`peso_por_ua_kg`) importam. É pequena e pura. A SPEC-014 completa, amanhã, acrescenta o resto
+no mesmo arquivo.
+`Ação manual: Abra o Muse Code e peça para implementar specs/SPEC-014A-estado-auxiliares.md. Quando ele terminar, chame o Antigravity para testar com revisoes/KIT-ACEITE-014A.md e commitar.`
+
 **A5. Conferência do bloco A.** A API sobe e `GET /saude` responde. `npm run build` passa. O
 banco tem 9 cultivares. `tests/fixtures/*.json` carregam em `contratos.py`. Deste ponto em
 diante, **ninguém da equipe fica bloqueado por você**.
@@ -211,9 +217,9 @@ O objetivo é ver, no banco real, o estado projetado de uma fazenda de verdade.
 
 ## 5. Checklist antes de enviar
 
-- [ ] SPEC-007 a SPEC-010 commitadas; `uv run pytest` verde
+- [ ] SPEC-007 a SPEC-010 commitadas; `uv run --env-file .env pytest` verde
 - [ ] Migrações 0001 e 0002 aplicadas no Supabase; `SELECT count(*) FROM cultivar` = 9
-- [ ] `uv run uvicorn seugado.api.main:app --app-dir src` sobe; `/saude` responde
+- [ ] `uv run --env-file .env uvicorn seugado.api.main:app --app-dir src` sobe; `/saude` responde
 - [ ] `cd frontend && npm run build` passa
 - [ ] SPEC-011 a SPEC-014 commitadas
 - [ ] Teste integrado do bloco C com massa e taxas plausíveis

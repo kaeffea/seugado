@@ -1,7 +1,7 @@
 # Estado Atual — SeuGado
 
-**Atualizado em:** 26/09/2026
-**Fase:** MVP — **F-MVP-010 concluída**.
+**Atualizado em:** 27/09/2026
+**Fase:** MVP — **F-MVP-014A concluída** (F-MVP-010 e F-MVP-014A entregues).
 **Próxima:** **F-MVP-011 (Clima e Graus-Dia — SPEC-011)**.
 
 > **Painel Operacional Conciso.** Este documento é mantido exclusivamente pelo **Antigravity** após a conclusão e commit de cada fatia. Modelos no Claude Projects apenas o consultam como ponteiro rápido.
@@ -11,14 +11,13 @@
 
 ## Situação do Repositório
 
-- **Fundação & MVP:** F-000 até F-004 e F-MVP-007 até F-MVP-010 concluídas e integradas.
-- **Suíte de Testes:** **333 testes passando** (0 skipped, 0 falhas), `ruff` e `mypy --strict` 100% limpos.
+- **Fundação & MVP:** F-000 até F-004, F-MVP-007 até F-MVP-010 e F-MVP-014A concluídas e integradas.
+- **Suíte de Testes:** **352 testes passando** (0 skipped, 0 falhas), `ruff` e `mypy --strict` 100% limpos.
 - **Frontend Web:** Vite React + TypeScript compilando limpo (`npm run build`), autenticação Supabase, Leaflet e Geoman integrados.
 - **Banco de Dados (Supabase):** Migrações `0001` e `0002` aplicadas, 9 cultivares populados, RLS habilitado (12 tabelas).
 - **Últimos commits:** 
-  - `f5403fd` (F-MVP-009: contratos entre modulos e conversao JSON)
-  - `49e253d` (prep(SPEC-010): esqueleto vite react-ts no frontend e dependencias da API no pyproject)
-  - F-MVP-010 (SPEC-010: esqueleto da API FastAPI e frontend web compartilhado)
+  - `caa83e3` (F-MVP-010: esqueleto da API FastAPI e frontend web compartilhado)
+  - F-MVP-014A (SPEC-014A: auxiliares puros do estado forrageiro em `planner/estado.py`)
 
 ---
 
@@ -30,11 +29,12 @@
 | **F-MVP-007 Eventos do MVP** | ✅ concluída | SPEC-007: OrigemPeso, AlturaMedida, Leitura raw, GeoJSON (281 testes) |
 | **F-MVP-008 Banco do MVP** | ✅ concluída | SPEC-008: migração `0002_mvp.sql`, projeção DB, catálogo (304 testes) |
 | **F-MVP-009 Contratos do MVP** | ✅ concluída | SPEC-009: `contratos.py`, 9 dataclasses, serialização JSON (321 testes) |
-| **F-MVP-010 Esqueleto API & Web** | ✅ **concluída** | SPEC-010: FastAPI, 5 rotas stubs, auth, frontend shell (333 testes) |
+| **F-MVP-010 Esqueleto API & Web** | ✅ concluída | SPEC-010: FastAPI, 5 rotas stubs, auth, frontend shell (333 testes) |
+| **F-MVP-014A Auxiliares do Estado** | ✅ **concluída** | SPEC-014A: `peso_por_ua_kg`, `avancar_massa_um_dia`, confiança (352 testes) |
 | **F-MVP-011 Clima e graus-dia** | ⬜ **próxima** | SPEC-011: Open-Meteo histórico e previsão |
 | F-MVP-012 Modelo SAFER | ⬜ não iniciada | SPEC-012: biomassa e evapotranspiração |
 | F-MVP-013 Ingestão de satélite HLS | ⬜ não iniciada | SPEC-013: Earth Engine HLS S30 |
-| F-MVP-014 Estado projetado | ⬜ não iniciada | SPEC-014: união de sensoriamento, clima e SAFER |
+| F-MVP-014 Estado projetado | ⬜ não iniciada | SPEC-014: projeção completa e carga |
 
 ---
 

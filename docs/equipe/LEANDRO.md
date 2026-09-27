@@ -19,7 +19,7 @@ na internet.
 6. Ciclo semanal (`jobs/ciclo.py`)
 7. Deploy: Render, Vercel e GitHub Actions
 
-**Prazo:** PR aberto até domingo à noite. A ordem das tarefas abaixo é a ordem de prioridade:
+**Prazo:** a L0 (`/me`) entra na `main` até as 10h de domingo, porque o Ezequiel depende dela; o resto em PR até domingo à noite. A ordem das tarefas abaixo é a ordem de prioridade:
 se o tempo apertar, o deploy (L7) pode ser feito na segunda com a equipe.
 
 ---
@@ -85,6 +85,8 @@ o link do Figma e as cores logo cedo.
 
 ## 3. Preparar o ambiente
 
+> **Importante:** o Python não lê o `.env` sozinho. Todo comando `uv run` local leva `--env-file .env` (como nos exemplos abaixo); sem isso a API responde erro 500 e os testes de banco são pulados.
+
 1. Instale Git, **Node 20+** e **uv** (docs.astral.sh/uv). Clone e crie a branch
    `feat/leandro-fazenda-lotes-ciclo`.
 2. Raiz: copie `.env.example` para `.env` e preencha com o que o Kauê mandar em privado:
@@ -93,11 +95,11 @@ o link do Figma e as cores logo cedo.
 3. `frontend/.env` a partir do `.env.example`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
    `VITE_API_URL=http://localhost:8000`.
 4. Backend: `uv sync --group dev` e
-   `uv run uvicorn seugado.api.main:app --app-dir src --reload` (docs em
+   `uv run --env-file .env uvicorn seugado.api.main:app --app-dir src --reload` (docs em
    `http://localhost:8000/docs`).
 5. Frontend: `cd frontend && npm install && npm run dev` (`http://localhost:5173`).
 
-**Antes do PR:** `uv run ruff check .`, `uv run pytest` e `npm run build` sem erros.
+**Antes do PR:** `uv run ruff check .`, `uv run --env-file .env pytest` e `npm run build` sem erros.
 
 ---
 
@@ -235,6 +237,25 @@ o produtor responde "não fiz" ou "fiz diferente". **Não mude essa assinatura.*
 ---
 
 ## 6. Tarefas (na ordem)
+
+### L0: `GET /me` e `POST /fazendas` primeiro, em PR pequeno (antes de tudo)
+
+**Por quê:** o site inteiro depende de `GET /me`. Sem ele, o `RotaProtegida` não sabe quem está
+logado e manda todo mundo de volta para o login, inclusive o Ezequiel, que precisa da rota
+`/mapa` funcionando. É a única tarefa da equipe que bloqueia outra pessoa.
+
+**Como:** faça só a parte **backend** da L3 (`cadastro/fazenda.py` com `criar_fazenda` e
+`carregar_fazenda`, e as rotas `GET /me` e `POST /fazendas`). Abra um PR pequeno
+(`feat/leandro-me`) e **avise o Kauê para fazer o merge na hora**, sem esperar a segunda. Depois
+avise o Ezequiel para dar `git pull` na `main`. Enquanto a tela de onboarding não existe, cada
+pessoa cria a própria fazenda pelo `/docs` da API local (`POST /fazendas`, com o cabeçalho
+`authorization: Bearer <token>`; o token aparece no navegador, em DevTools → Application →
+Local Storage → a chave `sb-…-auth-token`, campo `access_token`).
+
+**Critérios de aceite:**
+- [ ] Logado e sem fazenda, o site vai para `/onboarding`; com fazenda, abre `/mapa`.
+- [ ] Merge na `main` até as 10h.
+
 
 ### L1: Identidade visual (Figma) + `tema.css` (timebox: 1 hora)
 
@@ -421,6 +442,15 @@ dispara o plano. Na terça, esta página é a demo.
 Leo); histórico de planos.
 
 ### L6: Ciclo semanal (`jobs/ciclo.py`)
+
+**Módulos que ainda não estão na sua branch.** `gerar_plano`/`salvar_plano`/`carregar_plano_atual`
+(João) e `confirmar_por_omissao`/`enviar_plano` (Leo) só chegam na `main` na integração de
+segunda. Por isso, **importe-os dentro da função** (`from seugado.planner.otimizador import
+gerar_plano` na primeira linha de `executar_ciclo`, e o mesmo em `rotas_plano.py`), e nos testes
+injete módulos falsos com
+`monkeypatch.setitem(sys.modules, "seugado.planner.otimizador", modulo_falso)`. O `projecao_db`
+do Kauê já está na `main`; `ingestao` e `carga` entram ao longo de domingo. Se ainda não
+estiverem quando você chegar aqui, use a mesma técnica para eles.
 
 **Por quê:** é o que faz o SeuGado rodar **sozinho** toda segunda-feira. É a definição de MVP
 completo (F-015).

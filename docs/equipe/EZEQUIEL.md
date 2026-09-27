@@ -70,6 +70,8 @@ página). Se precisar de algo neles, peça ao Kauê. **Não adicione dependênci
 
 ## 3. Preparar o ambiente
 
+> **Importante:** o Python não lê o `.env` sozinho. Todo comando `uv run` local leva `--env-file .env` (como nos exemplos abaixo); sem isso a API responde erro 500 e os testes de banco são pulados.
+
 1. Instale **Git**, **Node 20+** e **uv** (gerenciador Python: `pip install uv` ou o instalador
    em docs.astral.sh/uv).
 2. Clone o repositório e crie a sua branch: `feat/ezequiel-piquetes`.
@@ -79,14 +81,15 @@ página). Se precisar de algo neles, peça ao Kauê. **Não adicione dependênci
    `VITE_SUPABASE_ANON_KEY` (os mesmos valores). `VITE_API_URL` fica
    `http://localhost:8000`.
 5. Backend: `uv sync --group dev`, depois
-   `uv run uvicorn seugado.api.main:app --app-dir src --reload`. Abra
+   `uv run --env-file .env uvicorn seugado.api.main:app --app-dir src --reload`. Abra
    `http://localhost:8000/docs`.
 6. Frontend: `cd frontend && npm install && npm run dev`. Abra `http://localhost:5173`.
-7. Crie a sua conta na tela de login. Enquanto a tela de onboarding do Leandro não existe,
-   peça ao Kauê para vincular uma fazenda de teste à sua conta. Também dá para usar o
-   `POST /fazendas` pelo `/docs` assim que o Leandro subir a rota.
+7. **Comece pelo backend (E1 a E3).** O site só deixa entrar na página Mapa depois que a rota
+   `GET /me` do Leandro estiver na `main` (ele sobe primeiro, até ~10h). Quando ele avisar, dê
+   `git pull origin main` e faça merge na sua branch. Crie a sua conta na tela de login e a sua
+   fazenda pelo `/docs` da API (`POST /fazendas`), até a tela de onboarding ficar pronta.
 
-**Antes de cada PR:** `uv run ruff check .` e `uv run pytest` sem erro, e `npm run build` sem
+**Antes de cada PR:** `uv run ruff check .` e `uv run --env-file .env pytest` sem erro, e `npm run build` sem
 erro.
 
 ---
@@ -418,7 +421,7 @@ as mudanças da semana.
    - validação de `campo` × método (sem banco);
    - com banco (pule se `SEUGADO_TEST_DATABASE_URL` não existir): criar, listar, editar,
      desativar.
-2. `uv run ruff check .`, `uv run pytest`, `npm run build`.
+2. `uv run ruff check .`, `uv run --env-file .env pytest`, `npm run build`.
 3. Abra o PR `feat/ezequiel-piquetes` → `main` com prints do mapa. Não faça merge sozinho: o
    merge é na reunião de segunda.
 
