@@ -1,7 +1,7 @@
-export default function Onboarding() {
+export default function Clientes() {
   return (
     <>
-      <h1>Onboarding</h1>
+      <h1>Clientes e fazendas</h1>
       <p>Em construção — responsável: Leandro</p>
     </>
   );

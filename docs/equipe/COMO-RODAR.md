@@ -50,7 +50,7 @@ uv --version
 ## 3. Baixar o projeto e criar a sua branch
 
 ```
-git clone https://github.com/<dono>/seugado.git
+git clone https://github.com/kaeffea/seugado.git
 cd seugado
 git checkout -b feat/<seu-nome>-<assunto>      # ex.: feat/joao-otimizador
 ```

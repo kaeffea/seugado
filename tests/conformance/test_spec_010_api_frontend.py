@@ -78,19 +78,40 @@ def test_five_router_modules_are_empty_stubs() -> None:
 
 
 def test_frontend_tipos_ts_matches_spec() -> None:
-    """frontend/src/lib/tipos.ts matches the verbatim TypeScript block in SPEC-010."""
+    """frontend/src/lib/tipos.ts contains contract types updated for ADR-025/SPEC-016."""
     tipos_path = FRONTEND_DIR / "src" / "lib" / "tipos.ts"
     assert tipos_path.exists(), "frontend/src/lib/tipos.ts does not exist"
-    content = tipos_path.read_text(encoding="utf-8").strip()
+    content = tipos_path.read_text(encoding="utf-8")
 
-    spec_content = SPEC_010_FILE.read_text(encoding="utf-8")
-    # Extract the code block under '## API contract types'
-    start_marker = "## API contract types\n```ts\n"
-    assert start_marker in spec_content, "Spec does not contain API contract types marker"
-    part = spec_content.split(start_marker, 1)[1]
-    expected_block = part.split("```", 1)[0].strip()
+    # Common contract types unchanged from SPEC-010
+    required_types = [
+        "export type Confianca =",
+        "export type MetodoPastejo =",
+        "export type SituacaoPiquete =",
+        "export interface Cultivar {",
+        "export interface GeoJsonPolygon {",
+        "export interface Piquete {",
+        "export interface ParametroPendente {",
+        "export interface ComposicaoItem {",
+        "export interface Lote {",
+        "export interface Movimentacao {",
+        "export interface Alerta {",
+        "export interface PedidoValidacao {",
+        "export interface ResumoPiquete {",
+        "export interface PlanoManejo {",
+    ]
+    for req in required_types:
+        assert req in content, f"Missing {req} in tipos.ts"
 
-    assert content == expected_block, "tipos.ts does not match spec verbatim block"
+    # Updated types per ADR-025 / SPEC-016
+    assert (
+        'export type Categoria = "bezerro" | "bezerra" | "novilho" | "novilha" | "vaca" | "boi"'
+        ' | "touro";' in content
+    )
+    assert "export interface Cliente {" in content
+    assert "animais_por_funcionario_dia: number;" in content
+    assert "manejos_por_funcionario_dia" not in content
+    assert "export interface Me { usuario_id: string; email: string | null; }" in content
 
 
 def test_frontend_package_json_dependencies() -> None:

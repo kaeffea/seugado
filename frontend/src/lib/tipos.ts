@@ -1,14 +1,19 @@
 export type Confianca = "alta" | "media" | "baixa";
 export type MetodoPastejo = "continuo" | "rotacionado";
-export type Categoria = "bezerro" | "novilho" | "adulto";
+export type Categoria = "bezerro" | "bezerra" | "novilho" | "novilha" | "vaca" | "boi" | "touro";
 export type SituacaoPiquete = "ocupado" | "descansando";
 
+export interface Cliente { id: string; nome: string; telefone: string | null; observacoes: string | null; }
+
 export interface Fazenda {
-  id: string; nome: string; timezone: string;
-  funcionarios_disponiveis: number; manejos_por_funcionario_dia: number;
+  id: string; cliente_id: string | null; cliente_nome: string | null;
+  nome: string; timezone: string;
+  funcionarios_disponiveis: number; animais_por_funcionario_dia: number;
   dias_preferenciais_manejo: number[];            // 0 = segunda … 6 = domingo
+  envio_plano_dia: number;                        // 0 = segunda … 6 = domingo
+  envio_plano_hora: number;                       // 0 … 23, hora local da fazenda
 }
-export interface Me { usuario_id: string; email: string | null; fazenda: Fazenda | null; }
+export interface Me { usuario_id: string; email: string | null; }
 
 export interface Cultivar {
   id: string; slug: string; nome: string;
