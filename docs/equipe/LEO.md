@@ -45,6 +45,124 @@ nada de formulário. Toda interação é por botão, exceto a altura, que é um 
 
 ---
 
+## Entradas e saídas: o que você recebe, de quem, e o que entrega
+
+Esta seção é o seu contrato com o resto da equipe. **Nomes, tipos e formatos são exatamente estes**; se algo aqui parecer faltar ou estar errado, fale com o Kauê antes de inventar outro formato.
+
+### Resumo
+
+| | O quê | De quem / para quem | Como chega / sai |
+|---|---|---|---|
+| **Recebe** | `PlanoManejo` para enviar | ciclo do Leandro (plano gerado pelo João) | argumento de `enviar_plano(conn, plano, atualizado)` |
+| **Recebe** | o plano atual, para achar a movimentação clicada | João | `carregar_plano_atual(conn, fazenda_id) -> PlanoManejo \| None` |
+| **Recebe** | mensagens e cliques do produtor | Telegram | `POST /telegram/webhook` (JSON do Telegram, campos abaixo) |
+| **Recebe** | nomes e posições de lotes e piquetes | banco (tabelas derivadas do Kauê) | SQL em `estado_lote`, `estado_piquete`, `fazenda` |
+| **Entrega** | mensagem do plano no celular | produtor | `enviar_plano(...) -> bool` (chamada pelo Leandro) |
+| **Entrega** | respostas do produtor como eventos | banco → Kauê (estado) → João (próximo plano) | `registrar_evento` + `reconstruir_projecao` + `commit` |
+| **Entrega** | confirmação por omissão | banco | `confirmar_por_omissao(conn, fazenda_id, hoje) -> int` (chamada pelo Leandro, sem commit) |
+| **Chama** | recálculo do plano | Leandro | `executar_ciclo(conn, fazenda_id, ingerir_satelite=False, atualizado=True) -> PlanoManejo` |
+
+### Assinaturas exatas que outros chamam
+
+```python
+# src/seugado/delivery/envio.py
+def enviar_plano(conn: psycopg.Connection[Any], plano: PlanoManejo,
+                 atualizado: bool = False, canal: Canal | None = None) -> bool: ...
+    # True = enviou; False = fazenda sem Telegram vinculado (não é erro)
+
+# src/seugado/delivery/confirmacao.py
+def confirmar_por_omissao(conn: psycopg.Connection[Any], fazenda_id: UUID, hoje: date) -> int: ...
+    # quantas movimentações foram confirmadas por omissão; NÃO faz commit
+
+# src/seugado/api/rotas_telegram.py
+# POST /telegram/webhook
+#   cabeçalho obrigatório: X-Telegram-Bot-Api-Secret-Token = TELEGRAM_WEBHOOK_SECRET  (senão 403)
+#   corpo: o "Update" do Telegram (JSON)
+#   resposta imediata: {"ok": true}  (o processamento roda em BackgroundTasks)
+```
+
+### O que chega do Telegram (só os campos que você usa)
+
+```jsonc
+// mensagem de texto
+{"update_id": 1, "message": {"message_id": 10, "chat": {"id": 123456789}, "text": "/start a1b2c3d4e5f60718"}}
+// clique em botão
+{"update_id": 2, "callback_query": {"id": "4382...", "data": "f:33333333-3333-4333-8333-000000000001",
+  "message": {"message_id": 11, "chat": {"id": 123456789}}}}
+```
+- `chat.id` é `int` (guarde em `fazenda.telegram_chat_id`).
+- `callback_query.id` vai para `responder_clique`.
+- `callback_query.data` é o texto do botão, com no máximo 64 bytes, nos formatos `m:`, `f:`, `n:`,
+  `d:`, `a:` e `o:` da tarefa T5.
+
+### Formatos
+
+#### `PlanoManejo`: o plano da semana
+
+Tipo Python em `seugado.contratos`; em JSON via `plano_para_dict` / `plano_de_dict`; em
+TypeScript em `frontend/src/lib/tipos.ts`. Exemplo completo: `tests/fixtures/plano_exemplo.json`.
+
+| Campo | Tipo (Python) | Em JSON | Significado |
+|---|---|---|---|
+| `id` | `UUID` | texto | Id do plano |
+| `fazenda_id` | `UUID` | texto | Fazenda dona do plano |
+| `data_geracao` | `datetime` (UTC, com fuso) | `"2026-09-28T08:00:00+00:00"` | Quando foi gerado |
+| `data_inicio` | `date` | `"2026-09-28"` | Primeiro dia do plano (hoje) |
+| `horizonte_dias` | `int` | `7` | Sempre 7 |
+| `movimentacoes` | `tuple[Movimentacao, ...]` | lista | Ordenadas por `(data, lote_nome)` |
+| `alertas` | `tuple[Alerta, ...]` | lista | Ordenados por `(data, tipo, texto)` |
+| `pedidos_validacao` | `tuple[PedidoValidacao, ...]` | lista | Ordenados pelo nome do piquete |
+| `piquetes` | `tuple[ResumoPiquete, ...]` | lista | Um por piquete ativo, em ordem de nome |
+
+**`Movimentacao`**: "mover o lote X do piquete A para o B no dia D"
+
+| Campo | Tipo | Em JSON | Significado |
+|---|---|---|---|
+| `id` | `UUID` | texto | Id da movimentação; é o `entidade_id` do evento `manejo_recomendado` e o que vai nos botões do bot |
+| `data` | `date` | `"2026-09-28"` | Dia da movimentação (sempre dia de manejo preferido) |
+| `lote_id` / `lote_nome` | `UUID` / `str` | texto | Lote que muda |
+| `piquete_origem_id` / `piquete_origem_nome` | `UUID \| None` / `str \| None` | texto ou `null` | De onde sai |
+| `piquete_destino_id` / `piquete_destino_nome` | `UUID` / `str` | texto | Para onde vai |
+| `altura_destino_cm` | `float` (1 casa) | número | Altura prevista do destino no início do dia |
+| `altura_entrada_alvo_cm` | `float` | número | Altura ideal de entrada do capim do destino |
+| `altura_origem_cm` | `float \| None` | número ou `null` | Altura prevista da origem no início do dia |
+| `altura_saida_alvo_cm` | `float \| None` | número ou `null` | Altura de saída do capim da origem |
+| `dias_previstos` | `int` | número | Dias que o lote deve ficar no destino |
+| `motivo` | `str` | texto | Frase pronta, em português, para o produtor |
+| `confianca` | `Confianca` | `"alta"` \| `"media"` \| `"baixa"` | Confiança da recomendação |
+| `motivo_confianca` | `str` | texto | Frase pronta: o dado mais fraco por trás da recomendação |
+
+**`Alerta`**
+
+| Campo | Tipo | Em JSON | Significado |
+|---|---|---|---|
+| `tipo` | `TipoAlerta` | um de: `sem_piquete_apto`, `capacidade_excedida`, `aguardando_parametro`, `estimativa_indisponivel`, `continuo_acima_maxima`, `continuo_abaixo_minima`, `lote_sem_piquete`, `sem_dia_de_manejo` | Tipo do aviso |
+| `data` | `date` | `"2026-10-01"` | Dia a que se refere |
+| `texto` | `str` | texto | Frase pronta para o produtor |
+| `confianca` / `motivo_confianca` | `Confianca` / `str` | texto | Como na movimentação |
+| `piquete_id` / `lote_id` | `UUID \| None` | texto ou `null` | A quem se refere |
+
+**`PedidoValidacao`**: pedido de medir o capim com régua
+
+| Campo | Tipo | Em JSON | Significado |
+|---|---|---|---|
+| `piquete_id` / `piquete_nome` | `UUID` / `str` | texto | Piquete a medir |
+| `motivo` | `str` | texto | Frase pronta: por que o sistema está pedindo |
+
+**`ResumoPiquete`**: a fotografia de cada piquete (usada no mapa)
+
+| Campo | Tipo | Em JSON | Significado |
+|---|---|---|---|
+| `piquete_id` / `nome` | `UUID` / `str` | texto | Piquete |
+| `situacao` | `SituacaoPiquete` | `"ocupado"` \| `"descansando"` | Tem gado ou está descansando |
+| `lote_atual_nome` | `str \| None` | texto ou `null` | Lote que está nele |
+| `altura_hoje_cm` | `float \| None` | número ou `null` | Altura estimada hoje; `null` = sem estimativa |
+| `altura_entrada_alvo_cm` / `altura_saida_alvo_cm` | `float \| None` | número ou `null` | Alvos (nulos no contínuo ou sem parâmetro) |
+| `confianca` / `motivo_confianca` | `Confianca` / `str` | texto | Confiança da estimativa do piquete |
+| `faltantes` | `tuple[str, ...]` | lista de texto | O que falta para estimar ou planejar; vazio = tudo certo |
+
+---
+
 ## 2. Stack e onde fica o seu código
 
 Python 3.12, FastAPI e **`httpx`** para falar com a API do Telegram (sem biblioteca de bot,

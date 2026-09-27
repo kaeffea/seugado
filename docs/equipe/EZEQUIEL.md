@@ -43,6 +43,111 @@ Nada disso funciona sem saber **onde** estão os piquetes. Esse é o seu trabalh
 
 ---
 
+## Entradas e saídas: o que você recebe, de quem, e o que entrega
+
+Esta seção é o seu contrato com o resto da equipe. **Nomes, tipos e formatos são exatamente estes**; se algo aqui parecer faltar ou estar errado, fale com o Kauê antes de inventar outro formato.
+
+### Resumo
+
+| | O quê | De quem / para quem | Como chega / sai |
+|---|---|---|---|
+| **Recebe** | desenho e dados do piquete | a sua página Mapa | `POST`/`PUT` `PiqueteIn` (JSON, seção 5.1) |
+| **Recebe** | usuário logado e fazenda dele | Kauê (`api/auth.py`) e Leandro (`GET /me`) | dependências `Usuario`, `FazendaAutorizada`; no front, `useFazenda()` |
+| **Recebe** | catálogo de capins com as alturas | Kauê (`persistencia/catalogo.py`) | funções `carregar_catalogo`, `resolver_alturas`, `faltantes_calibracao` |
+| **Recebe** | o plano da semana, para pintar o mapa | Leandro (rota), gerado pelo João | `GET /fazendas/{id}/plano/atual` → `PlanoManejo` (JSON) ou 404 |
+| **Entrega** | piquetes gravados como eventos | banco → Kauê (satélite, estado) → João (plano) | `piquete_criado`, `piquete_alterado`, `altura_medida`, `parametro_alterado` |
+| **Entrega** | lista de piquetes | Leandro (formulário de lotes: "onde o lote está") | `GET /fazendas/{id}/piquetes` → `Piquete[]` |
+| **Entrega** | registrar altura medida | Leandro (página do plano, "Medições pedidas") | `POST /fazendas/{id}/piquetes/{piquete_id}/alturas` |
+
+### O `Piquete` que você devolve (JSON), campo a campo
+
+| Campo | Tipo | Exemplo | Origem |
+|---|---|---|---|
+| `id` | texto (UUID) | `"1111…0001"` | `estado_piquete.piquete_id` |
+| `nome` | texto | `"Piquete 1"` | `estado_piquete.nome` |
+| `geometria` | GeoJSON Polygon, `[longitude, latitude]` | `{"type": "Polygon", "coordinates": [[[-36.09, -9.78], …]]}` | `ST_AsGeoJSON(estado_piquete.geometria)::json` |
+| `area_ha` | número | `4.02` | `estado_piquete.area_ha` |
+| `cultivar_id` / `cultivar_nome` | texto | `"…"`, `"Marandu"` | `estado_piquete.cultivar_id` + `cultivar.nome` |
+| `metodo_pastejo` | `"rotacionado"` \| `"continuo"` | `"rotacionado"` | `estado_piquete.metodo_pastejo` |
+| `situacao` | `"ocupado"` \| `"descansando"` | `"descansando"` | `estado_piquete.situacao` |
+| `lote_atual_id` / `lote_atual_nome` | texto ou `null` | `null` | `estado_piquete.lote_atual_id` + `estado_lote.nome` |
+| `ultima_altura_cm` | número ou `null` | `28.0` | `altura_atual.altura_cm` |
+| `ultima_altura_data` | texto ISO ou `null` | `"2026-09-27"` | `altura_atual.data` |
+
+### O que você lê do plano (campos usados no mapa)
+
+- `piquetes[]` (`ResumoPiquete`): `piquete_id`, `situacao`, `lote_atual_nome`, `altura_hoje_cm`,
+  `altura_entrada_alvo_cm`, `altura_saida_alvo_cm`, `confianca`, `motivo_confianca`,
+  `faltantes`.
+- `movimentacoes[]` (`Movimentacao`): `data`, `lote_nome`, `piquete_origem_id`,
+  `piquete_destino_id`.
+
+#### `PlanoManejo`: o plano da semana
+
+Tipo Python em `seugado.contratos`; em JSON via `plano_para_dict` / `plano_de_dict`; em
+TypeScript em `frontend/src/lib/tipos.ts`. Exemplo completo: `tests/fixtures/plano_exemplo.json`.
+
+| Campo | Tipo (Python) | Em JSON | Significado |
+|---|---|---|---|
+| `id` | `UUID` | texto | Id do plano |
+| `fazenda_id` | `UUID` | texto | Fazenda dona do plano |
+| `data_geracao` | `datetime` (UTC, com fuso) | `"2026-09-28T08:00:00+00:00"` | Quando foi gerado |
+| `data_inicio` | `date` | `"2026-09-28"` | Primeiro dia do plano (hoje) |
+| `horizonte_dias` | `int` | `7` | Sempre 7 |
+| `movimentacoes` | `tuple[Movimentacao, ...]` | lista | Ordenadas por `(data, lote_nome)` |
+| `alertas` | `tuple[Alerta, ...]` | lista | Ordenados por `(data, tipo, texto)` |
+| `pedidos_validacao` | `tuple[PedidoValidacao, ...]` | lista | Ordenados pelo nome do piquete |
+| `piquetes` | `tuple[ResumoPiquete, ...]` | lista | Um por piquete ativo, em ordem de nome |
+
+**`Movimentacao`**: "mover o lote X do piquete A para o B no dia D"
+
+| Campo | Tipo | Em JSON | Significado |
+|---|---|---|---|
+| `id` | `UUID` | texto | Id da movimentação; é o `entidade_id` do evento `manejo_recomendado` e o que vai nos botões do bot |
+| `data` | `date` | `"2026-09-28"` | Dia da movimentação (sempre dia de manejo preferido) |
+| `lote_id` / `lote_nome` | `UUID` / `str` | texto | Lote que muda |
+| `piquete_origem_id` / `piquete_origem_nome` | `UUID \| None` / `str \| None` | texto ou `null` | De onde sai |
+| `piquete_destino_id` / `piquete_destino_nome` | `UUID` / `str` | texto | Para onde vai |
+| `altura_destino_cm` | `float` (1 casa) | número | Altura prevista do destino no início do dia |
+| `altura_entrada_alvo_cm` | `float` | número | Altura ideal de entrada do capim do destino |
+| `altura_origem_cm` | `float \| None` | número ou `null` | Altura prevista da origem no início do dia |
+| `altura_saida_alvo_cm` | `float \| None` | número ou `null` | Altura de saída do capim da origem |
+| `dias_previstos` | `int` | número | Dias que o lote deve ficar no destino |
+| `motivo` | `str` | texto | Frase pronta, em português, para o produtor |
+| `confianca` | `Confianca` | `"alta"` \| `"media"` \| `"baixa"` | Confiança da recomendação |
+| `motivo_confianca` | `str` | texto | Frase pronta: o dado mais fraco por trás da recomendação |
+
+**`Alerta`**
+
+| Campo | Tipo | Em JSON | Significado |
+|---|---|---|---|
+| `tipo` | `TipoAlerta` | um de: `sem_piquete_apto`, `capacidade_excedida`, `aguardando_parametro`, `estimativa_indisponivel`, `continuo_acima_maxima`, `continuo_abaixo_minima`, `lote_sem_piquete`, `sem_dia_de_manejo` | Tipo do aviso |
+| `data` | `date` | `"2026-10-01"` | Dia a que se refere |
+| `texto` | `str` | texto | Frase pronta para o produtor |
+| `confianca` / `motivo_confianca` | `Confianca` / `str` | texto | Como na movimentação |
+| `piquete_id` / `lote_id` | `UUID \| None` | texto ou `null` | A quem se refere |
+
+**`PedidoValidacao`**: pedido de medir o capim com régua
+
+| Campo | Tipo | Em JSON | Significado |
+|---|---|---|---|
+| `piquete_id` / `piquete_nome` | `UUID` / `str` | texto | Piquete a medir |
+| `motivo` | `str` | texto | Frase pronta: por que o sistema está pedindo |
+
+**`ResumoPiquete`**: a fotografia de cada piquete (usada no mapa)
+
+| Campo | Tipo | Em JSON | Significado |
+|---|---|---|---|
+| `piquete_id` / `nome` | `UUID` / `str` | texto | Piquete |
+| `situacao` | `SituacaoPiquete` | `"ocupado"` \| `"descansando"` | Tem gado ou está descansando |
+| `lote_atual_nome` | `str \| None` | texto ou `null` | Lote que está nele |
+| `altura_hoje_cm` | `float \| None` | número ou `null` | Altura estimada hoje; `null` = sem estimativa |
+| `altura_entrada_alvo_cm` / `altura_saida_alvo_cm` | `float \| None` | número ou `null` | Alvos (nulos no contínuo ou sem parâmetro) |
+| `confianca` / `motivo_confianca` | `Confianca` / `str` | texto | Confiança da estimativa do piquete |
+| `faltantes` | `tuple[str, ...]` | lista de texto | O que falta para estimar ou planejar; vazio = tudo certo |
+
+---
+
 ## 2. Stack e onde fica o seu código
 
 | Camada | Tecnologia |

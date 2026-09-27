@@ -53,6 +53,203 @@ CP-SAT vêm depois; o seu guloso vira a linha de base contra a qual eles serão 
 
 ---
 
+## Entradas e saídas: o que você recebe, de quem, e o que entrega
+
+Esta seção é o seu contrato com o resto da equipe. **Nomes, tipos e formatos são exatamente estes**; se algo aqui parecer faltar ou estar errado, fale com o Kauê antes de inventar outro formato.
+
+### Resumo
+
+| | O quê | De quem / para quem | Como chega / sai |
+|---|---|---|---|
+| **Recebe** | `EstadoProjetado` (a fotografia da fazenda) | Kauê (`montar_estado_projetado`) | argumento `estado` de `gerar_plano`, passado pelo ciclo do Leandro |
+| **Recebe** | `Fazenda` (rotina de manejo) | Leandro (`carregar_fazenda`) | argumento `fazenda` de `gerar_plano` |
+| **Recebe** | `agora: datetime` (UTC, com fuso) e `plano_id: UUID` | Leandro (ciclo) | argumentos de `gerar_plano` |
+| **Recebe** | funções prontas de cálculo | Kauê (`core/`, `planner/estado.py`) | import (lista abaixo) |
+| **Entrega** | `PlanoManejo` | Leandro (salva e mostra na web), Leo (manda no Telegram), Ezequiel (pinta o mapa) | **retorno** de `gerar_plano` |
+| **Entrega** | plano gravado + eventos `manejo_recomendado` | banco → Leo (respostas) e Leandro (página) | `salvar_plano(conn, plano) -> None` |
+| **Entrega** | leitura do plano atual | Leandro (rota `/plano/atual`) e Leo (bot) | `carregar_plano_atual(conn, fazenda_id) -> PlanoManejo \| None` e `carregar_plano(conn, plano_id) -> PlanoManejo \| None` |
+
+### Assinaturas exatas que você implementa
+
+```python
+# src/seugado/planner/otimizador.py
+def gerar_plano(estado: EstadoProjetado, fazenda: Fazenda,
+                agora: datetime, plano_id: UUID) -> PlanoManejo: ...
+
+# src/seugado/planner/confianca.py
+def confianca_movimentacao(destino: PiqueteProjetado,
+                           lote: LoteProjetado) -> tuple[Confianca, str]: ...
+
+# src/seugado/planner/geo.py
+def distancia_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float: ...
+
+# src/seugado/persistencia/planos.py   (nenhuma faz commit)
+def salvar_plano(conn: psycopg.Connection[Any], plano: PlanoManejo) -> None: ...
+def carregar_plano_atual(conn: psycopg.Connection[Any], fazenda_id: UUID) -> PlanoManejo | None: ...
+def carregar_plano(conn: psycopg.Connection[Any], plano_id: UUID) -> PlanoManejo | None: ...
+```
+
+### Funções prontas que você usa (não reimplemente)
+
+```python
+from seugado.planner.estado import avancar_massa_um_dia
+#   (massa_kg_ms_ha, taxa_acumulo_kg_ms_ha_dia, consumo_lote_kg_ms_dia, area_ha,
+#    eficiencia_pastejo) -> float   # estoque no início do dia seguinte
+from seugado.core.regras import urgencia, descanso_cumprido, combinar_confianca
+#   urgencia(altura_atual_cm, parametros) -> float          # saida - altura
+#   descanso_cumprido(dias_desde_ultima_saida: int, descanso_min_dias: float) -> bool
+#   combinar_confianca(*fatores: Confianca) -> Confianca    # o mínimo
+from seugado.core.forragem import dias_ocupacao, massa_para_altura
+#   dias_ocupacao(massa_atual, massa_residuo, taxa, area_ha, eficiencia, consumo) -> float (pode ser inf)
+#   massa_para_altura(massa_kg_ms_ha, densidade_kg_ha_por_cm) -> float
+from seugado.contratos import (EstadoProjetado, PiqueteProjetado, LoteProjetado, PlanoManejo,
+    Movimentacao, Alerta, PedidoValidacao, ResumoPiquete, TipoAlerta,
+    estado_de_dict, plano_para_dict, plano_de_dict)
+from seugado.core.models import Fazenda, Confianca, MetodoPastejo
+```
+
+### Formatos
+
+#### `EstadoProjetado`: a fotografia da fazenda (entrada do otimizador)
+
+Tipo Python em `seugado.contratos`. Exemplo completo: `tests/fixtures/estado_projetado_exemplo.json`
+(carregue com `estado_de_dict`).
+
+| Campo | Tipo | Significado |
+|---|---|---|
+| `fazenda_id` | `UUID` | Fazenda |
+| `data_base` | `date` | Hoje; primeiro dia do plano |
+| `horizonte_previsao_dias` | `int` | 14 (dias de taxa de crescimento prevista) |
+| `piquetes` | `tuple[PiqueteProjetado, ...]` | Piquetes ativos, em ordem de nome |
+| `lotes` | `tuple[LoteProjetado, ...]` | Lotes, em ordem de nome |
+
+**`PiqueteProjetado`**
+
+| Campo | Tipo | Unidade / valores | Significado |
+|---|---|---|---|
+| `piquete_id`, `nome` | `UUID`, `str` | — | Identificação |
+| `area_ha` | `float` | ha | Área |
+| `metodo_pastejo` | `MetodoPastejo` | `ROTACIONADO` \| `CONTINUO` | Só rotacionado entra no plano |
+| `cultivar_slug`, `cultivar_nome` | `str` | ex.: `"marandu"`, `"Marandu"` | Capim |
+| `centroide_lat`, `centroide_lon` | `float` | graus | Centro do piquete (para a distância) |
+| `situacao` | `SituacaoPiquete` | `OCUPADO` \| `DESCANSANDO` | Situação hoje |
+| `lote_atual_id` | `UUID \| None` | — | Lote que está nele hoje |
+| `dias_descanso` | `int` | dias | Dias desde que o último lote saiu (0 se ocupado) |
+| `parametros` | `ParametrosRegime \| None` | — | Alturas-alvo: `altura_entrada_cm`, `altura_saida_cm` (rotacionado) ou `altura_maxima_cm`, `altura_minima_cm` (contínuo); mais `confianca` e `fonte` |
+| `faltantes` | `tuple[str, ...]` | — | Vazio = pode planejar. Se não vazio, o piquete não recebe nem perde lote |
+| `descanso_min_dias` | `float` | dias | Descanso mínimo do capim (21 no Marandu) |
+| `densidade_kg_ha_por_cm` | `float \| None` | kg MS/ha por cm | Converte massa ↔ altura |
+| `eficiencia_pastejo` | `float \| None` | 0–1 | Fração do capim removido que vira comida |
+| `massa_hoje_kg_ms_ha` | `float \| None` | kg MS/ha | Estoque hoje (`None` = sem estimativa) |
+| `altura_hoje_cm` | `float \| None` | cm | `massa ÷ densidade` |
+| `taxa_acumulo_prevista_kg_ms_ha_dia` | `tuple[float, ...]` | kg MS/ha/dia | **14 valores**: índice 0 = hoje, 1 = amanhã… |
+| `confianca`, `motivo_confianca` | `Confianca`, `str` | — | Confiança da estimativa do piquete |
+| `dias_desde_imagem_limpa` | `int \| None` | dias | Idade da última imagem de satélite sem nuvem |
+
+**`LoteProjetado`**
+
+| Campo | Tipo | Unidade / valores | Significado |
+|---|---|---|---|
+| `lote_id`, `nome` | `UUID`, `str` | — | Identificação |
+| `composicao` | `tuple[ComposicaoLote, ...]` | cada item: `categoria`, `n_animais`, `peso_medio_kg`, `origem_peso` | Animais do lote |
+| `indissoluvel` | `bool` | — | Nunca pode ser juntado a outro |
+| `piquete_atual_id` | `UUID \| None` | — | Onde está hoje |
+| `desde` | `date \| None` | — | Desde quando está lá |
+| `peso_vivo_total_kg` | `float` | kg | Soma dos pesos |
+| `consumo_kg_ms_dia` | `float` | kg MS/dia | Quanto o lote come por dia (já calculado) |
+| `confianca_peso`, `motivo_confianca_peso` | `Confianca`, `str` | — | Alta se o peso foi informado; média se veio da tabela de UA |
+
+#### `Fazenda`: a configuração (de `seugado.core.models`)
+
+| Campo | Tipo | Valores | Significado |
+|---|---|---|---|
+| `id` | `UUID` | — | Fazenda |
+| `nome` | `str` | — | Nome |
+| `timezone` | `str` | `"America/Fortaleza"` | Fuso |
+| `funcionarios_disponiveis` | `int` | ≥ 1 | Pessoas que fazem o manejo |
+| `manejos_por_funcionario_dia` | `int` | ≥ 1 | Movimentações por pessoa por dia |
+| `dias_preferenciais_manejo` | `tuple[int, ...]` | 0 = segunda … 6 = domingo | Dias em que se pode mover gado |
+| `ativo` | `bool` | — | Fazenda ativa |
+
+#### `PlanoManejo`: o plano da semana
+
+Tipo Python em `seugado.contratos`; em JSON via `plano_para_dict` / `plano_de_dict`; em
+TypeScript em `frontend/src/lib/tipos.ts`. Exemplo completo: `tests/fixtures/plano_exemplo.json`.
+
+| Campo | Tipo (Python) | Em JSON | Significado |
+|---|---|---|---|
+| `id` | `UUID` | texto | Id do plano |
+| `fazenda_id` | `UUID` | texto | Fazenda dona do plano |
+| `data_geracao` | `datetime` (UTC, com fuso) | `"2026-09-28T08:00:00+00:00"` | Quando foi gerado |
+| `data_inicio` | `date` | `"2026-09-28"` | Primeiro dia do plano (hoje) |
+| `horizonte_dias` | `int` | `7` | Sempre 7 |
+| `movimentacoes` | `tuple[Movimentacao, ...]` | lista | Ordenadas por `(data, lote_nome)` |
+| `alertas` | `tuple[Alerta, ...]` | lista | Ordenados por `(data, tipo, texto)` |
+| `pedidos_validacao` | `tuple[PedidoValidacao, ...]` | lista | Ordenados pelo nome do piquete |
+| `piquetes` | `tuple[ResumoPiquete, ...]` | lista | Um por piquete ativo, em ordem de nome |
+
+**`Movimentacao`**: "mover o lote X do piquete A para o B no dia D"
+
+| Campo | Tipo | Em JSON | Significado |
+|---|---|---|---|
+| `id` | `UUID` | texto | Id da movimentação; é o `entidade_id` do evento `manejo_recomendado` e o que vai nos botões do bot |
+| `data` | `date` | `"2026-09-28"` | Dia da movimentação (sempre dia de manejo preferido) |
+| `lote_id` / `lote_nome` | `UUID` / `str` | texto | Lote que muda |
+| `piquete_origem_id` / `piquete_origem_nome` | `UUID \| None` / `str \| None` | texto ou `null` | De onde sai |
+| `piquete_destino_id` / `piquete_destino_nome` | `UUID` / `str` | texto | Para onde vai |
+| `altura_destino_cm` | `float` (1 casa) | número | Altura prevista do destino no início do dia |
+| `altura_entrada_alvo_cm` | `float` | número | Altura ideal de entrada do capim do destino |
+| `altura_origem_cm` | `float \| None` | número ou `null` | Altura prevista da origem no início do dia |
+| `altura_saida_alvo_cm` | `float \| None` | número ou `null` | Altura de saída do capim da origem |
+| `dias_previstos` | `int` | número | Dias que o lote deve ficar no destino |
+| `motivo` | `str` | texto | Frase pronta, em português, para o produtor |
+| `confianca` | `Confianca` | `"alta"` \| `"media"` \| `"baixa"` | Confiança da recomendação |
+| `motivo_confianca` | `str` | texto | Frase pronta: o dado mais fraco por trás da recomendação |
+
+**`Alerta`**
+
+| Campo | Tipo | Em JSON | Significado |
+|---|---|---|---|
+| `tipo` | `TipoAlerta` | um de: `sem_piquete_apto`, `capacidade_excedida`, `aguardando_parametro`, `estimativa_indisponivel`, `continuo_acima_maxima`, `continuo_abaixo_minima`, `lote_sem_piquete`, `sem_dia_de_manejo` | Tipo do aviso |
+| `data` | `date` | `"2026-10-01"` | Dia a que se refere |
+| `texto` | `str` | texto | Frase pronta para o produtor |
+| `confianca` / `motivo_confianca` | `Confianca` / `str` | texto | Como na movimentação |
+| `piquete_id` / `lote_id` | `UUID \| None` | texto ou `null` | A quem se refere |
+
+**`PedidoValidacao`**: pedido de medir o capim com régua
+
+| Campo | Tipo | Em JSON | Significado |
+|---|---|---|---|
+| `piquete_id` / `piquete_nome` | `UUID` / `str` | texto | Piquete a medir |
+| `motivo` | `str` | texto | Frase pronta: por que o sistema está pedindo |
+
+**`ResumoPiquete`**: a fotografia de cada piquete (usada no mapa)
+
+| Campo | Tipo | Em JSON | Significado |
+|---|---|---|---|
+| `piquete_id` / `nome` | `UUID` / `str` | texto | Piquete |
+| `situacao` | `SituacaoPiquete` | `"ocupado"` \| `"descansando"` | Tem gado ou está descansando |
+| `lote_atual_nome` | `str \| None` | texto ou `null` | Lote que está nele |
+| `altura_hoje_cm` | `float \| None` | número ou `null` | Altura estimada hoje; `null` = sem estimativa |
+| `altura_entrada_alvo_cm` / `altura_saida_alvo_cm` | `float \| None` | número ou `null` | Alvos (nulos no contínuo ou sem parâmetro) |
+| `confianca` / `motivo_confianca` | `Confianca` / `str` | texto | Confiança da estimativa do piquete |
+| `faltantes` | `tuple[str, ...]` | lista de texto | O que falta para estimar ou planejar; vazio = tudo certo |
+
+### O que `salvar_plano` grava
+
+1. Uma linha na tabela `plano`: `(id, fazenda_id, gerado_em, data_inicio, horizonte_dias, payload)`,
+   com `payload = plano_para_dict(plano)` (JSON).
+2. Um evento `manejo_recomendado` por movimentação (origem `sistema`, ator `"planner"`,
+   `chave_idempotencia = "recomendacao:{plano.id}:{mov.id}"`), com o payload **exato**:
+
+```json
+{"entidade_id": "<mov.id>", "lote_id": "<uuid>", "piquete_origem_id": "<uuid ou null>",
+ "piquete_destino_id": "<uuid>", "data_prevista": "2026-09-28", "dias_previstos": 3,
+ "motivo": "<texto>", "confianca": "media", "motivo_confianca": "<texto>"}
+```
+
+---
+
 ## 2. Stack e onde fica o seu código
 
 Python 3.12, sem dependência nova. Use o que já existe:
