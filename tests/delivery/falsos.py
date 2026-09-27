@@ -20,19 +20,26 @@ class Enviado:
 
 
 class CanalFalso:
-    """Canal that records what would have reached the producer."""
+    """Canal that records what would have reached the producer, and in which order."""
 
     def __init__(self) -> None:
         self.enviados: list[Enviado] = []
         self.cliques: list[tuple[str, str | None]] = []
+        self.ordem: list[str] = []
 
     def enviar_texto(
         self, chat_id: int, texto: str, botoes: Sequence[Sequence[Botao]] = ()
     ) -> None:
+        self.ordem.append("texto")
         self.enviados.append(Enviado(chat_id, texto, [list(linha) for linha in botoes]))
 
     def responder_clique(self, id_clique: str, texto: str | None = None) -> None:
+        self.ordem.append("clique")
         self.cliques.append((id_clique, texto))
+
+    @property
+    def textos(self) -> list[str]:
+        return [enviado.texto for enviado in self.enviados]
 
 
 class _CursorFalso:
@@ -47,18 +54,23 @@ class _CursorFalso:
 
     def execute(self, sql: str, params: tuple[Any, ...] = ()) -> None:
         self._conexao.consultas.append((sql, params))
+        if self._conexao.erro is not None:
+            raise self._conexao.erro
 
     def fetchone(self) -> tuple[Any, ...] | None:
         return self._conexao.linha
 
 
 class ConexaoFalsa:
-    """Answers every query with one fixed row (or none); records the SQL and any commit."""
+    """Answers every query with one fixed row (or none, or raises `erro`); records SQL,
+    commits and rollbacks."""
 
-    def __init__(self, linha: tuple[Any, ...] | None) -> None:
+    def __init__(self, linha: tuple[Any, ...] | None, erro: Exception | None = None) -> None:
         self.linha = linha
+        self.erro = erro
         self.consultas: list[tuple[str, tuple[Any, ...]]] = []
         self.commits = 0
+        self.rollbacks = 0
 
     def cursor(self) -> _CursorFalso:
         return _CursorFalso(self)
@@ -66,10 +78,15 @@ class ConexaoFalsa:
     def commit(self) -> None:
         self.commits += 1
 
+    def rollback(self) -> None:
+        self.rollbacks += 1
 
-def conexao_falsa(linha: tuple[Any, ...] | None) -> tuple[psycopg.Connection[Any], ConexaoFalsa]:
+
+def conexao_falsa(
+    linha: tuple[Any, ...] | None, erro: Exception | None = None
+) -> tuple[psycopg.Connection[Any], ConexaoFalsa]:
     """The fake typed as a psycopg connection, plus the fake itself for assertions."""
-    falsa = ConexaoFalsa(linha)
+    falsa = ConexaoFalsa(linha, erro)
     return cast("psycopg.Connection[Any]", falsa), falsa
 
 
@@ -144,3 +161,19 @@ class PlanosFalsos:
         return modulo_falso(
             "seugado.persistencia.planos", **{nome: getattr(self, nome) for nome in nomes}
         )
+
+
+class CicloFalso:
+    """jobs/ciclo.py (Leandro): records each executar_ciclo call, optionally failing."""
+
+    def __init__(self, erro: Exception | None = None) -> None:
+        self.erro = erro
+        self.chamadas: list[tuple[UUID, dict[str, Any]]] = []
+
+    def executar_ciclo(self, conn: object, fazenda_id: UUID, **opcoes: Any) -> None:
+        self.chamadas.append((fazenda_id, opcoes))
+        if self.erro is not None:
+            raise self.erro
+
+    def modulo(self) -> types.ModuleType:
+        return modulo_falso("seugado.jobs.ciclo", executar_ciclo=self.executar_ciclo)

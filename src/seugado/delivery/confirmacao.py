@@ -14,6 +14,7 @@ from seugado.contratos import Movimentacao, PlanoManejo
 from seugado.core.models import OrigemEvento, TipoEvento
 from seugado.delivery.canais.base import Canal
 from seugado.delivery.envio import enviar_lembrete
+from seugado.delivery.mensagem import ALTURA_FORA_DA_FAIXA, JA_RESPONDIDA
 from seugado.persistencia.eventos import registrar_evento
 from seugado.persistencia.projecao_db import reconstruir_projecao
 
@@ -88,7 +89,7 @@ def resposta_existente(conn: psycopg.Connection[Any], fazenda_id: UUID, mov_id: 
 
 def _exigir_sem_resposta(conn: psycopg.Connection[Any], fazenda_id: UUID, mov_id: UUID) -> None:
     if resposta_existente(conn, fazenda_id, mov_id) is not None:
-        raise RespostaInvalida("Você já respondeu esta movimentação.")
+        raise RespostaInvalida(JA_RESPONDIDA)
 
 
 def piquetes_livres(conn: psycopg.Connection[Any], fazenda_id: UUID) -> list[tuple[UUID, str]]:
@@ -202,7 +203,7 @@ def registrar_altura(  # noqa: PLR0913, PLR0917 — signature fixed by LEO.md
 ) -> None:
     """Grass height measured with a ruler and typed into the bot."""
     if not 0 < altura_cm <= ALTURA_MAXIMA_CM:
-        raise RespostaInvalida("A altura precisa ser maior que 0 e no máximo 400 cm.")
+        raise RespostaInvalida(ALTURA_FORA_DA_FAIXA)
     if _um(conn, _SELECT_PIQUETE, (fazenda_id, piquete_id)) is None:
         raise RespostaInvalida("Não encontrei esse piquete.")
     payload = {

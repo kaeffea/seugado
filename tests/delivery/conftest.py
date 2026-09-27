@@ -37,9 +37,10 @@ def conn_banco() -> Iterator[psycopg.Connection[Any]]:
     """Real test-database connection, always rolled back.
 
     The database is shared and `evento` is append-only, so a committed test row could never
-    be removed: commit() fails here. Tests of code that commits replace it with a counter.
+    be removed: commit() fails here. Tests of code that commits use banco.emular_transacoes.
     """
     conn = psycopg.connect(os.environ["SEUGADO_TEST_DATABASE_URL"])
+    desfazer_tudo = conn.rollback  # the real one, even if a test replaces conn.rollback
 
     def _commit_proibido() -> None:
         raise AssertionError("tests must not commit to the shared database")
@@ -48,5 +49,5 @@ def conn_banco() -> Iterator[psycopg.Connection[Any]]:
     try:
         yield conn
     finally:
-        conn.rollback()
+        desfazer_tudo()
         conn.close()

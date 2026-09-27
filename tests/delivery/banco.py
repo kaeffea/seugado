@@ -25,6 +25,35 @@ PIQUETE_INATIVO = 9
 _GEOMETRIA = {"type": "Polygon", "coordinates": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]}
 
 
+@dataclass
+class Transacoes:
+    commits: int = 0
+    rollbacks: int = 0
+
+
+def emular_transacoes(conn: psycopg.Connection[Any]) -> Transacoes:
+    """Let code under test commit and roll back inside the test's own transaction.
+
+    commit() keeps the work so far (releases and retakes a savepoint); rollback() goes back
+    to the last commit. The fixture's final rollback still discards everything.
+    """
+    contagem = Transacoes()
+    conn.execute("SAVEPOINT codigo_testado")
+
+    def commit() -> None:
+        conn.execute("RELEASE SAVEPOINT codigo_testado")
+        conn.execute("SAVEPOINT codigo_testado")
+        contagem.commits += 1
+
+    def rollback() -> None:
+        conn.execute("ROLLBACK TO SAVEPOINT codigo_testado")
+        contagem.rollbacks += 1
+
+    conn.commit = commit  # type: ignore[method-assign]
+    conn.rollback = rollback  # type: ignore[method-assign]
+    return contagem
+
+
 def piquete(n: int) -> UUID:
     """Id of "Piquete n", the same ids used in plano_exemplo.json."""
     return UUID(f"11111111-1111-4111-8111-{n:012d}")

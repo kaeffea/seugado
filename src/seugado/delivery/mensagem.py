@@ -27,6 +27,37 @@ _RODAPE_ALTURAS = (
 CANDIDATO_VENCIDO = "Essa atualização não vale mais."
 CANDIDATO_JA_EM_USO = "Você já está usando esse plano. Toque em /plano para vê-lo."
 PLANO_MANTIDO = "Combinado, seguimos com o plano que você já tem."
+NAO_VINCULADO = "Este chat ainda não está ligado a uma fazenda. Peça o link à equipe SeuGado."
+CODIGO_INVALIDO = "Não encontrei esse código. Confira o link que a equipe SeuGado mandou."
+SEM_PLANO = "Ainda não há plano."
+SEM_LOTES = "Ainda não há lotes cadastrados nesta fazenda."
+NAO_ENTENDI = "Não entendi. Use /plano, /alturas, /mover ou toque nos botões."
+MOVIMENTACAO_ANTIGA = "Esta movimentação é de um plano antigo. Use /plano."
+JA_RESPONDIDA = "Você já respondeu esta movimentação."
+QUAL_LOTE = "Qual lote você mudou de piquete?"
+QUANDO = "Quando?"
+OPCAO_VENCIDA = "Essa opção não vale mais. Comece de novo pelo /plano ou pelo /mover."
+NUMERO_INVALIDO = "Não entendi o número. Digite só a altura em centímetros, por exemplo 35."
+ALTURA_FORA_DA_FAIXA = "A altura precisa ser maior que 0 e no máximo 400 cm."
+NAO_FIZ = "Entendido. Vou refazer o plano…"
+REFAZENDO = "Refazendo o plano com as alturas novas…"
+RECALCULANDO = "Recalculando o plano…"
+RECALCULO_FALHOU = "Não consegui recalcular agora. Tento de novo na próxima rotina."
+ERRO_INESPERADO = "Tive um problema para registrar isso. Tente de novo em alguns minutos."
+AJUDA = "\n".join(
+    [
+        "🌱 <b>Como usar o SeuGado</b>",
+        "/plano: ver o plano da semana",
+        "/alturas: ver e corrigir a altura dos piquetes",
+        "/mover: contar que você mudou um lote de piquete",
+        "/ajuda: esta mensagem",
+        "",
+        "No plano, toque numa movimentação para dizer se fez (✅ Fiz), se não fez (❌ Não fiz)"
+        " ou se fez diferente (🔄), levando o lote para outro piquete ou em outro dia.",
+        "Para corrigir uma altura, toque no piquete e mande o número que você mediu com a régua,"
+        " em centímetros.",
+    ]
+)
 
 
 def _h(texto: str) -> str:
@@ -238,3 +269,49 @@ def texto_lembrete(pendentes: Sequence[Movimentacao]) -> str:
 def botoes_lembrete(pendentes: Sequence[Movimentacao]) -> list[list[Botao]]:
     """One "m:" button per pending movement, labelled like the reminder lines."""
     return [[Botao(_rotulo_movimentacao(mov), f"m:{mov.id}")] for mov in pendentes]
+
+
+def texto_vinculado(fazenda_nome: str) -> str:
+    return f"Pronto! A {_h(fazenda_nome)} está conectada. Você vai receber o plano da semana aqui."
+
+
+def texto_ja_vinculado(fazenda_nome: str) -> str:
+    return (
+        f"Este chat já está ligado à {_h(fazenda_nome)}."
+        " Para trocar de fazenda, fale com a equipe SeuGado."
+    )
+
+
+def texto_fiz(lote_nome: str, piquete_nome: str) -> str:
+    return f"✅ Anotado: {_h(lote_nome)} no {_h(piquete_nome)}."
+
+
+def texto_anotado_recalculando(lote_nome: str, piquete_nome: str) -> str:
+    return f"✅ Anotado: {_h(lote_nome)} no {_h(piquete_nome)}. {RECALCULANDO}"
+
+
+def texto_para_qual_piquete(lote_nome: str) -> str:
+    return f"Para qual piquete o {_h(lote_nome)} foi?"
+
+
+def texto_sem_piquete_livre(lote_nome: str) -> str:
+    return f"Não há piquete ativo e vazio para onde o {_h(lote_nome)} possa ter ido."
+
+
+def texto_pedir_altura(piquete_nome: str) -> str:
+    return f"Digite a altura do {_h(piquete_nome)} em centímetros (só o número)."
+
+
+def texto_altura_anotada(piquete_nome: str, altura_cm: float) -> str:
+    return f"Anotado: {_h(piquete_nome)} com {_cm(altura_cm)} cm hoje."
+
+
+def botoes_opcoes(rotulos: Sequence[str]) -> list[list[Botao]]:
+    """One "o:<n>" button per option of the current conversation step, two per row."""
+    botoes = [Botao(rotulo, f"o:{n}") for n, rotulo in enumerate(rotulos)]
+    return [botoes[i : i + 2] for i in range(0, len(botoes), 2)]
+
+
+def botoes_quando() -> list[list[Botao]]:
+    """o:0 / o:1 / o:2 = today / yesterday / the day before."""
+    return [[Botao("Hoje", "o:0"), Botao("Ontem", "o:1"), Botao("Anteontem", "o:2")]]
