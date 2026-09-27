@@ -1,26 +1,34 @@
 ---
-title: "SeuGado — Leandro: fazenda, lotes, plano, ciclo e deploy"
-subtitle: "Login e cadastro da fazenda e dos lotes, página do plano, ciclo semanal e publicação"
+title: "SeuGado — Leandro: painel admin, rotina e deploy"
+subtitle: "Clientes, fazendas e lotes no painel da equipe; rotina diária e entrega semanal; publicação"
 date: "27/09/2026"
 ---
 
-# Leandro: fazenda, lotes, plano, ciclo e deploy
+# Leandro: painel admin, rotina e deploy
 
-**Sua parte em uma frase:** você liga o sistema de ponta a ponta. O produtor entra, cadastra
-a fazenda e o rebanho, vê o plano da semana, e o sistema roda sozinho toda segunda, publicado
-na internet.
+**Sua parte em uma frase:** você liga o sistema de ponta a ponta. A equipe cadastra clientes,
+fazendas e lotes no painel; o sistema calcula todo dia com o satélite, entrega o plano no dia e
+hora que cada produtor escolheu, e tudo está publicado na internet.
+
+> **Regras do MVP (ADR-025):**
+> - O site é **só da equipe (admin)**. O produtor **nunca** entra no site; ele só conversa com o
+>   bot do Telegram.
+> - Não existe cadastro aberto: as contas da equipe são criadas pelo Kauê no Supabase.
+> - Todo usuário logado é admin e vê todas as fazendas.
+> - **Só Marandu em pastejo rotacionado.**
 
 **Você entrega:**
-1. Identidade visual (Figma) + `tema.css`
-2. Login
-3. Fazenda: onboarding e configurações (funcionários, dias de manejo, Telegram)
-4. Lotes: cadastro por categoria
-5. Página "Plano da semana"
-6. Ciclo semanal (`jobs/ciclo.py`)
-7. Deploy: Render, Vercel e GitHub Actions
 
-**Prazo:** a L0 (`/me`) entra na `main` até as 10h de domingo, porque o Ezequiel depende dela; o resto em PR até domingo à noite. A ordem das tarefas abaixo é a ordem de prioridade:
-se o tempo apertar, o deploy (L7) pode ser feito na segunda com a equipe.
+| # | Tarefa | Prioridade |
+|---|---|---|
+| L0 | Backend base: `/me`, clientes e fazendas (PR pequeno, merge cedo) | **primeiro, até 10h** |
+| L1 | Identidade visual (Figma) + `tema.css` | 1 h |
+| L2 | Login da equipe | |
+| L3 | Página "Clientes e fazendas" + página "Fazenda" (configuração e Telegram) | |
+| L4 | Lotes | |
+| L5 | Página "Plano da semana" | |
+| L6 | Rotina: cálculo diário, entrega semanal e recálculo (`jobs/ciclo.py`) | |
+| L7 | Deploy: Render, Vercel e GitHub Actions | pode ir para segunda |
 
 ---
 
@@ -28,52 +36,60 @@ se o tempo apertar, o deploy (L7) pode ser feito na segunda com a equipe.
 
 O pecuarista divide o pasto em **piquetes** e o gado em **lotes**. O capim tem uma altura certa
 para o lote entrar e uma altura em que ele precisa sair. O SeuGado estima a altura de cada
-piquete por satélite e clima e manda, **toda semana**, um plano pelo Telegram: *"segunda: mova
-o lote Recria do Piquete 2 para o Piquete 1"*. O plano respeita a rotina da fazenda: só propõe
-movimentação nos **dias de manejo** que o produtor escolheu e nunca mais movimentações por dia
-do que os funcionários dão conta.
+piquete por satélite e clima **todo dia**. Uma vez por semana, no dia e hora que o produtor
+escolheu, o bot manda o **plano da semana**: *"segunda: mova o lote Recria do Piquete 2 para o
+Piquete 6"*. O plano respeita a rotina da fazenda: só propõe movimentação nos **dias de manejo**
+e nunca move mais **animais** por dia do que os funcionários dão conta.
+
+Se no meio da semana chegam imagens novas e o plano muda em algo que o produtor ainda não fez,
+o bot pergunta se ele quer ver as mudanças e escolher entre o plano antigo e o novo.
 
 ### Palavras que você vai usar
 
 | Termo | O que é |
 |---|---|
+| **Cliente** | O produtor (pessoa). Pode ter mais de uma fazenda |
 | **Lote** | Grupo de animais que anda junto. É a unidade de manejo |
-| **Categoria** | `bezerro` (até ~1 ano), `novilho` (recria, ~1 a 3 anos), `adulto` (vaca, boi, touro) |
-| **Composição do lote** | Quantos animais de cada categoria e o **peso médio** de cada uma |
-| **Peso médio** | Define quanto o lote come (≈ 2,2–2,4% do peso por dia). Se o produtor não sabe, o sistema estima pela tabela de **Unidade Animal** (bezerro 112,5 kg · novilho 337,5 kg · adulto 450 kg) e a recomendação fica com confiança menor |
+| **Categoria** | `bezerro`, `bezerra` (até ~1 ano), `novilho`, `novilha` (recria, ~1–3 anos), `vaca`, `boi`, `touro` |
+| **Peso médio** | Define quanto o lote come (≈ 2,2–2,4% do peso por dia). Se ninguém sabe o peso, o sistema estima pela tabela de **Unidade Animal** (bezerros 112,5 kg · novilhos/novilhas 337,5 kg · vaca/boi 450 kg · touro 562,5 kg) e a recomendação fica com confiança menor |
 | **Lote indissolúvel** | Lote que nunca pode ser juntado a outro (ex.: vacas com bezerro ao pé) |
-| **Dias de manejo preferidos** | Dias da semana em que a fazenda aceita mexer no gado. Guardados como números: 0 = segunda … 6 = domingo |
-| **Manejos por funcionário por dia** | Quantas movimentações de lote cada funcionário consegue fazer num dia |
+| **Funcionários disponíveis** | Quantas pessoas fazem o manejo |
+| **Animais por funcionário por dia** | Quantos **animais** cada pessoa consegue mover sozinha num dia |
+| **Dias de manejo** | Dias da semana em que se pode mexer no gado (0 = segunda … 6 = domingo) |
+| **Envio do plano** | Dia da semana e hora em que o produtor quer receber o plano |
+| **Plano vigente / candidato** | Vigente: o que o produtor está seguindo. Candidato: plano novo oferecido a ele, que ele pode aceitar ou recusar |
 | **Evento** | Registro imutável de algo que aconteceu ("lote criado"). Nunca se edita o passado: grava-se um evento novo |
-| **Ciclo** | A rotina que coleta satélite, estima o pasto, gera o plano e manda pelo Telegram |
 
-**Por que não pedimos raça, sexo nem brinco?** O que muda o consumo de capim é o **peso** e a
-**idade** do animal, não a raça nem o sexo. Cadastro animal por animal é outro produto (ERP) e
-está fora do escopo (ADR-001). O produtor informa só "40 novilhos de ~340 kg".
+**Por que o sexo entra e a raça não?** Macho e fêmea da mesma idade podem ter pesos bem
+diferentes, e o peso define o consumo. Quando ninguém sabe o peso, a tabela de reserva é por
+idade (não há fonte por sexo), com exceção do touro. A raça fica para depois do MVP. Animal por
+animal (brinco, pesagem) está fora do escopo (ADR-001).
 
 ---
 
 ## Entradas e saídas: o que você recebe, de quem, e o que entrega
 
-Esta seção é o seu contrato com o resto da equipe. **Nomes, tipos e formatos são exatamente estes**; se algo aqui parecer faltar ou estar errado, fale com o Kauê antes de inventar outro formato.
+Esta seção é o seu contrato com o resto da equipe. **Nomes, tipos e formatos são exatamente
+estes**; se algo aqui parecer faltar ou estar errado, fale com o Kauê antes de inventar outro
+formato.
 
 ### Resumo
 
 | | O quê | De quem / para quem | Como chega / sai |
 |---|---|---|---|
-| **Recebe** | login e sessão | Supabase Auth, via `api/auth.py` do Kauê | `Usuario`, `FazendaAutorizada`; no front, `supabase` e `useFazenda()` |
+| **Recebe** | login e sessão da equipe | Supabase Auth, via `api/auth.py` do Kauê | `Usuario`, `FazendaAutorizada`; no front, `supabase` e `useFazenda()` |
+| **Recebe** | fazenda selecionada no topo do site | esqueleto do Kauê | `useFazenda().fazenda` (e `fazendas`, `selecionar`, `recarregar`) |
 | **Recebe** | lista de piquetes | Ezequiel | `GET /fazendas/{id}/piquetes` → `Piquete[]` (`id`, `nome`, `situacao`, `lote_atual_id`…) |
 | **Recebe** | peso de reserva por categoria | Kauê | `peso_por_ua_kg(categoria: CategoriaAnimal) -> float` (`planner/estado.py`) |
-| **Recebe** | funções do ciclo | Kauê, João, Leo | assinaturas na seção 5.2 |
-| **Recebe** | o plano atual | João | `carregar_plano_atual(conn, fazenda_id) -> PlanoManejo \| None` |
-| **Entrega** | `Fazenda` (rotina) | João (via ciclo) | `carregar_fazenda(conn, fazenda_id) -> Fazenda` |
-| **Entrega** | usuário + fazenda para o site todo | todas as páginas (inclusive o Mapa do Ezequiel) | `GET /me` → `{"usuario_id", "email", "fazenda": Fazenda \| null}` |
+| **Recebe** | funções da rotina | Kauê, João, Leo | assinaturas na seção 5.2 |
+| **Entrega** | `Fazenda` (rotina) | João (via rotina) | `carregar_fazenda(conn, fazenda_id) -> Fazenda` |
+| **Entrega** | usuário e lista de fazendas | o site todo (inclusive o Mapa do Ezequiel) | `GET /me`, `GET /fazendas` |
 | **Entrega** | lotes gravados como eventos | banco → Kauê (consumo e posição) → João | `lote_criado`, `lote_alterado`, `lote_dissolvido`, `manejo_confirmado` |
-| **Entrega** | plano atual para a web | Ezequiel (mapa) e a sua página Plano | `GET /fazendas/{id}/plano/atual` → `plano_para_dict(plano)` ou 404 |
-| **Entrega** | recálculo | Leo | `executar_ciclo(conn, fazenda_id, hoje=None, ingerir_satelite=True, enviar=True, atualizado=False) -> PlanoManejo` |
-| **Entrega** | ciclo semanal automático | todos | GitHub Actions → `python -m seugado.jobs.ciclo --todas` |
+| **Entrega** | plano vigente para a web | Ezequiel (mapa) e a sua página Plano | `GET /fazendas/{id}/plano/atual` → `plano_para_dict(plano)` ou 404 |
+| **Entrega** | recálculo imediato | Leo (quando o produtor diverge ou corrige alturas) | `executar_ciclo(conn, fazenda_id, hoje=None, ingerir_satelite=True, enviar=True, atualizado=False) -> PlanoManejo` |
+| **Entrega** | rotina automática | todos | GitHub Actions de hora em hora → `python -m seugado.jobs.ciclo --agenda` |
 
-### `Fazenda` na API (JSON) e no Python
+### `Fazenda` no Python
 
 #### `Fazenda`: a configuração (de `seugado.core.models`)
 
@@ -83,12 +99,14 @@ Esta seção é o seu contrato com o resto da equipe. **Nomes, tipos e formatos 
 | `nome` | `str` | — | Nome |
 | `timezone` | `str` | `"America/Fortaleza"` | Fuso |
 | `funcionarios_disponiveis` | `int` | ≥ 1 | Pessoas que fazem o manejo |
-| `manejos_por_funcionario_dia` | `int` | ≥ 1 | Movimentações por pessoa por dia |
+| `animais_por_funcionario_dia` | `int` | ≥ 1 | Quantos **animais** cada pessoa consegue mover por dia |
 | `dias_preferenciais_manejo` | `tuple[int, ...]` | 0 = segunda … 6 = domingo | Dias em que se pode mover gado |
+| `envio_plano_dia` | `int` | 0 = segunda … 6 = domingo | Dia em que o produtor recebe o plano semanal |
+| `envio_plano_hora` | `int` | 0 … 23 (hora local) | Hora em que recebe o plano |
 | `ativo` | `bool` | — | Fazenda ativa |
 
-Em JSON (`GET /me`, `POST /fazendas`, `PUT`), os mesmos campos, sem `ativo`;
-`dias_preferenciais_manejo` vira lista (`[0, 3]`) e `id` vira texto.
+Em JSON (rotas `/fazendas`), os mesmos campos sem `ativo`, mais `cliente_id` e
+`cliente_nome`; `dias_preferenciais_manejo` vira lista (`[0, 3]`) e os ids viram texto.
 
 ### `Lote` que você devolve (JSON), campo a campo
 
@@ -103,8 +121,7 @@ Em JSON (`GET /me`, `POST /fazendas`, `PUT`), os mesmos campos, sem `ativo`;
 | `peso_vivo_total_kg` | número | `50625.0` | `estado_lote.peso_vivo_total_kg` |
 | `n_animais_total` | número | `150` | soma de `n_animais` |
 
-`categoria`: `"bezerro"` | `"novilho"` | `"adulto"`. `origem_peso`: `"produtor"` (informado) |
-`"ua_tabela"` (estimado: 112,5 / 337,5 / 450 kg).
+`origem_peso`: `"produtor"` (informado) ou `"ua_tabela"` (estimado).
 
 ### O plano que você mostra
 
@@ -147,7 +164,7 @@ TypeScript em `frontend/src/lib/tipos.ts`. Exemplo completo: `tests/fixtures/pla
 
 | Campo | Tipo | Em JSON | Significado |
 |---|---|---|---|
-| `tipo` | `TipoAlerta` | um de: `sem_piquete_apto`, `capacidade_excedida`, `aguardando_parametro`, `estimativa_indisponivel`, `continuo_acima_maxima`, `continuo_abaixo_minima`, `lote_sem_piquete`, `sem_dia_de_manejo` | Tipo do aviso |
+| `tipo` | `TipoAlerta` | um de: `sem_piquete_apto`, `capacidade_excedida`, `aguardando_parametro`, `estimativa_indisponivel`, `continuo_acima_maxima`, `continuo_abaixo_minima`, `lote_sem_piquete`, `sem_dia_de_manejo`, `passando_do_ponto` | Tipo do aviso |
 | `data` | `date` | `"2026-10-01"` | Dia a que se refere |
 | `texto` | `str` | texto | Frase pronta para o produtor |
 | `confianca` / `motivo_confianca` | `Confianca` / `str` | texto | Como na movimentação |
@@ -181,23 +198,23 @@ TypeScript em `frontend/src/lib/tipos.ts`. Exemplo completo: `tests/fixtures/pla
 | Backend | Python 3.12, FastAPI, psycopg 3 (SQL puro, sem ORM), Pydantic |
 | Banco e login | Supabase (PostgreSQL + PostGIS + Auth) |
 | Frontend | React + TypeScript + Vite, `react-router`, `@supabase/supabase-js`, CSS puro com variáveis |
-| Hospedagem | Render (API) · Vercel (site) · GitHub Actions (ciclo semanal) |
+| Hospedagem | Render (API) · Vercel (site) · GitHub Actions (rotina de hora em hora) |
 
 **Arquivos que são seus (só você edita):**
 - Backend: `src/seugado/api/rotas_fazenda.py`, `rotas_lotes.py`, `rotas_plano.py` (já existem,
-  vazios); `src/seugado/cadastro/fazenda.py`, `cadastro/lotes.py`; `src/seugado/jobs/ciclo.py`.
-- Frontend: `frontend/src/paginas/Login.tsx`, `Onboarding.tsx`, `Configuracoes.tsx`,
-  `Lotes.tsx`, `Plano.tsx` (já existem com texto provisório); `frontend/src/estilo/*`; componentes
-  que você criar em `frontend/src/componentes/ui/`.
-- Infra: `.github/workflows/ciclo-semanal.yml`, `render.yaml`.
-- Testes: `tests/cadastro/test_fazenda.py`, `tests/cadastro/test_lotes.py`, `tests/jobs/*`.
+  vazios); `src/seugado/cadastro/fazenda.py`, `cadastro/clientes.py`, `cadastro/lotes.py`;
+  `src/seugado/jobs/ciclo.py`.
+- Frontend: `frontend/src/paginas/Login.tsx`, `Clientes.tsx`, `Configuracoes.tsx` (a página
+  "Fazenda"), `Lotes.tsx`, `Plano.tsx`; `frontend/src/estilo/*`; componentes seus em
+  `frontend/src/componentes/ui/`.
+- Infra: `.github/workflows/rotina.yml`, `render.yaml`.
+- Testes: `tests/cadastro/test_fazenda.py`, `test_clientes.py`, `test_lotes.py`, `tests/jobs/*`.
 
 **Você usa, mas não edita:** `api/deps.py` (`Conexao`), `api/auth.py` (`Usuario`,
-`FazendaAutorizada`, `fazenda_do_usuario`), `persistencia/*`, `contratos.py`,
-`planner/estado.py` (`peso_por_ua_kg`), `frontend/src/lib/*` (`api()`, `supabase`, tipos,
-`useFazenda()`), `frontend/src/App.tsx` (as rotas já apontam para as suas páginas),
-`frontend/src/componentes/Layout.tsx` (pode restilizar via `tema.css`). **Não adicione
-dependências.**
+`FazendaAutorizada`), `persistencia/*`, `contratos.py`, `planner/estado.py`,
+`frontend/src/lib/*` (`api()`, `supabase`, tipos, `useFazenda()`), `frontend/src/App.tsx` e
+`frontend/src/componentes/Layout.tsx` (as rotas e o seletor de fazenda já existem). **Não
+adicione dependências.**
 
 O Ezequiel também faz frontend (a página Mapa). Vocês dois usam o mesmo `tema.css`: mande a ele
 o link do Figma e as cores logo cedo.
@@ -206,10 +223,12 @@ o link do Figma e as cores logo cedo.
 
 ## 3. Preparar o ambiente
 
-> **Importante:** o Python não lê o `.env` sozinho. Todo comando `uv run` local leva `--env-file .env` (como nos exemplos abaixo); sem isso a API responde erro 500 e os testes de banco são pulados.
+> **Importante:** o Python não lê o `.env` sozinho. Todo comando `uv run` local leva
+> `--env-file .env` (como nos exemplos abaixo); sem isso a API responde erro 500 e os testes de
+> banco são pulados.
 
 1. Instale Git, **Node 20+** e **uv** (docs.astral.sh/uv). Clone e crie a branch
-   `feat/leandro-fazenda-lotes-ciclo`.
+   `feat/leandro-admin-rotina`.
 2. Raiz: copie `.env.example` para `.env` e preencha com o que o Kauê mandar em privado:
    `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` e as duas do Earth Engine. **Nunca
    commite o `.env`.**
@@ -219,6 +238,7 @@ o link do Figma e as cores logo cedo.
    `uv run --env-file .env uvicorn seugado.api.main:app --app-dir src --reload` (docs em
    `http://localhost:8000/docs`).
 5. Frontend: `cd frontend && npm install && npm run dev` (`http://localhost:5173`).
+6. Peça ao Kauê a sua conta de admin (e-mail e senha).
 
 **Antes do PR:** `uv run ruff check .`, `uv run --env-file .env pytest` e `npm run build` sem erros.
 
@@ -226,7 +246,8 @@ o link do Figma e as cores logo cedo.
 
 ## 4. A regra de gravação do projeto
 
-- **Fazenda** é configuração: `INSERT`/`UPDATE` direto na tabela `fazenda` (ADR-022).
+- **Cliente e fazenda** são cadastro de configuração: `INSERT`/`UPDATE` direto nas tabelas
+  `cliente` e `fazenda` (ADR-022).
 - **Lote** (e as movimentações que você registra) é história: vira **evento**.
 
 ```python
@@ -256,11 +277,11 @@ A conexão (`Conexao`) **não faz commit sozinha**. Para ler como dicionário, u
 
 | Tabela | Uso |
 |---|---|
-| `fazenda` | `id, nome, timezone, funcionarios_disponiveis, manejos_por_funcionario_dia, dias_preferenciais_manejo (smallint[]), telegram_chat_id, codigo_vinculo_telegram, ativo` |
-| `fazenda_usuario` | `usuario_id (PK), fazenda_id`: uma fazenda por usuário |
+| `cliente` | `id, nome, telefone, observacoes, criado_em` |
+| `fazenda` | `id, cliente_id, nome, timezone, funcionarios_disponiveis, animais_por_funcionario_dia, dias_preferenciais_manejo (smallint[]), envio_plano_dia, envio_plano_hora, ultimo_envio_semanal, ultima_rotina_diaria, telegram_chat_id, codigo_vinculo_telegram, ativo` |
 | `estado_lote` (derivada, só leitura) | `lote_id, nome, indissoluvel, composicao (jsonb), piquete_atual_id, desde, peso_vivo_total_kg` |
 | `estado_piquete` (derivada, só leitura) | `piquete_id, nome, ativo, lote_atual_id` |
-| `plano` | escrito pelo João; você só lê por `carregar_plano_atual` |
+| `plano` | escrito pelo João; você lê por `carregar_plano_atual` |
 
 **Payloads dos eventos de lote** (todos os campos obrigatórios):
 
@@ -268,11 +289,11 @@ A conexão (`Conexao`) **não faz commit sozinha**. Para ler como dicionário, u
 # lote_criado
 {"entidade_id": "<uuid do lote>", "nome": "Recria", "indissoluvel": False,
  "composicao": [{"categoria": "novilho", "n_animais": 150, "peso_medio_kg": 337.5,
-                 "origem_peso": "ua_tabela"}]}          # "produtor" | "ua_tabela"
+                 "origem_peso": "ua_tabela"}]}   # categoria: bezerro|bezerra|novilho|novilha|vaca|boi|touro
 # lote_alterado: os mesmos campos + "ativo": True
 # lote_dissolvido
 {"entidade_id": "<uuid do lote>"}
-# manejo_confirmado (onde o lote está / movimentação avulsa)
+# manejo_confirmado (onde o lote está / correção de posição)
 {"entidade_id": "<uuid novo>", "lote_id": "<uuid do lote>",
  "piquete_destino_id": "<uuid do piquete>", "data_execucao": "2026-09-20"}
 ```
@@ -283,219 +304,220 @@ A conexão (`Conexao`) **não faz commit sozinha**. Para ler como dicionário, u
 
 ### 5.1 Rotas
 
-Todas exigem login (`Usuario`). As que têm `{fazenda_id}` usam `FazendaAutorizada` (403 se a
-fazenda não for do usuário).
+Todas exigem login (`Usuario`). As que têm `{fazenda_id}` usam `FazendaAutorizada` (404 se a
+fazenda não existe).
 
 | Método e caminho | Corpo | Resposta |
 |---|---|---|
-| `GET /me` | — | `{"usuario_id", "email", "fazenda": Fazenda \| null}` |
-| `POST /fazendas` | `FazendaIn` | `201` + `Fazenda`; `409` se o usuário já tem fazenda |
+| `GET /me` | — | `{"usuario_id", "email"}` |
+| `GET /clientes` | — | `Cliente[]` (por nome) |
+| `POST /clientes` | `ClienteIn` | `201` + `Cliente` |
+| `PUT /clientes/{cliente_id}` | `ClienteIn` | `Cliente` |
+| `GET /fazendas` | — | `Fazenda[]` (por nome do cliente, depois nome da fazenda; só ativas) |
+| `POST /fazendas` | `FazendaIn` | `201` + `Fazenda` |
+| `GET /fazendas/{fazenda_id}` | — | `Fazenda` |
 | `PUT /fazendas/{fazenda_id}` | `FazendaIn` | `Fazenda` |
 | `GET /fazendas/{fazenda_id}/telegram` | — | `{"vinculado": bool, "link": "https://t.me/<bot>?start=<codigo>"}` |
 | `GET /fazendas/{fazenda_id}/lotes` | — | `Lote[]` (por nome) |
 | `POST /fazendas/{fazenda_id}/lotes` | `LoteIn` | `201` + `Lote` |
 | `PUT /fazendas/{fazenda_id}/lotes/{lote_id}` | `LoteIn` | `Lote` |
 | `DELETE /fazendas/{fazenda_id}/lotes/{lote_id}` | — | `204` |
-| `GET /fazendas/{fazenda_id}/plano/atual` | — | `PlanoManejo` ou `404` |
+| `GET /fazendas/{fazenda_id}/plano/atual` | — | `PlanoManejo` (vigente) ou `404` |
 | `POST /fazendas/{fazenda_id}/ciclo` | `{"ingerir_satelite": true, "enviar": true}` | `PlanoManejo` |
 
 ```jsonc
-// FazendaIn / Fazenda (Fazenda = FazendaIn + "id")
-{ "nome": "Fazenda Boa Vista", "timezone": "America/Fortaleza",
-  "funcionarios_disponiveis": 1, "manejos_por_funcionario_dia": 2,
-  "dias_preferenciais_manejo": [0, 3] }          // segunda e quinta
+// ClienteIn / Cliente (Cliente = ClienteIn + "id")
+{ "nome": "João da Silva", "telefone": "+55 82 99999-0000", "observacoes": null }
+
+// FazendaIn / Fazenda (Fazenda = FazendaIn + "id" + "cliente_nome")
+{ "cliente_id": "…", "nome": "Fazenda Boa Vista", "timezone": "America/Fortaleza",
+  "funcionarios_disponiveis": 2, "animais_por_funcionario_dia": 150,
+  "dias_preferenciais_manejo": [0, 3],            // segunda e quinta
+  "envio_plano_dia": 6, "envio_plano_hora": 18 }  // domingo às 18h
 
 // LoteIn
 { "nome": "Recria", "indissoluvel": false,
   "composicao": [ {"categoria": "novilho", "n_animais": 150, "peso_medio_kg": null} ],
   "piquete_atual_id": "…",          // obrigatório
   "desde": "2026-09-25" }           // opcional; padrão: hoje
-
-// Lote (resposta)
-{ "id": "…", "nome": "Recria", "indissoluvel": false,
-  "composicao": [ {"categoria": "novilho", "n_animais": 150, "peso_medio_kg": 337.5, "origem_peso": "ua_tabela"} ],
-  "piquete_atual_id": "…", "piquete_atual_nome": "Piquete 2", "desde": "2026-09-25",
-  "peso_vivo_total_kg": 50625.0, "n_animais_total": 150 }
 ```
 
-Os tipos TypeScript (`Fazenda`, `Me`, `Lote`, `ComposicaoItem`, `PlanoManejo`, …) **já existem**
-em `frontend/src/lib/tipos.ts`. O `PlanoManejo` tem exemplo completo em
-`tests/fixtures/plano_exemplo.json`: use-o para montar a página do plano antes de a
-integração estar pronta.
+Os tipos TypeScript (`Cliente`, `Fazenda`, `Me`, `Lote`, `ComposicaoItem`, `PlanoManejo`…)
+**já existem** em `frontend/src/lib/tipos.ts`. O `PlanoManejo` tem exemplo completo em
+`tests/fixtures/plano_exemplo.json`: use-o para montar a página do plano antes de a integração
+estar pronta.
 
-### 5.2 Funções que o seu ciclo chama (de outras pessoas)
+### 5.2 Funções que a sua rotina chama (de outras pessoas)
 
 ```python
-from seugado.delivery.confirmacao import confirmar_por_omissao   # Leo
-from seugado.sensing.ingestao import ingerir_leituras            # Kauê
-from seugado.persistencia.projecao_db import reconstruir_projecao  # Kauê
-from seugado.planner.carga import montar_estado_projetado        # Kauê
-from seugado.planner.otimizador import gerar_plano               # João
-from seugado.persistencia.planos import salvar_plano, carregar_plano_atual  # João
-from seugado.delivery.envio import enviar_plano                  # Leo
+from seugado.sensing.ingestao import ingerir_leituras               # Kauê
+from seugado.persistencia.projecao_db import reconstruir_projecao   # Kauê
+from seugado.planner.carga import montar_estado_projetado           # Kauê
+from seugado.planner.otimizador import gerar_plano                  # João
+from seugado.planner.comparacao import comparar_planos              # João
+from seugado.persistencia.planos import (salvar_plano, carregar_plano_atual,
+                                         ids_respondidos)           # João
+from seugado.delivery.envio import enviar_plano, avisar_plano_candidato   # Leo
+from seugado.delivery.confirmacao import lembrar_pendentes                # Leo
 
-confirmar_por_omissao(conn, fazenda_id: UUID, hoje: date) -> int
-ingerir_leituras(conn, fazenda_id: UUID, data_inicio: date, data_fim: date) -> int
-reconstruir_projecao(conn, fazenda_id: UUID) -> EstadoFazenda
-montar_estado_projetado(conn, fazenda_id: UUID, data_base: date) -> EstadoProjetado
-gerar_plano(estado: EstadoProjetado, fazenda: Fazenda, agora: datetime, plano_id: UUID) -> PlanoManejo
-salvar_plano(conn, plano: PlanoManejo) -> None
-enviar_plano(conn, plano: PlanoManejo, atualizado: bool = False) -> bool
+ingerir_leituras(conn, fazenda_id, data_inicio, data_fim) -> int      # quantas leituras NOVAS
+reconstruir_projecao(conn, fazenda_id) -> EstadoFazenda
+montar_estado_projetado(conn, fazenda_id, data_base: date) -> EstadoProjetado
+gerar_plano(estado, fazenda: Fazenda, agora: datetime, plano_id: UUID) -> PlanoManejo
+comparar_planos(anterior, novo, respondidas: frozenset[UUID], hoje: date) -> tuple[DiferencaLote, ...]
+salvar_plano(conn, plano, status: str = "vigente") -> None           # "vigente" | "candidato"
+carregar_plano_atual(conn, fazenda_id) -> PlanoManejo | None
+ids_respondidos(conn, fazenda_id) -> frozenset[UUID]
+enviar_plano(conn, plano, atualizado: bool = False) -> bool
+avisar_plano_candidato(conn, plano, diferencas: tuple[DiferencaLote, ...]) -> bool
+lembrar_pendentes(conn, fazenda_id, hoje: date) -> int
 ```
-Nenhuma delas faz commit: **o ciclo é que faz.**
+Nenhuma delas faz commit: **a rotina é que faz.**
 
-### 5.3 Função que os outros chamam (sua)
-
-```python
-# src/seugado/jobs/ciclo.py
-def executar_ciclo(conn, fazenda_id: UUID, hoje: date | None = None,
-                   ingerir_satelite: bool = True, enviar: bool = True,
-                   atualizado: bool = False) -> PlanoManejo
-```
-O Leo chama `executar_ciclo(conn, fazenda_id, ingerir_satelite=False, atualizado=True)` quando
-o produtor responde "não fiz" ou "fiz diferente". **Não mude essa assinatura.**
+**Módulos que ainda não estão na sua branch.** As funções do João e do Leo só chegam na `main`
+na integração de segunda, e as do Kauê (`ingestao`, `carga`) ao longo de domingo. Por isso,
+**importe-as dentro das funções** de `jobs/ciclo.py` e `rotas_plano.py` (não no topo do
+arquivo), e nos testes injete módulos falsos com
+`monkeypatch.setitem(sys.modules, "seugado.planner.otimizador", modulo_falso)`.
 
 ---
 
 ## 6. Tarefas (na ordem)
 
-### L0: `GET /me` e `POST /fazendas` primeiro, em PR pequeno (antes de tudo)
+### L0: Backend base: `/me`, clientes e fazendas (PR pequeno, primeiro)
 
-**Por quê:** o site inteiro depende de `GET /me`. Sem ele, o `RotaProtegida` não sabe quem está
-logado e manda todo mundo de volta para o login, inclusive o Ezequiel, que precisa da rota
-`/mapa` funcionando. É a única tarefa da equipe que bloqueia outra pessoa.
+**Por quê:** o site inteiro depende disso. Sem `GET /me` e `GET /fazendas`, o seletor de fazenda
+fica vazio e ninguém (inclusive o Ezequiel) consegue usar as páginas. É a única tarefa da equipe
+que bloqueia outra pessoa.
 
-**Como:** faça só a parte **backend** da L3 (`cadastro/fazenda.py` com `criar_fazenda` e
-`carregar_fazenda`, e as rotas `GET /me` e `POST /fazendas`). Abra um PR pequeno
-(`feat/leandro-me`) e **avise o Kauê para fazer o merge na hora**, sem esperar a segunda. Depois
-avise o Ezequiel para dar `git pull` na `main`. Enquanto a tela de onboarding não existe, cada
-pessoa cria a própria fazenda pelo `/docs` da API local (`POST /fazendas`, com o cabeçalho
-`authorization: Bearer <token>`; o token aparece no navegador, em DevTools → Application →
-Local Storage → a chave `sb-…-auth-token`, campo `access_token`).
+**Como:**
+1. `cadastro/clientes.py`: `listar_clientes`, `criar_cliente`, `atualizar_cliente` (SQL direto
+   na tabela `cliente`; `nome` não vazio).
+2. `cadastro/fazenda.py`:
+   - `listar_fazendas(conn)`: `fazenda` + `cliente.nome AS cliente_nome` (LEFT JOIN), só
+     `ativo`;
+   - `criar_fazenda(conn, dados) -> UUID` (`INSERT … RETURNING id`);
+   - `carregar_fazenda(conn, fazenda_id) -> Fazenda` (a dataclass de `seugado.core.models`, com
+     `dias_preferenciais_manejo` como `tuple[int, ...]`). A rotina usa esta função;
+   - `atualizar_fazenda(conn, fazenda_id, dados)`.
+3. Validação (Pydantic):
+   - `nome` não vazio; `cliente_id` existente;
+   - `funcionarios_disponiveis >= 1` e `animais_por_funcionario_dia >= 1`;
+   - `dias_preferenciais_manejo` com pelo menos 1 valor, todos entre 0 e 6, sem repetição
+     (ordene);
+   - `envio_plano_dia` entre 0 e 6; `envio_plano_hora` entre 0 e 23;
+   - `timezone` padrão `America/Fortaleza`.
+4. Rotas `GET /me` (`{"usuario_id", "email"}` de `Usuario`), `/clientes` e `/fazendas` (tabela
+   5.1). Cada rota que escreve termina com `conn.commit()`.
+5. Abra o PR `feat/leandro-base` e **avise o Kauê para fazer o merge na hora**. Depois avise o
+   Ezequiel para dar `git pull`.
 
 **Critérios de aceite:**
-- [ ] Logado e sem fazenda, o site vai para `/onboarding`; com fazenda, abre `/mapa`.
+- [ ] Com o token de uma conta da equipe, `GET /me` e `GET /fazendas` respondem 200.
+- [ ] Criar cliente e fazenda pelo `/docs` faz a fazenda aparecer no seletor do site.
 - [ ] Merge na `main` até as 10h.
-
 
 ### L1: Identidade visual (Figma) + `tema.css` (timebox: 1 hora)
 
-**Por quê:** na terça, a banca vai julgar também o produto. Uma paleta e uma tipografia
-consistentes nas 6 telas, incluindo o mapa do Ezequiel, fazem o sistema parecer um produto só.
+**Por quê:** na terça, a banca vai julgar também o produto. Paleta e tipografia consistentes
+fazem o painel parecer um produto só. Lembre que quem usa o painel é a equipe; o produtor vê só
+o Telegram.
 
 **Como:**
-1. No Figma, faça wireframes simples das 6 telas: Login, Onboarding, Mapa, Lotes, Plano da
-   semana, Configurações. Foque em layout e hierarquia; é uma hora, não um design system.
-2. Paleta (verde de pasto como primária; cores de estado para o mapa: verde, amarelo, azul,
+1. No Figma, wireframes simples das telas: Login, Clientes e fazendas, Fazenda, Mapa, Lotes,
+   Plano da semana.
+2. Paleta (verde de pasto como primária; cores de estado do mapa: verde, amarelo, azul,
    vermelho, cinza), tipografia (fonte do sistema) e raio de borda.
-3. Passe para `frontend/src/estilo/tema.css`, trocando os valores das variáveis que já existem
-   (`--cor-primaria`, `--cor-fundo`, …) e acrescentando as de estado (`--cor-pronto`,
-   `--cor-crescendo`, `--cor-ocupado`, `--cor-sair`, `--cor-sem-estimativa`).
-4. Mande o link do Figma e as variáveis ao Ezequiel **antes das 10h**.
+3. Passe para `frontend/src/estilo/tema.css`: troque os valores das variáveis que já existem e
+   acrescente `--cor-pronto`, `--cor-crescendo`, `--cor-ocupado`, `--cor-sair` e
+   `--cor-sem-estimativa`.
+4. Mande o link e as variáveis ao Ezequiel.
 
 **Critérios de aceite:**
-- [ ] 6 telas no Figma e link compartilhado com a equipe.
-- [ ] `tema.css` com as variáveis; nenhuma cor escrita direto nas páginas.
+- [ ] Telas no Figma e link compartilhado.
+- [ ] Nenhuma cor escrita direto nas páginas.
 
 **Fora do escopo:** logo definitivo; biblioteca de componentes; modo escuro.
 
-### L2: Login (`Login.tsx`)
+### L2: Login da equipe (`Login.tsx`)
 
-**Por quê:** cada produtor vê só a própria fazenda. O login é do Supabase: você não guarda
-senha.
+**Por quê:** o painel mostra dados de todos os clientes; só a equipe entra.
 
 **Como:**
-1. Formulário com e-mail e senha e dois modos: **Entrar** (`supabase.auth.signInWithPassword`)
-   e **Criar conta** (`supabase.auth.signUp`).
-2. Sucesso → `navigate("/mapa")`. O `RotaProtegida` já redireciona para `/onboarding` se ainda
-   não houver fazenda.
-3. Erros do Supabase em português ("E-mail ou senha incorretos", "Senha precisa de 6
-   caracteres").
-4. **No painel do Supabase** (combine com o Kauê, que é o dono do projeto):
-   - *Authentication → Email*: "Confirm email" desligado;
-   - *URL Configuration*: Site URL = endereço do Vercel;
-   - Redirect URLs com `http://localhost:5173`.
+1. Formulário de e-mail e senha com **um único botão, Entrar**
+   (`supabase.auth.signInWithPassword`). **Não há "Criar conta".**
+2. Sucesso → `navigate("/mapa")`. Erros em português ("E-mail ou senha incorretos").
+3. No Supabase (o Kauê é o dono do projeto, combine com ele):
+   - *Authentication → Sign In / Providers*: **desligue "Allow new users to sign up"**;
+   - crie as contas da equipe em *Authentication → Users → Add user*;
+   - *URL Configuration*: Site URL = endereço do Vercel; Redirect URLs com
+     `http://localhost:5173`.
 
 **Critérios de aceite:**
-- [ ] Criar conta → entra direto → cai no onboarding.
+- [ ] Conta da equipe entra; e-mail desconhecido não entra.
 - [ ] Sair e entrar de novo funciona.
-- [ ] Erro aparece na tela, sem `alert()`.
 
-**Fora do escopo:** login social; recuperação de senha; perfis e permissões.
+**Fora do escopo:** login social; recuperação de senha; papéis diferentes entre admins.
 
-### L3: Fazenda: backend, onboarding e configurações
+### L3: Páginas "Clientes e fazendas" (`Clientes.tsx`) e "Fazenda" (`Configuracoes.tsx`)
 
-**Por quê:** a fazenda guarda a **rotina** que o otimizador respeita: quantos funcionários,
-quantas movimentações cada um faz por dia e em quais dias da semana se mexe no gado. É o
-diferencial do SeuGado (R7 e R8 do motor).
+**Por quê:** é por aqui que a equipe cadastra o cliente e a **rotina** da fazenda que o
+otimizador respeita (R7 e R8 do motor, o diferencial do SeuGado), e que o produtor recebe o link
+do bot.
 
-**Como (backend, `cadastro/fazenda.py` + `rotas_fazenda.py`):**
-1. `criar_fazenda(conn, usuario_id, dados) -> UUID`: se `fazenda_do_usuario` já existir →
-   erro 409. Senão, `INSERT INTO fazenda (nome, timezone, funcionarios_disponiveis,
-   manejos_por_funcionario_dia, dias_preferenciais_manejo) … RETURNING id` e
-   `INSERT INTO fazenda_usuario`.
-2. `carregar_fazenda(conn, fazenda_id) -> Fazenda` (a dataclass `Fazenda` de
-   `seugado.core.models`, com `dias_preferenciais_manejo` como `tuple[int, ...]`). O ciclo
-   usa esta função.
-3. `atualizar_fazenda(conn, fazenda_id, dados)`: `UPDATE`.
-4. Validação (Pydantic): `nome` não vazio; `funcionarios_disponiveis >= 1`;
-   `manejos_por_funcionario_dia >= 1`; `dias_preferenciais_manejo` com pelo menos 1 valor,
-   todos entre 0 e 6, sem repetição (ordene); `timezone` padrão `America/Fortaleza`.
-5. `GET /me`: `usuario_atual` + `fazenda_do_usuario` + `carregar_fazenda`.
-6. `GET /fazendas/{id}/telegram`:
-   `link = f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={codigo_vinculo_telegram}"`
-   (variável de ambiente), `vinculado = telegram_chat_id is not None`.
-7. Cada rota que escreve termina com `conn.commit()`.
+**Como (Clientes e fazendas):**
+- Lista de clientes, cada um com as suas fazendas embaixo.
+- "Novo cliente" (nome, telefone, observações) e "Nova fazenda" dentro de um cliente.
+- Clicar numa fazenda → `selecionar(id)` (de `useFazenda()`) → vai para `/mapa`.
+- Formulário da fazenda:
+  - **Nome da fazenda**;
+  - **"Quantas pessoas fazem o manejo do gado?"** (`funcionarios_disponiveis`);
+  - **"Quantos animais cada pessoa consegue mover sozinha num dia?"**
+    (`animais_por_funcionario_dia`);
+  - **"Em quais dias da semana se pode mexer no gado?"**: 7 caixas seg…dom, com segunda e
+    quinta marcadas por padrão;
+  - **"Quando o produtor quer receber o plano?"**: dia da semana (select) + hora (0–23).
 
-**Como (frontend):**
-- **Onboarding:**
-  - boas-vindas + nome da fazenda;
-  - "Quantas pessoas cuidam do manejo do gado?";
-  - "Quantos lotes cada pessoa consegue mudar de piquete por dia?";
-  - "Em quais dias da semana vocês costumam mexer no gado?", com 7 caixas seg…dom e segunda
-    e quinta marcadas por padrão.
-
-  Salvar → `POST /fazendas` → `recarregar()` (de `useFazenda`) → `/mapa` com a mensagem
-  *"Agora desenhe seus piquetes."*
-- **Configurações:** o mesmo formulário (`PUT`) + cartão **Telegram**:
-  - se não vinculado: "Abra este link no celular e toque em **Começar**", com o link e um botão
-    "Já abri", que recarrega o status;
-  - se vinculado: "Telegram conectado ✓".
+**Como (Fazenda, a página da fazenda selecionada):**
+- O mesmo formulário (`PUT /fazendas/{id}`) + nome do cliente.
+- Cartão **Telegram**:
+  - não vinculado: *"Mande este link para o produtor abrir no celular e tocar em
+    **Começar**"*, com o link e os botões "Copiar" e "Atualizar status";
+  - vinculado: "Telegram conectado ✓".
+- Depois de salvar, chame `recarregar()` para o seletor refletir o nome novo.
 
 **Critérios de aceite:**
-- [ ] Usuário novo passa pelo onboarding e não volta mais a ele.
-- [ ] Mudar os dias de manejo persiste.
-- [ ] `GET /me` sem fazenda devolve `"fazenda": null`.
+- [ ] Cadastrar cliente + fazenda + rotina e ver a fazenda no seletor.
+- [ ] Mudar dias de manejo e horário de envio persiste.
+- [ ] O link do Telegram aparece e o status muda para vinculado depois do `/start` no bot.
 
-**Fora do escopo:** mais de uma fazenda por usuário; convidar outros usuários; endereço ou
-município.
+**Fora do escopo:** apagar cliente ou fazenda; importar planilha; mapa aqui (é do Ezequiel).
 
 ### L4: Lotes: backend e página
 
 **Por quê:** o consumo do lote é metade da conta do otimizador: quanto o lote come define em
-quantos dias ele rapa o piquete. E o otimizador precisa saber **onde cada lote está agora**.
+quantos dias ele rapa o piquete. E o otimizador precisa saber **onde cada lote está agora** e
+**quantos animais** tem (a mão de obra é contada em animais).
 
 **Como (backend, `cadastro/lotes.py` + `rotas_lotes.py`):**
 1. `criar_lote(conn, fazenda_id, ator, nome, indissoluvel, composicao, piquete_atual_id, desde) -> UUID`:
    - valide:
-     - nome não repetido entre os lotes da fazenda (`estado_lote`);
+     - nome não repetido entre os lotes da fazenda;
      - composição com pelo menos 1 item, categorias sem repetição, `n_animais >= 1`;
      - `peso_medio_kg`, se informado, entre 20 e 1.500;
      - o piquete existe, está ativo e **está vazio** (`estado_piquete.lote_atual_id IS NULL`);
      - `desde <= hoje`;
-   - peso ausente → `peso_por_ua_kg(categoria)` (de `seugado.planner.estado`) com
+   - peso ausente → `peso_por_ua_kg(CategoriaAnimal(categoria))` com
      `origem_peso: "ua_tabela"`; informado → `"produtor"`;
    - registre `LOTE_CRIADO` e em seguida `MANEJO_CONFIRMADO` (novo `entidade_id`, `lote_id`,
      `piquete_destino_id = piquete_atual_id`, `data_execucao = desde`), ambos com
      `ocorrido_em = agora`;
    - `reconstruir_projecao`.
-2. `editar_lote(...)`: registre `LOTE_ALTERADO` (todos os campos + `ativo: True`). Se o
-   `piquete_atual_id` mudou, registre também `MANEJO_CONFIRMADO` para o novo piquete (vazio)
-   com `data_execucao = hoje`: é uma correção de posição feita pela web.
-3. `dissolver_lote(...)`: `LOTE_DISSOLVIDO`. O piquete onde ele estava passa a descansar
-   sozinho na reconstrução.
-4. `listar_lotes(conn, fazenda_id)`: `estado_lote` + nome do piquete (`estado_piquete`);
-   `n_animais_total` = soma da composição.
+2. `editar_lote(...)`: `LOTE_ALTERADO` (todos os campos + `ativo: True`). Se o
+   `piquete_atual_id` mudou (correção feita pela equipe), registre também `MANEJO_CONFIRMADO`
+   para o novo piquete (vazio) com `data_execucao = hoje`.
+3. `dissolver_lote(...)`: `LOTE_DISSOLVIDO`.
+4. `listar_lotes(conn, fazenda_id)`: `estado_lote` + nome do piquete; `n_animais_total` = soma.
 5. Rotas: `ValueError`/`ValidationError` → 400, lote inexistente → 404, piquete ocupado → 409.
    `conn.commit()` no fim.
 
@@ -504,172 +526,191 @@ quantos dias ele rapa o piquete. E o otimizador precisa saber **onde cada lote e
 
   > **Recria** · 150 animais · Piquete 2 desde 25/09 · 50,6 t de peso vivo
 
-- Formulário "Novo lote / Editar":
+- Formulário:
   - **Nome**;
-  - **Composição**: linhas com categoria (`select`), quantidade e peso médio (kg), com a dica
-    *"Não sabe? Deixe em branco: estimamos pela tabela de Unidade Animal (bezerro 112,5 · novilho
-    337,5 · adulto 450 kg)"*, e o botão "+ categoria";
-  - **Onde o lote está agora**: `select` com os piquetes livres, de
-    `GET /fazendas/{id}/piquetes` (rota do Ezequiel), mais o piquete atual do lote, na edição;
+  - **Composição**: linhas com categoria (bezerro, bezerra, novilho, novilha, vaca, boi,
+    touro), quantidade e peso médio (kg), com a dica *"Sem peso? Deixe em branco: estimamos
+    pela tabela de Unidade Animal"*, e o botão "+ categoria";
+  - **Onde o lote está agora**: piquetes livres de `GET /fazendas/{id}/piquetes`, mais o atual
+    do lote na edição;
   - **Desde** (data);
-  - **Lote indissolúvel**, com a explicação *"Marque se este lote nunca pode ser juntado a
-    outro, por exemplo vacas com bezerro ao pé."*
-- Se ainda não há piquete, mostre *"Cadastre os piquetes no Mapa antes dos lotes"*, com link.
-- Dissolver com confirmação na própria tela.
+  - **Lote indissolúvel**, com a explicação.
+- Sem piquete cadastrado → *"Cadastre os piquetes no Mapa antes dos lotes"*.
 
 **Critérios de aceite:**
-- [ ] Criar "Recria: 150 novilhos, sem peso, no Piquete 2" grava peso 337,5 com
-      `origem_peso: "ua_tabela"` e o Piquete 2 aparece ocupado.
-- [ ] Não deixa colocar dois lotes no mesmo piquete.
-- [ ] Editar a composição atualiza o peso vivo total.
+- [ ] "Recria: 150 novilhos, sem peso, no Piquete 2" grava 337,5 kg com
+      `origem_peso: "ua_tabela"`, e o Piquete 2 aparece ocupado.
+- [ ] 30 touros sem peso → 562,5 kg.
+- [ ] Não deixa dois lotes no mesmo piquete.
 
-**Fora do escopo:** raça, sexo, brinco, pesagem individual (ERP, ADR-001); fusão de lotes
-(F-022); histórico de movimentações na tela.
+**Fora do escopo:** raça, brinco, pesagem individual; fusão de lotes; histórico na tela.
 
 ### L5: Plano da semana (`rotas_plano.py` + `Plano.tsx`)
 
-**Por quê:** o Telegram é o canal do dia a dia, mas é na web que se apresenta, se confere e se
-dispara o plano. Na terça, esta página é a demo.
+**Por quê:** é onde a equipe confere o que o produtor recebeu e dispara um plano na hora. Na
+terça, esta página é a demo.
 
 **Como (backend):**
-1. `GET /fazendas/{id}/plano/atual`: `carregar_plano_atual(conn, fazenda_id)` →
+1. `GET /fazendas/{id}/plano/atual`: `carregar_plano_atual` (plano **vigente**) →
    `plano_para_dict`, ou 404 `"Ainda não há plano"`.
-2. `POST /fazendas/{id}/ciclo`: chama `executar_ciclo(conn, fazenda_id,
-   ingerir_satelite=corpo.ingerir_satelite, enviar=corpo.enviar)` e devolve o plano. A chamada
-   pode levar até ~1–2 min (satélite + clima). Erros de serviço externo → 502 com a mensagem.
+2. `POST /fazendas/{id}/ciclo`: `executar_ciclo(conn, fazenda_id,
+   ingerir_satelite=corpo.ingerir_satelite, enviar=corpo.enviar)` → plano. Pode levar 1–2 min.
+   Erros de serviço externo → 502 com a mensagem.
 
 **Como (frontend, `Plano.tsx`):**
-- Cabeçalho: *"Plano de seg 28/09 a dom 04/10"* · *"gerado em 28/09 às 05:00"* · botão
-  **Gerar plano agora**, com spinner, desabilitado durante a chamada e o texto "Buscando
-  satélite e clima…".
-- **Movimentações**, agrupadas por dia (só os dias com movimento). Em cada cartão:
-  - título: **Mover Recria: Piquete 2 → Piquete 1**;
+- Cabeçalho:
+  - *"Plano de seg 28/09 a dom 04/10 · gerado em 28/09 às 05:00"*;
+  - botão **Gerar e enviar plano agora**, com spinner e "Buscando satélite e clima…";
+  - uma caixa "enviar ao produtor", marcada por padrão.
+- Movimentações agrupadas por dia (só dias com movimento). Em cada cartão:
+  - título **Mover Recria: Piquete 2 → Piquete 6**;
   - `motivo`;
-  - "Previsão: 3 dias no piquete";
-  - selo de confiança (alta/média/baixa, com cor) e `motivo_confianca` em cinza.
-- **Alertas**, cada um com ícone por `tipo` e o `texto`.
-- **Medições pedidas** (`pedidos_validacao`): "Meça a altura do **Piquete 4** com uma régua",
-  com o motivo e um campo "cm" + botão que chama
-  `POST /fazendas/{id}/piquetes/{piquete_id}/alturas` (rota do Ezequiel).
-- Sem plano (404): estado vazio com o botão "Gerar o primeiro plano".
-- **Não recalcule nada no frontend**: mostre exatamente o que vem do plano.
+  - "Previsão: N dias no piquete";
+  - selo de confiança e `motivo_confianca`.
+- Alertas (ícone por `tipo` + `texto`) e medições pedidas (`pedidos_validacao`), com campo "cm"
+  que chama `POST /fazendas/{id}/piquetes/{piquete_id}/alturas` (rota do Ezequiel).
+- Sem plano (404): estado vazio com "Gerar o primeiro plano".
+- Não recalcule nada no frontend.
 
 **Critérios de aceite:**
-- [ ] Com `plano_exemplo.json`, a página mostra 2 dias (segunda com 2 movimentos, quinta com
-      1), 3 alertas e 1 pedido de medição.
-- [ ] "Gerar plano agora" atualiza a página com o plano novo.
+- [ ] Com `plano_exemplo.json`: segunda com 2 movimentos, quinta com 1, 2 alertas e 1 pedido
+      de medição.
+- [ ] O botão gera o plano novo e a página atualiza.
 
-**Fora do escopo:** editar o plano; aceitar ou recusar pela web (isso é pelo Telegram, com o
-Leo); histórico de planos.
+**Fora do escopo:** editar o plano; responder por ele (isso é pelo Telegram).
 
-### L6: Ciclo semanal (`jobs/ciclo.py`)
+### L6: A rotina (`jobs/ciclo.py`)
 
-**Módulos que ainda não estão na sua branch.** `gerar_plano`/`salvar_plano`/`carregar_plano_atual`
-(João) e `confirmar_por_omissao`/`enviar_plano` (Leo) só chegam na `main` na integração de
-segunda. Por isso, **importe-os dentro da função** (`from seugado.planner.otimizador import
-gerar_plano` na primeira linha de `executar_ciclo`, e o mesmo em `rotas_plano.py`), e nos testes
-injete módulos falsos com
-`monkeypatch.setitem(sys.modules, "seugado.planner.otimizador", modulo_falso)`. O `projecao_db`
-do Kauê já está na `main`; `ingestao` e `carga` entram ao longo de domingo. Se ainda não
-estiverem quando você chegar aqui, use a mesma técnica para eles.
-
-**Por quê:** é o que faz o SeuGado rodar **sozinho** toda segunda-feira. É a definição de MVP
-completo (F-015).
+**Por quê:** é o que faz o SeuGado rodar **sozinho**. O cálculo roda **todo dia** (o satélite
+passa a cada ~4–5 dias, sem horário fixo), o plano semanal chega **no dia e hora que o produtor
+escolheu**, e o produtor só é incomodado no meio da semana se algo que ele ainda não fez mudou.
 
 **Como:**
 ```python
-def executar_ciclo(conn, fazenda_id, hoje=None, ingerir_satelite=True, enviar=True, atualizado=False):
-    agora = datetime.now(UTC)
+HORA_ROTINA_DIARIA = 6   # hora local; escolha nossa
+
+def calcular_plano(conn, fazenda: Fazenda, hoje: date, ingerir_satelite: bool) -> tuple[PlanoManejo, int]:
+    novas = ingerir_leituras(conn, fazenda.id, hoje - timedelta(days=30), hoje) if ingerir_satelite else 0
+    reconstruir_projecao(conn, fazenda.id)
+    conn.commit()                                   # leituras salvas mesmo se algo falhar depois
+    estado = montar_estado_projetado(conn, fazenda.id, hoje)
+    return gerar_plano(estado, fazenda, datetime.now(UTC), uuid4()), novas
+
+def executar_ciclo(conn, fazenda_id, hoje=None, ingerir_satelite=True, enviar=True, atualizado=False) -> PlanoManejo:
+    """Calcula e JÁ coloca em vigor (botão da web e recálculo pedido pelo produtor no bot)."""
     fazenda = carregar_fazenda(conn, fazenda_id)
-    hoje = hoje or agora.astimezone(ZoneInfo(fazenda.timezone)).date()
-    confirmar_por_omissao(conn, fazenda_id, hoje)                       # 1
-    if ingerir_satelite:
-        ingerir_leituras(conn, fazenda_id, hoje - timedelta(days=30), hoje)  # 2
-    reconstruir_projecao(conn, fazenda_id)                              # 3
-    conn.commit()
-    estado = montar_estado_projetado(conn, fazenda_id, hoje)            # 4
-    plano = gerar_plano(estado, fazenda, agora, uuid4())                # 5
-    salvar_plano(conn, plano)                                           # 6
+    hoje = hoje or datetime.now(ZoneInfo(fazenda.timezone)).date()
+    plano, _ = calcular_plano(conn, fazenda, hoje, ingerir_satelite)
+    salvar_plano(conn, plano, "vigente")
     conn.commit()
     if enviar:
-        enviar_plano(conn, plano, atualizado=atualizado)                # 7
+        enviar_plano(conn, plano, atualizado=atualizado)
     return plano
+
+def entregar_plano_semanal(conn, fazenda_id, hoje) -> PlanoManejo:
+    plano = executar_ciclo(conn, fazenda_id, hoje, ingerir_satelite=True, enviar=True)
+    # UPDATE fazenda SET ultimo_envio_semanal = hoje, ultima_rotina_diaria = hoje; commit
+    return plano
+
+def rotina_diaria(conn, fazenda_id, hoje) -> None:
+    lembrar_pendentes(conn, fazenda_id, hoje)       # bot pergunta o que ficou sem resposta
+    fazenda = carregar_fazenda(conn, fazenda_id)
+    vigente = carregar_plano_atual(conn, fazenda_id)
+    novo, novas = calcular_plano(conn, fazenda, hoje, ingerir_satelite=True)
+    # UPDATE fazenda SET ultima_rotina_diaria = hoje; commit
+    if vigente is None or novas == 0:
+        return                                      # sem plano em vigor ou sem imagem nova
+    difs = comparar_planos(vigente, novo, ids_respondidos(conn, fazenda_id), hoje)
+    if difs:
+        salvar_plano(conn, novo, "candidato")
+        conn.commit()
+        avisar_plano_candidato(conn, novo, difs)    # "quer ver as mudanças?"
+
+def executar_agenda(agora_utc: datetime | None = None) -> int:
+    """Roda de hora em hora. Devolve 0 se tudo certo, 1 se alguma fazenda falhou."""
 ```
-1. Exatamente nessa ordem (ADR-024). Os commits intermediários garantem que satélite e
-   respostas fiquem salvos mesmo se o plano falhar depois.
-2. `executar_todas()`: abre a própria conexão (`psycopg.connect(os.environ["DATABASE_URL"])`)
-   e percorre as fazendas `ativo` que têm pelo menos 1 piquete ativo. Cada fazenda roda num
-   `try`: erro → `rollback()`, imprime o erro com o id da fazenda e **continua** com a próxima.
-   No fim, código de saída 1 se alguma falhou (o GitHub mostra em vermelho).
-3. Linha de comando (`python -m seugado.jobs.ciclo`, com `argparse`): `--todas`, ou
-   `--fazenda <uuid>`, mais `--sem-satelite` e `--sem-envio`.
-4. Testes: troque as sete funções por falsas (`monkeypatch`) e confira a **ordem** das chamadas,
-   os commits e que uma fazenda com erro não derruba as outras.
+`executar_agenda`:
+1. Abre a própria conexão (`psycopg.connect(os.environ["DATABASE_URL"])`).
+2. Para cada fazenda `ativo` com pelo menos 1 piquete ativo:
+   - `local = agora.astimezone(ZoneInfo(timezone))`, `hoje = local.date()`;
+   - **entrega semanal** se `local.weekday() == envio_plano_dia`,
+     `local.hour >= envio_plano_hora` e `ultimo_envio_semanal != hoje`;
+   - senão, **rotina diária** se `local.hour >= HORA_ROTINA_DIARIA` e
+     `ultima_rotina_diaria != hoje`.
+
+   (O `>=` com a data de controle garante que um atraso do GitHub não faz perder o horário, e
+   que nada roda duas vezes no mesmo dia.)
+3. Cada fazenda roda num `try`: erro → `rollback()`, imprime com o id da fazenda e **continua**.
+
+Linha de comando (`python -m seugado.jobs.ciclo`, com `argparse`):
+- `--agenda`;
+- `--fazenda <uuid>` com `--entregar`, `--diaria` ou `--recalcular` (este último =
+  `executar_ciclo`);
+- `--sem-satelite` e `--sem-envio`.
 
 **Critérios de aceite:**
-- [ ] Ordem das chamadas exatamente 1→7.
-- [ ] `--sem-satelite` não chama o Earth Engine.
-- [ ] Uma fazenda com erro não impede as outras.
+- [ ] Testes com funções falsas conferem:
+  - a ordem das chamadas em cada rotina;
+  - que o candidato só é salvo e avisado quando há leitura nova **e** diferença;
+  - que a entrega semanal não se repete no mesmo dia;
+  - que uma fazenda com erro não derruba as outras.
+- [ ] `--fazenda <id> --recalcular --sem-satelite` não chama o Earth Engine.
 
-**Fora do escopo:** fila, paralelismo, agendamento dentro da API, reenvio automático.
+**Fora do escopo:** fila, paralelismo, agendamento dentro da API, lembrete em outro horário.
 
 ### L7: Deploy
 
-**Por quê:** "funcionando de verdade" na terça quer dizer acessível pela internet e rodando
-sem o computador de ninguém ligado.
+**Por quê:** "funcionando de verdade" na terça quer dizer acessível pela internet e rodando sem
+o computador de ninguém ligado.
 
 **Como:**
-1. **API no Render** (plano gratuito), *New → Web Service* a partir do repositório GitHub:
-   - Runtime Python; variável `PYTHON_VERSION=3.12`;
+1. **API no Render** (grátis), *New → Web Service* a partir do repositório:
+   - `PYTHON_VERSION=3.12`;
    - Build: `pip install uv && uv sync --frozen --no-dev`;
    - Start: `uv run uvicorn seugado.api.main:app --app-dir src --host 0.0.0.0 --port $PORT`;
    - Health check: `/saude`;
    - Variáveis: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
-     `SEUGADO_CORS_ORIGINS=https://<seu-app>.vercel.app,http://localhost:5173`,
+     `SEUGADO_CORS_ORIGINS=https://<app>.vercel.app,http://localhost:5173`,
      `SEUGADO_GEE_PROJECT`, `SEUGADO_GEE_SERVICE_ACCOUNT_JSON`, `TELEGRAM_BOT_TOKEN`,
-     `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET` (as três últimas vêm do Leo).
-   - Guarde a configuração em `render.yaml` na raiz.
-   - O plano grátis dorme após 15 min sem uso, e a primeira chamada demora ~1 min. **Antes da
-     apresentação, abra `/saude` para acordar a API.**
-2. **Site no Vercel:** *Add New → Project*, root directory `frontend`, framework Vite; variáveis
-   `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_URL=https://<api>.onrender.com`. O
-   `vercel.json` (rotas do SPA) já existe.
-3. **Ciclo no GitHub Actions**, `.github/workflows/ciclo-semanal.yml`:
-   - `on.schedule.cron: "0 8 * * 1"` (08:00 UTC = segunda 05:00 em Fortaleza) e
-     `workflow_dispatch` com os inputs `fazenda_id` (texto, opcional) e `sem_satelite`
-     (booleano);
+     `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET` (as três últimas do Leo).
+   - Guarde em `render.yaml`.
+   - O plano grátis dorme após 15 min sem uso. **Antes da apresentação, abra `/saude`.**
+2. **Site no Vercel:** root `frontend`, framework Vite, variáveis `VITE_SUPABASE_URL`,
+   `VITE_SUPABASE_ANON_KEY`, `VITE_API_URL=https://<api>.onrender.com`.
+3. **Rotina no GitHub Actions**, `.github/workflows/rotina.yml`:
+   - `on.schedule.cron: "7 * * * *"` (de hora em hora, no minuto 7) + `workflow_dispatch`
+     com os inputs `fazenda_id` (opcional) e `acao` (`agenda` | `entregar` | `diaria` |
+     `recalcular`);
    - passos: `actions/checkout`, `astral-sh/setup-uv` (versão estável atual),
-     `uv sync --frozen --no-dev`, `uv run python -m seugado.jobs.ciclo --todas` (ou
-     `--fazenda` se o input vier), com `PYTHONPATH: src`;
-   - secrets do repositório: `DATABASE_URL`, `SEUGADO_GEE_PROJECT`,
-     `SEUGADO_GEE_SERVICE_ACCOUNT_JSON`, `TELEGRAM_BOT_TOKEN`.
-4. Depois do deploy, mande à equipe as URLs do site e da API. O Leo precisa da URL da API para
-   registrar o webhook do Telegram.
+     `uv sync --frozen --no-dev`, `uv run python -m seugado.jobs.ciclo --agenda` (ou a ação
+     escolhida), com `PYTHONPATH: src`;
+   - secrets: `DATABASE_URL`, `SEUGADO_GEE_PROJECT`, `SEUGADO_GEE_SERVICE_ACCOUNT_JSON`,
+     `TELEGRAM_BOT_TOKEN`.
+4. Mande à equipe as URLs do site e da API (o Leo precisa da URL da API para o webhook).
 
 **Critérios de aceite:**
 - [ ] O site no Vercel faz login e fala com a API no Render.
-- [ ] "Run workflow" no GitHub roda o ciclo e o plano aparece no site.
-- [ ] Nenhuma chave aparece no repositório.
+- [ ] "Run workflow" com `entregar` gera o plano, que aparece no site e no Telegram.
+- [ ] Nenhuma chave no repositório.
 
-**Fora do escopo:** domínio próprio; ambientes separados de homologação e produção;
-monitoramento.
+**Fora do escopo:** domínio próprio; homologação separada; monitoramento.
 
 ---
 
 ## 7. Integração na segunda (a sua parte é a cola)
 
-1. Merge na ordem: Ezequiel → você (fazenda e lotes) → João → Leo → você (ciclo e deploy).
-2. Com uma fazenda de teste real, na web: login → onboarding → piquetes (Ezequiel) → lotes →
-   "Gerar plano agora" → o plano aparece aqui, no mapa e no Telegram do Leo.
+1. Merge na ordem: Ezequiel → você (base, clientes, fazendas e lotes) → João → Leo → você
+   (rotina e deploy).
+2. Na web: login → cliente → fazenda → piquetes (Ezequiel) → lotes → "Gerar e enviar plano
+   agora" → o plano aparece aqui, no mapa e no Telegram.
 
 ## 8. Usando IA no seu fluxo
 
 Dê à IA este documento e o arquivo que ela vai editar, **uma tarefa por vez**. Exemplo:
 
-> "Leia docs/equipe/LEANDRO.md, seções 4, 5 e a tarefa L4. Implemente
-> src/seugado/cadastro/lotes.py e as rotas em src/seugado/api/rotas_lotes.py seguindo
-> exatamente os payloads e regras descritos. Use registrar_evento e reconstruir_projecao já
-> existentes. Não altere outros arquivos nem adicione dependências."
+> "Leia docs/equipe/LEANDRO.md, seções 4, 5 e a tarefa L6. Implemente src/seugado/jobs/ciclo.py
+> exatamente como descrito, importando as funções de outras pessoas dentro das funções. Não
+> altere outros arquivos nem adicione dependências."
 
 Se a IA quiser mudar arquivo de outra pessoa, instalar pacote ou alterar contrato, a resposta é
 não: fale com o Kauê.

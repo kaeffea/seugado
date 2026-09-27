@@ -394,7 +394,7 @@
       "nome": "Vacas com bezerro",
       "composicao": [
         {
-          "categoria": "adulto",
+          "categoria": "vaca",
           "n_animais": 100,
           "peso_medio_kg": 480.0,
           "origem_peso": "produtor"

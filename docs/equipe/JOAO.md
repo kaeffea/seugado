@@ -31,7 +31,13 @@ O Kauê estima o capim de cada piquete por satélite e clima. O Leo manda o plan
 
 - o plano é **semanal** (7 dias a partir de hoje);
 - movimentação **só nos dias de manejo preferidos** pelo produtor (ex.: segunda e quinta);
-- no máximo `funcionarios × manejos_por_funcionario_dia` movimentações por dia.
+- a mão de obra é contada em **animais**: por dia, no máximo
+  `funcionarios_disponiveis × animais_por_funcionario_dia` animais movidos (um lote nunca é
+  dividido).
+
+**No MVP, só existe Marandu em pastejo rotacionado** (ADR-025). A fixture de exemplo também tem
+um piquete contínuo e um de Mombaça; eles estão lá de propósito, para você testar que o
+algoritmo os ignora sem quebrar.
 
 Isto é o **estágio 1** do motor de otimização do projeto (guloso, ADR-008). Busca local e
 CP-SAT vêm depois; o seu guloso vira a linha de base contra a qual eles serão medidos.
@@ -66,7 +72,10 @@ Esta seção é o seu contrato com o resto da equipe. **Nomes, tipos e formatos 
 | **Recebe** | `agora: datetime` (UTC, com fuso) e `plano_id: UUID` | Leandro (ciclo) | argumentos de `gerar_plano` |
 | **Recebe** | funções prontas de cálculo | Kauê (`core/`, `planner/estado.py`) | import (lista abaixo) |
 | **Entrega** | `PlanoManejo` | Leandro (salva e mostra na web), Leo (manda no Telegram), Ezequiel (pinta o mapa) | **retorno** de `gerar_plano` |
-| **Entrega** | plano gravado + eventos `manejo_recomendado` | banco → Leo (respostas) e Leandro (página) | `salvar_plano(conn, plano) -> None` |
+| **Entrega** | plano gravado (com status) + eventos `manejo_recomendado` | banco → Leo (respostas) e Leandro (página) | `salvar_plano(conn, plano, status="vigente" \| "candidato") -> None` |
+| **Entrega** | troca de plano quando o produtor aceita o novo | Leo | `promover_candidato(conn, plano_id) -> PlanoManejo`, `descartar_plano(conn, plano_id) -> None` |
+| **Entrega** | o que mudou entre dois planos | Leandro (rotina diária) e Leo (mostra ao produtor) | `comparar_planos(anterior, novo, respondidas, hoje) -> tuple[DiferencaLote, ...]` |
+| **Entrega** | movimentações já respondidas | Leandro e Leo | `ids_respondidos(conn, fazenda_id) -> frozenset[UUID]` |
 | **Entrega** | leitura do plano atual | Leandro (rota `/plano/atual`) e Leo (bot) | `carregar_plano_atual(conn, fazenda_id) -> PlanoManejo \| None` e `carregar_plano(conn, plano_id) -> PlanoManejo \| None` |
 
 ### Assinaturas exatas que você implementa
@@ -83,10 +92,19 @@ def confianca_movimentacao(destino: PiqueteProjetado,
 # src/seugado/planner/geo.py
 def distancia_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float: ...
 
-# src/seugado/persistencia/planos.py   (nenhuma faz commit)
-def salvar_plano(conn: psycopg.Connection[Any], plano: PlanoManejo) -> None: ...
-def carregar_plano_atual(conn: psycopg.Connection[Any], fazenda_id: UUID) -> PlanoManejo | None: ...
-def carregar_plano(conn: psycopg.Connection[Any], plano_id: UUID) -> PlanoManejo | None: ...
+# src/seugado/planner/comparacao.py
+def comparar_planos(anterior: PlanoManejo, novo: PlanoManejo,
+                    respondidas: frozenset[UUID], hoje: date) -> tuple[DiferencaLote, ...]: ...
+
+# src/seugado/persistencia/planos.py   (nenhuma faz commit; conn: psycopg.Connection[Any])
+def salvar_plano(conn, plano: PlanoManejo, status: str = "vigente") -> None: ...
+def promover_candidato(conn, plano_id: UUID) -> PlanoManejo: ...
+def descartar_plano(conn, plano_id: UUID) -> None: ...
+def carregar_plano_atual(conn, fazenda_id: UUID) -> PlanoManejo | None: ...   # vigente
+def carregar_candidato(conn, fazenda_id: UUID) -> PlanoManejo | None: ...
+def carregar_plano(conn, plano_id: UUID) -> PlanoManejo | None: ...
+def status_do_plano(conn, plano_id: UUID) -> str | None: ...
+def ids_respondidos(conn, fazenda_id: UUID) -> frozenset[UUID]: ...
 ```
 
 ### Funções prontas que você usa (não reimplemente)
@@ -167,8 +185,10 @@ Tipo Python em `seugado.contratos`. Exemplo completo: `tests/fixtures/estado_pro
 | `nome` | `str` | — | Nome |
 | `timezone` | `str` | `"America/Fortaleza"` | Fuso |
 | `funcionarios_disponiveis` | `int` | ≥ 1 | Pessoas que fazem o manejo |
-| `manejos_por_funcionario_dia` | `int` | ≥ 1 | Movimentações por pessoa por dia |
+| `animais_por_funcionario_dia` | `int` | ≥ 1 | Quantos **animais** cada pessoa consegue mover por dia |
 | `dias_preferenciais_manejo` | `tuple[int, ...]` | 0 = segunda … 6 = domingo | Dias em que se pode mover gado |
+| `envio_plano_dia` | `int` | 0 = segunda … 6 = domingo | Dia em que o produtor recebe o plano semanal |
+| `envio_plano_hora` | `int` | 0 … 23 (hora local) | Hora em que recebe o plano |
 | `ativo` | `bool` | — | Fazenda ativa |
 
 #### `PlanoManejo`: o plano da semana
@@ -210,7 +230,7 @@ TypeScript em `frontend/src/lib/tipos.ts`. Exemplo completo: `tests/fixtures/pla
 
 | Campo | Tipo | Em JSON | Significado |
 |---|---|---|---|
-| `tipo` | `TipoAlerta` | um de: `sem_piquete_apto`, `capacidade_excedida`, `aguardando_parametro`, `estimativa_indisponivel`, `continuo_acima_maxima`, `continuo_abaixo_minima`, `lote_sem_piquete`, `sem_dia_de_manejo` | Tipo do aviso |
+| `tipo` | `TipoAlerta` | um de: `sem_piquete_apto`, `capacidade_excedida`, `aguardando_parametro`, `estimativa_indisponivel`, `continuo_acima_maxima`, `continuo_abaixo_minima`, `lote_sem_piquete`, `sem_dia_de_manejo`, `passando_do_ponto` | Tipo do aviso |
 | `data` | `date` | `"2026-10-01"` | Dia a que se refere |
 | `texto` | `str` | texto | Frase pronta para o produtor |
 | `confianca` / `motivo_confianca` | `Confianca` / `str` | texto | Como na movimentação |
@@ -237,9 +257,9 @@ TypeScript em `frontend/src/lib/tipos.ts`. Exemplo completo: `tests/fixtures/pla
 
 ### O que `salvar_plano` grava
 
-1. Uma linha na tabela `plano`: `(id, fazenda_id, gerado_em, data_inicio, horizonte_dias, payload)`,
+1. Uma linha na tabela `plano`: `(id, fazenda_id, gerado_em, data_inicio, horizonte_dias, payload, status)`,
    com `payload = plano_para_dict(plano)` (JSON).
-2. Um evento `manejo_recomendado` por movimentação (origem `sistema`, ator `"planner"`,
+2. **Só para plano `vigente`:** um evento `manejo_recomendado` por movimentação (origem `sistema`, ator `"planner"`,
    `chave_idempotencia = "recomendacao:{plano.id}:{mov.id}"`), com o payload **exato**:
 
 ```json
@@ -265,7 +285,7 @@ Python 3.12, sem dependência nova. Use o que já existe:
 
 **Arquivos que são seus:** `src/seugado/planner/otimizador.py`,
 `src/seugado/planner/confianca.py`, `src/seugado/planner/geo.py`,
-`src/seugado/persistencia/planos.py`, `tests/planner/test_otimizador.py`,
+`src/seugado/planner/comparacao.py`, `src/seugado/persistencia/planos.py`, `tests/planner/test_otimizador.py`, `tests/planner/test_comparacao.py`,
 `tests/planner/test_confianca.py`, `tests/persistencia/test_planos.py`.
 
 **Não edite** nenhum outro arquivo. Se precisar de algo em `contratos.py` ou `core/`, fale com
@@ -321,11 +341,12 @@ com `estado_de_dict(json.load(...))`):
 - Para cada lote: `piquete_atual_id`, `consumo_kg_ms_dia`, `indissoluvel`, `confianca_peso`,
   `motivo_confianca_peso`.
 - `fazenda.dias_preferenciais_manejo`: `date.weekday()` (0 = segunda … 6 = domingo);
-  `funcionarios_disponiveis`; `manejos_por_funcionario_dia`.
+  `funcionarios_disponiveis`; `animais_por_funcionario_dia`.
 
 **Saída:** `PlanoManejo` (exemplo completo em `tests/fixtures/plano_exemplo.json`). **Esse
 arquivo é exatamente o que o seu `gerar_plano` deve produzir para o estado de exemplo**, com a
-fazenda do exemplo (dias preferenciais segunda e quinta, 1 funcionário, 2 manejos por dia),
+fazenda do exemplo (dias preferenciais segunda e quinta, 2 funcionários, 150 animais por
+funcionário por dia, envio segunda às 5h),
 `agora = 2026-09-28T08:00:00+00:00` e
 `plano_id = 44444444-4444-4444-8444-000000000001`. Ele é o seu teste de aceitação principal.
 
@@ -386,7 +407,8 @@ concorrente modela essa rotina.
 **Constantes:**
 ```python
 HORIZONTE_DIAS = 7
-FRACAO_ALVO_MARGINAL = 0.9   # HIPOTESE-CALIBRAR (ADR-024)
+FRACAO_ALVO_MARGINAL = 0.9       # HIPOTESE-CALIBRAR (ADR-024)
+FATOR_PASSANDO_DO_PONTO = 1.2    # HIPOTESE-CALIBRAR (ADR-025)
 ```
 
 **Algoritmo (siga exatamente, porque a fixture depende disso):**
@@ -398,7 +420,8 @@ FRACAO_ALVO_MARGINAL = 0.9   # HIPOTESE-CALIBRAR (ADR-024)
 - Estado simulado, que você atualiza dia a dia: `massa[p]` (começa em `massa_hoje`),
   `ocupante[p]` (id do lote ou `None`, a partir de `lote.piquete_atual_id`), `posicao[l]` (o
   piquete do lote) e `descanso[p]` (começa em `dias_descanso`).
-- `capacidade = funcionarios_disponiveis × manejos_por_funcionario_dia`.
+- `capacidade_animais = funcionarios_disponiveis × animais_por_funcionario_dia`.
+- `n_animais(lote)` = soma de `n_animais` da composição.
 - `altura(p) = massa[p] ÷ densidade`.
 - `proximo_dia_de_manejo(d)`: primeiro dia depois de `d`, dentro de 7 dias, cujo `weekday()`
   está nos dias preferenciais (pode cair fora do horizonte do plano; tudo bem, a taxa tem 14
@@ -423,6 +446,13 @@ FRACAO_ALVO_MARGINAL = 0.9   # HIPOTESE-CALIBRAR (ADR-024)
 - Lote sem piquete (`piquete_atual_id` nulo) → `LOTE_SEM_PIQUETE`: `"O lote {nome} não está em
   nenhum piquete. Informe onde ele está na página Lotes."`, com a confiança do peso do lote.
 
+- **Antes do primeiro dia de manejo:** se `data_base` **não** é dia de manejo, para cada lote
+  num piquete planejável, simule os dias até o primeiro dia de manejo. Se a altura prevista
+  ficar `<= altura_saida`, gere o alerta `SEM_DIA_DE_MANEJO` (data = `data_base`): `"O lote
+  {lote} deve ficar abaixo de {saida} cm no {piquete} antes do próximo dia de manejo ({ddd}
+  {dd/mm}). Se puder, mova antes."` Isso acontece quando o plano é recalculado no meio da
+  semana, e o sistema não pode ficar calado.
+
 **Passo 2: simular a semana**, para `i` de 0 a 6 (`d = data_base + i`):
 1. Se `d` é dia de manejo:
    - `n = (proximo_dia_de_manejo(d) − d).days`.
@@ -432,13 +462,16 @@ FRACAO_ALVO_MARGINAL = 0.9   # HIPOTESE-CALIBRAR (ADR-024)
      é candidato com `urgencia(altura_prevista, parametros)`.
    - Ordene os candidatos por urgência **decrescente**; empate → nome do lote.
    - Para cada candidato, em ordem:
-     - Se já houve `capacidade` movimentos hoje → alerta `CAPACIDADE_EXCEDIDA`: `"Não há mão
-       de obra para mover o lote {lote} {na/no} {dia por extenso} ({dd/mm}): o limite é {cap}
-       movimentação(ões) por dia. Ele continua no {origem}."`. Pule para o próximo.
+     - **Mão de obra:** se já foram movidos animais hoje **e** `movidos_hoje + n_animais(lote) >
+       capacidade_animais` → alerta `CAPACIDADE_EXCEDIDA`: `"Não há mão de obra para mover o
+       lote {lote} ({n} animais) {na/no} {dia por extenso} ({dd/mm}): o limite é {cap} animais
+       por dia. Ele continua no {origem}."`. Pule para o próximo. (Se for o **primeiro** lote do
+       dia, ele pode ser movido mesmo sendo maior que a capacidade: lote não se divide.)
      - **Escolher o destino:** entre os piquetes planejáveis, vazios, diferentes da origem e
        com `descanso_cumprido(descanso[q], descanso_min_dias)`:
-       - **aptos:** `altura(q) >= altura_entrada`. Escolha o menor
-         `(|altura(q) − entrada|, distância da origem, nome)`;
+       - **aptos:** `altura(q) >= altura_entrada`. Escolha o **mais passado do ponto**: o menor
+         `(−(altura(q) − entrada), distância da origem, nome)`. Assim, o capim que está
+         passando do ponto é pastejado primeiro (ADR-025);
        - se não houver apto, **marginais:** `altura(q) >= 0,9 × entrada`. Escolha o menor
          `(entrada − altura(q), distância da origem, nome)`;
        - se não houver nenhum → alerta `SEM_PIQUETE_APTO`: `"Nenhum piquete estará pronto
@@ -451,6 +484,12 @@ FRACAO_ALVO_MARGINAL = 0.9   # HIPOTESE-CALIBRAR (ADR-024)
        - alvos de entrada (destino) e saída (origem);
        - `motivo` = parte 1 + `" "` + parte 2;
        - `confianca`, `motivo_confianca` = `confianca_movimentacao(destino, lote)`.
+
+       Atualize também `movidos_hoje += n_animais(lote)` (zera a cada dia).
+   - **Passando do ponto** (anote, alerta sai no passo 4): no início de cada dia de manejo,
+     antes das movimentações, todo piquete planejável **vazio** com
+     `altura(q) >= 1,2 × altura_entrada` é anotado com a primeira data e altura em que isso
+     aconteceu.
 
        Atualize: `ocupante[origem] = None`, `descanso[origem] = 0`,
        `ocupante[destino] = lote`, `posicao[lote] = destino`.
@@ -465,6 +504,10 @@ FRACAO_ALVO_MARGINAL = 0.9   # HIPOTESE-CALIBRAR (ADR-024)
   consumo))`. Se der infinito (o capim cresce mais do que o lote come), use 7.
 
 **Passo 4: montar o plano.**
+- **Alerta `PASSANDO_DO_PONTO`:** para cada piquete anotado que **não** é destino de nenhuma
+  movimentação do plano: `"O {piquete} vai passar do ponto: {h} cm {na/no} {dia} ({dd/mm}),
+  acima de {1,2×entrada} cm (entrada: {entrada} cm). Considere adiantar a entrada de um
+  lote."`, com a confiança e o motivo do próprio piquete.
 - `movimentacoes` ordenadas por `(data, lote_nome)`; `alertas` por `(data, tipo.value,
   texto)`; `pedidos_validacao` por nome do piquete.
 - `piquetes`: um `ResumoPiquete` por piquete, na ordem do estado, com `altura_hoje_cm`, alvos de
@@ -488,7 +531,11 @@ FRACAO_ALVO_MARGINAL = 0.9   # HIPOTESE-CALIBRAR (ADR-024)
       seção 4, `plano_para_dict(gerar_plano(...))` é **igual** a `plano_exemplo.json`.
 - [ ] **Determinismo:** duas chamadas iguais → planos iguais.
 - [ ] **Dia não preferencial:** nenhuma movimentação fora dos dias preferenciais.
-- [ ] **Mão de obra saturada:** com capacidade 1 e 2 lotes urgentes no mesmo dia → 1
+- [ ] **Lote maior que a capacidade:** lote de 150 animais, capacidade 100, sozinho no dia →
+      é movido.
+- [ ] **Passando do ponto:** piquete vazio a 40 cm (entrada 30) que ninguém recebe →
+      alerta `PASSANDO_DO_PONTO`.
+- [ ] **Mão de obra saturada:** com capacidade de 100 animais e 2 lotes urgentes de 80 no mesmo dia → 1
       movimentação (o mais urgente) + 1 `CAPACIDADE_EXCEDIDA`.
 - [ ] **Resíduo:** nenhum lote é mandado para piquete abaixo de 90% da entrada.
 - [ ] **Sem piquete apto:** gera `SEM_PIQUETE_APTO` e o lote fica.
@@ -499,41 +546,93 @@ FRACAO_ALVO_MARGINAL = 0.9   # HIPOTESE-CALIBRAR (ADR-024)
 busca local; lookahead de "esperar dois dias"; regra de 1–3 dias de ocupação (ADR-024);
 qualquer I/O neste arquivo.
 
-### J4: Gravar e ler o plano (`persistencia/planos.py`)
+### J4: Gravar e ler o plano, com status (`persistencia/planos.py`)
 
-**Por quê:** o plano precisa ficar guardado. O site mostra o "plano atual", e o bot precisa
-saber quais movimentações o produtor está confirmando. Cada movimentação também vira evento
-`manejo_recomendado`, que é o que permite, depois, comparar o que o sistema mandou com o que o
-produtor fez.
+**Por quê:** o plano precisa ficar guardado. O site mostra o plano em vigor, e o bot precisa
+saber quais movimentações o produtor está respondendo. Existe também o **plano candidato**:
+quando chegam imagens novas no meio da semana e o plano muda, o produtor escolhe se troca ou
+não (ADR-025). Por isso cada plano tem um `status`:
+
+| `status` | Significado |
+|---|---|
+| `vigente` | O plano que o produtor está seguindo (só **um** por fazenda) |
+| `candidato` | Plano novo oferecido ao produtor, ainda sem resposta (no máximo um) |
+| `substituido` | Foi vigente e deixou de ser |
+| `descartado` | Candidato recusado ou vencido por outro |
 
 **Como:**
 ```python
-def salvar_plano(conn, plano: PlanoManejo) -> None
-def carregar_plano_atual(conn, fazenda_id: UUID) -> PlanoManejo | None
-def carregar_plano(conn, plano_id: UUID) -> PlanoManejo | None
+def salvar_plano(conn, plano: PlanoManejo, status: str = "vigente") -> None
+def promover_candidato(conn, plano_id: UUID) -> PlanoManejo
+def descartar_plano(conn, plano_id: UUID) -> None
+def carregar_plano_atual(conn, fazenda_id: UUID) -> PlanoManejo | None      # o vigente
+def carregar_candidato(conn, fazenda_id: UUID) -> PlanoManejo | None
+def carregar_plano(conn, plano_id: UUID) -> PlanoManejo | None               # qualquer status
+def status_do_plano(conn, plano_id: UUID) -> str | None
+def ids_respondidos(conn, fazenda_id: UUID) -> frozenset[UUID]
 ```
-1. `salvar_plano`:
-   - `INSERT INTO plano (id, fazenda_id, gerado_em, data_inicio, horizonte_dias, payload)`,
-     com `payload = Json(plano_para_dict(plano))` (`from psycopg.types.json import Json`);
-   - depois, para cada movimentação, `registrar_evento(conn, plano.fazenda_id,
-     TipoEvento.MANEJO_RECOMENDADO, OrigemEvento.SISTEMA, ocorrido_em=plano.data_geracao,
-     payload=…, ator="planner", chave_idempotencia=f"recomendacao:{plano.id}:{mov.id}")`,
-     com o payload
-     `{"entidade_id": mov.id, "lote_id", "piquete_origem_id", "piquete_destino_id",
-     "data_prevista": mov.data, "dias_previstos", "motivo", "confianca", "motivo_confianca"}`
-     (UUIDs e datas como string ISO, confiança como `.value`);
-   - **sem commit**: quem chama (o ciclo do Leandro) faz o commit.
-2. `carregar_plano_atual`: `SELECT payload FROM plano WHERE fazenda_id = %s ORDER BY gerado_em
-   DESC LIMIT 1` → `plano_de_dict`, ou `None`.
-3. `carregar_plano`: o mesmo, por `id`.
+1. `salvar_plano(conn, plano, status)`, com `status` em `"vigente"` ou `"candidato"`:
+   - se `"vigente"`: `UPDATE plano SET status = 'substituido' WHERE fazenda_id = %s AND
+     status = 'vigente'`, depois `UPDATE … SET status = 'descartado' WHERE … status =
+     'candidato'`;
+   - se `"candidato"`: só `UPDATE … SET status = 'descartado' WHERE … status = 'candidato'`;
+   - `INSERT INTO plano (id, fazenda_id, gerado_em, data_inicio, horizonte_dias, payload,
+     status)`, com `payload = Json(plano_para_dict(plano))`
+     (`from psycopg.types.json import Json`);
+   - **só quando `"vigente"`**: para cada movimentação, `registrar_evento(conn,
+     plano.fazenda_id, TipoEvento.MANEJO_RECOMENDADO, OrigemEvento.SISTEMA,
+     ocorrido_em=datetime.now(UTC), payload=…, ator="planner",
+     chave_idempotencia=f"recomendacao:{plano.id}:{mov.id}")` (payload na seção "Entradas e
+     saídas"). Candidato não gera evento: ele ainda não foi recomendado ao produtor.
+2. `promover_candidato(conn, plano_id)`: confere que o status é `candidato` (senão
+   `ValueError`), marca o vigente atual como `substituido`, marca este como `vigente`,
+   registra os eventos `manejo_recomendado` dele (como no item 1) e devolve o plano.
+3. `descartar_plano(conn, plano_id)`: `UPDATE … SET status = 'descartado' WHERE id = %s AND
+   status = 'candidato'`.
+4. `carregar_plano_atual`: o mais recente com `status = 'vigente'`. `carregar_candidato`: o mais
+   recente com `status = 'candidato'`. `carregar_plano`: por id, qualquer status.
+   `status_do_plano`: o status ou `None`.
+5. `ids_respondidos(conn, fazenda_id)`: os `entidade_id` de todos os eventos
+   `manejo_confirmado`, `manejo_recusado` e `manejo_divergente` da fazenda, ou seja, as
+   movimentações que o produtor já respondeu.
+6. **Nenhuma função faz commit**: quem chama faz.
 
 **Critérios de aceite:**
 - [ ] Salvar e carregar devolve um plano igual ao original.
-- [ ] Salvar o mesmo plano duas vezes não duplica eventos (o `INSERT` do plano falha na
-      segunda vez; isso é esperado).
+- [ ] Depois de salvar um vigente novo, só existe um `vigente` por fazenda.
+- [ ] Candidato não gera evento; `promover_candidato` gera.
 - [ ] Testes com banco pulam se `SEUGADO_TEST_DATABASE_URL` não existir.
 
-**Fora do escopo:** apagar ou editar plano; histórico paginado.
+**Fora do escopo:** apagar plano; histórico paginado.
+
+### J4b: Comparar o plano em vigor com um plano novo (`planner/comparacao.py`)
+
+**Por quê:** o sistema recalcula todo dia com as imagens novas do satélite, mas o produtor pode
+já ter se organizado com o plano que recebeu. Só vale incomodar se o plano novo muda algo que
+ele **ainda não respondeu**. Esta função diz exatamente o que mudou, lote por lote, e o Leo
+mostra isso no bot.
+
+**Como:**
+```python
+def comparar_planos(anterior: PlanoManejo, novo: PlanoManejo,
+                    respondidas: frozenset[UUID], hoje: date) -> tuple[DiferencaLote, ...]
+```
+1. Para cada lote que aparece em qualquer um dos dois planos:
+   - `antes` = `PassoPlano(mov.data, mov.piquete_destino_nome)` das movimentações do
+     **anterior** daquele lote com `mov.data >= hoje` e `mov.id` **não** em `respondidas`, em
+     ordem de data;
+   - `depois` = o mesmo a partir do **novo** (sem filtro de respondidas).
+2. Se `antes != depois`, entra um `DiferencaLote(lote_id, lote_nome, antes, depois)`.
+3. Devolva em ordem de `lote_nome`. Vazio = nada relevante mudou.
+
+`PassoPlano` e `DiferencaLote` já existem em `seugado.contratos`.
+
+**Critérios de aceite:**
+- [ ] Planos iguais → vazio.
+- [ ] Mudança só numa movimentação já respondida → vazio.
+- [ ] Destino diferente na quinta para o lote Recria → um `DiferencaLote` com `antes` e
+      `depois`.
+- [ ] Função pura, sem banco.
 
 ### J5: Testes e PR
 
@@ -547,19 +646,20 @@ def carregar_plano(conn, plano_id: UUID) -> PlanoManejo | None
 
 ## 6. Quem usa o seu código
 
-- **Leandro**, no ciclo semanal:
-  ```python
-  plano = gerar_plano(estado, fazenda, datetime.now(UTC), uuid4())
-  salvar_plano(conn, plano)
-  conn.commit()
-  ```
-  E também `carregar_plano_atual` para a página do plano.
-- **Leo** lê as movimentações pelo `id` para os botões "Fiz / Não fiz / Fiz diferente" e usa
-  `carregar_plano_atual` e `carregar_plano`.
+- **Leandro**, na rotina (`jobs/ciclo.py`):
+  - entrega semanal e recálculo: `gerar_plano` → `salvar_plano(conn, plano, "vigente")`;
+  - rotina diária: `gerar_plano` → `comparar_planos(vigente, novo, ids_respondidos(...), hoje)`
+    → se houver diferença, `salvar_plano(conn, novo, "candidato")`;
+  - página web: `carregar_plano_atual`.
+- **Leo**:
+  - `carregar_plano_atual` para os botões "Fiz / Não fiz / Fiz diferente";
+  - `carregar_candidato`, `comparar_planos`, `promover_candidato` e `descartar_plano` para a
+    pergunta "quer ver as mudanças?";
+  - `ids_respondidos` para não perguntar duas vezes.
 - **Ezequiel** pinta o mapa com `plano.piquetes` e desenha as setas com `plano.movimentacoes`.
 
-Por isso a saída precisa bater **exatamente** com o contrato: todo mundo desenvolve hoje em
-cima da fixture.
+Por isso a saída precisa bater **exatamente** com o contrato: todo mundo desenvolve em cima da
+fixture.
 
 ## 7. Usando IA no seu fluxo
 
@@ -577,10 +677,21 @@ vez do início, e formatar `34,0` em vez de `34`.
 
 ## 8. Glossário de conferência (números da fixture)
 
-- **Segunda 28/09:** o lote Recria (150 novilhos, 1.113,75 kg MS/dia) está no Piquete 2
-  (22 cm, 3,5 ha). Até quinta, cairia para 11,6 cm, abaixo da saída de 15 cm, então sai. O
-  Piquete 1 (31,5 cm) e o 6 (34 cm) estão aptos; o 1 está mais perto do alvo de 30 cm, e o
-  Recria, mais urgente, vai para ele. As Vacas com bezerro vão para o 6.
-- **Quinta 01/10:** os dois lotes cairiam abaixo de 15 cm até a segunda seguinte. Nenhum
-  piquete está a 30 cm, mas o 3 está a 28,6 cm (≥ 27, que é 90% de 30) e fica com o Recria,
-  que é o mais urgente. As Vacas ficam, com alerta.
+- **Segunda 28/09:**
+  - o Recria (150 novilhos, 1.113,75 kg MS/dia) está no Piquete 2 (22 cm, 3,5 ha); até quinta
+    cairia para 11,6 cm, abaixo da saída de 15 cm, e é o mais urgente;
+  - as Vacas com bezerro (140 animais) estão no Piquete 5 e cairiam para 11,7 cm;
+  - os aptos são o Piquete 6 (34 cm) e o 1 (31,5 cm). O **mais passado do ponto** é o 6, que
+    fica com o Recria; as Vacas vão para o 1;
+  - 150 + 140 = 290 animais, dentro da capacidade de 2 × 150 = 300.
+- **Quinta 01/10:**
+  - o Recria no Piquete 6 chegaria à segunda seguinte com 15,9 cm, então fica;
+  - as Vacas no 1 chegariam a 7,5 cm, então saem;
+  - nenhum piquete está a 30 cm, mas o 3 está a 28,6 cm (≥ 27, que é 90% de 30) e fica com
+    elas.
+- **Dias previstos:**
+  - Recria no 6: 7 (sem nova movimentação na semana; `dias_ocupacao` ≈ 7,4);
+  - Vacas no 1: 3 (até quinta);
+  - Vacas no 3: 4.
+- **Alertas:** Piquete 8 (Mombaça, sem calibração) e Piquete 7 (contínuo acima de 35 cm).
+- **Pedido de medição:** Piquete 4 (última imagem há 18 dias).

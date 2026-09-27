@@ -25,7 +25,7 @@ mercado. (b) Só visualização de satélite — é o que a Pastu já faz, sem d
 ---
 
 ## ADR-002 — HLS como fonte óptica primária
-**Data:** 17/09/2026 · **Status:** aceita
+**Data:** 17/09/2026 · **Status:** substituída pela ADR-025 no MVP (Sentinel-2 a 10 m)
 
 **Contexto.** Landsat 8 tem 16 dias de revisita; Sentinel-2 tem ~5 dias e 10 m, mas nenhum
 tem banda termal (que se descobriu não ser necessária: o SAFER deriva T₀ pelo método
@@ -863,6 +863,80 @@ mais no pipeline sem ganho com poucas dezenas de piquetes.
 preferencial. A frequência maior ou personalizada fica para depois do MVP, como a equipe
 combinou. No MVP, só o Marandu tem todos os parâmetros; as outras cultivares aparecem como
 `aguardando_parametro`.
+
+---
+
+## ADR-025 — MVP operado pela equipe, calendário do produtor, Sentinel-2 a 10 m e ajustes do otimizador
+**Data:** 27/09/2026 · **Status:** aceita · **Reabre, de forma declarada:** ADR-002 (fonte óptica), ADR-004 (confirmação por omissão), ADR-024 §1 (ciclo fixo de segunda) e §2 (critério de destino)
+
+**Contexto.** Revisão do fluxo em 27/09 pelo usuário. Os pontos levantados:
+- o produtor não deve usar sistema nenhum além do bot;
+- a mão de obra se mede em animais, não em lotes;
+- sexo muda peso;
+- o satélite traz imagens com mais frequência que um ciclo semanal (7 passagens em 30 dias);
+- o produtor quer escolher quando recebe o plano;
+- só ele pode confirmar um manejo;
+- piquetes de 0,1–0,5 ha são comuns, e com HLS a 30 m e buffer de −15 m quase todos ficariam
+  sem pixel útil.
+
+**Decisão.**
+1. **Operação só pela equipe.** O site é painel de admin: todo usuário autenticado é admin, o
+   cadastro público do Supabase fica desligado, e há tabela `cliente` com `fazenda.cliente_id`.
+   O produtor interage **apenas** pelo bot, e cada chat do Telegram fica ligado a uma única
+   fazenda.
+2. **Mão de obra em animais:** `animais_por_funcionario_dia` substitui
+   `manejos_por_funcionario_dia`. A capacidade diária é `funcionarios × animais_por_funcionario`.
+   Um lote nunca é dividido: se sozinho excede a capacidade, pode ser movido num dia sem outra
+   movimentação.
+3. **Categorias com sexo:** bezerro, bezerra, novilho, novilha, vaca, boi, touro. O peso de
+   reserva segue a idade (tabela de UA, sem fonte por sexo), mais o touro (1,25 UA). O consumo
+   por idade segue o `05`. Raça fica pós-MVP.
+4. **Cálculo diário, entrega no calendário do produtor.** Uma rotina de hora em hora (GitHub
+   Actions):
+   - **Rotina diária (06h local):**
+     - lembrete das movimentações sem resposta;
+     - ingestão de satélite;
+     - recálculo;
+     - se houve leitura nova e o plano mudou em movimentações ainda não respondidas, o plano
+       novo é salvo como `candidato` e o bot pergunta se o produtor quer ver as mudanças. Ele
+       escolhe manter o vigente ou trocar.
+   - **Entrega semanal** no `envio_plano_dia`/`envio_plano_hora` da fazenda.
+
+   Planos passam a ter `status` (`vigente`, `candidato`, `substituido`, `descartado`).
+5. **Confirmação só pelo produtor.** Revoga a confirmação por omissão da ADR-004 e do F-013.
+   Movimentação sem resposta não muda o estado e gera lembrete diário.
+6. **Altura inicial obrigatória** no cadastro do piquete. O produtor corrige alturas pelo bot
+   (`/alturas`) e pede o recálculo.
+7. **Escopo agronômico do MVP: só Marandu em pastejo rotacionado.**
+8. **Otimizador:**
+   - entre os piquetes aptos, o destino passa a ser o **mais passado do ponto** (maior
+     `altura − entrada`), e não o mais próximo do alvo;
+   - novo alerta `passando_do_ponto` quando um piquete vazio chega a **1,2 × entrada**
+     (`HIPOTESE-CALIBRAR`) e ninguém o recebe no plano;
+   - novo alerta `sem_dia_de_manejo` quando um lote passa da saída antes do primeiro dia de
+     manejo.
+9. **Fonte óptica: Sentinel-2 L2A a 10 m** (`COPERNICUS/S2_SR_HARMONIZED`), com máscara Cloud
+   Score+ (`cs_cdf ≥ 0,60`), buffer de −5 m (`HIPOTESE-CALIBRAR`) e mínimo de 3 pixels limpos.
+   É o mesmo satélite que já alimentava o `HLSS30`, com pixel 9 vezes menor. Um piquete de
+   0,1 ha (≈ 32 × 32 m) fica com cerca de 5 pixels úteis.
+
+**Alternativas.**
+- *Manter HLS a 30 m* — inviabiliza a maioria dos piquetes reais.
+- *Confirmação por omissão* — contraria a decisão de produto; estado errado silencioso é pior
+  que estado atrasado com lembrete.
+- *Recalcular e reenviar o plano toda vez* — desrespeita quem já se organizou; por isso o
+  candidato com escolha.
+- *Puxar lote antes da hora para pastejar capim passando do ponto* — exige lookahead ou função
+  objetivo (F-020/F-021); no MVP, só critério de destino e alerta.
+
+**Consequências.**
+- **Schema:** migração `0003`.
+- **Specs:** SPEC-015 (backend, modelos, auth, contratos) e SPEC-016 (painel); SPEC-013
+  reescrita para Sentinel-2.
+- **Fixtures** regeneradas; suítes de conformidade antigas ajustadas (mudança intencional).
+- A ADR-002 fica substituída para o MVP; o HLS deixa de ser usado.
+- Risco: a harmonização entre sensores deixa de importar, porque é um sensor só.
+- Custo: mais consultas ao Earth Engine (diárias), ainda dentro do uso não comercial.
 
 ---
 

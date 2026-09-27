@@ -1,18 +1,19 @@
 ---
 title: "SeuGado — Leo: o bot do Telegram"
-subtitle: "Entregar o plano no celular do produtor e registrar o que ele fez"
+subtitle: "A única interface do produtor: plano, respostas, alturas e atualizações"
 date: "27/09/2026"
 ---
 
 # Leo: o bot do Telegram
 
-**Sua parte em uma frase:** o SeuGado mora no bolso do produtor. Toda segunda o plano chega pelo
-Telegram; com um toque, ele diz se fez, se não fez ou se fez diferente; e, quando o sistema
-pede, ele manda a altura do capim medida com régua. Quando ele não faz o que foi recomendado,
-o bot pede um plano novo e manda de volta.
+**Sua parte em uma frase:** no MVP, **o bot é o SeuGado inteiro para o produtor**. Ele não usa
+site nenhum: recebe o plano da semana no dia e hora que escolheu, diz com um toque se fez, não
+fez ou fez diferente, corrige a altura dos piquetes, e decide se aceita um plano atualizado
+quando chegam imagens novas do satélite.
 
-**Você entrega:** `delivery/` (texto, canal Telegram, envio, respostas, conversa),
-`api/rotas_telegram.py` (webhook) e `scripts/telegram_polling.py` (modo de desenvolvimento).
+**Você entrega:** `delivery/` (texto, canal Telegram, envio, respostas, lembretes, plano
+candidato, conversa), `api/rotas_telegram.py` (webhook) e `scripts/telegram_polling.py` (modo de
+desenvolvimento).
 
 **Prazo:** PR aberto até domingo à noite.
 
@@ -22,24 +23,31 @@ o bot pede um plano novo e manda de volta.
 
 O gado é dividido em **lotes**, e o pasto em **piquetes**. O capim tem uma altura certa para o
 lote entrar e uma altura em que ele precisa sair. O sistema estima as alturas por satélite e
-clima, e o otimizador (João) monta o **plano da semana**. Você entrega esse plano e traz de volta
-a realidade: o que de fato aconteceu no campo. **A resposta "fiz diferente" é o dado mais
-valioso do sistema**: é onde o produtor discordou da máquina (ADR-007).
+clima todo dia, e o otimizador (João) monta o **plano da semana**. Você entrega esse plano e
+traz de volta a realidade: o que de fato aconteceu no campo. **A resposta "fiz diferente" é o
+dado mais valioso do sistema**: é onde o produtor discordou da máquina (ADR-007).
 
-Princípio de produto (ADR-004): **confirmar tem que custar um toque.** Nada de digitar frase,
-nada de formulário. Toda interação é por botão, exceto a altura, que é um número.
+Regras que valem para você (ADR-025):
+- **Só o produtor confirma.** Nada é dado como feito sem a resposta dele. Enquanto ele não
+  responde, o sistema considera que o lote **não** saiu do lugar e lembra uma vez por dia.
+- **O plano semanal** chega no dia e hora escolhidos para a fazenda (quem dispara é a rotina do
+  Leandro, que chama a sua `enviar_plano`).
+- **Plano candidato:** se no meio da semana o satélite traz dado novo e o plano muda em algo que
+  o produtor ainda não fez, você pergunta se ele quer ver as mudanças. Ele pode manter o plano
+  dele ou trocar pelo novo.
+- **Confirmar custa um toque** (ADR-004). Tudo é por botão, exceto a altura, que é um número.
 
 ### Palavras que você vai usar
 
 | Termo | O que é |
 |---|---|
-| **Plano** (`PlanoManejo`) | O resultado do otimizador para 7 dias: movimentações, alertas e pedidos de medição |
+| **Plano vigente** | O plano que o produtor está seguindo |
+| **Plano candidato** | Plano novo, oferecido ao produtor, que ele aceita ou recusa |
 | **Movimentação** | "Mover o lote X do piquete A para o B no dia D". Tem um `id` único |
-| **Fiz** | O produtor fez como recomendado → evento `manejo_confirmado` |
+| **Fiz** | Fez como recomendado → evento `manejo_confirmado` |
 | **Não fiz** | Não fez → evento `manejo_recusado` → **recalcular** |
-| **Fiz diferente** | Levou para outro piquete ou em outro dia → evento `manejo_divergente` → **recalcular** |
-| **Movimentação avulsa** | O produtor mudou um lote sem recomendação → `manejo_confirmado` com id novo → **recalcular** |
-| **Confirmação por omissão** | Se o dia passou e ele não respondeu, o sistema assume que fez (ADR-004), com confiança menor |
+| **Fiz diferente** | Levou para outro piquete ou em outro dia → `manejo_divergente` → **recalcular** |
+| **Movimentação avulsa** | Mudou um lote sem recomendação → `manejo_confirmado` com id novo → **recalcular** |
 | **Altura medida** | O produtor mede o capim com régua e manda o número → evento `altura_medida` |
 | **Evento** | Registro imutável de algo que aconteceu. Nunca se edita o passado |
 
@@ -47,32 +55,37 @@ nada de formulário. Toda interação é por botão, exceto a altura, que é um 
 
 ## Entradas e saídas: o que você recebe, de quem, e o que entrega
 
-Esta seção é o seu contrato com o resto da equipe. **Nomes, tipos e formatos são exatamente estes**; se algo aqui parecer faltar ou estar errado, fale com o Kauê antes de inventar outro formato.
+Esta seção é o seu contrato com o resto da equipe. **Nomes, tipos e formatos são exatamente
+estes**; se algo aqui parecer faltar ou estar errado, fale com o Kauê antes de inventar outro
+formato.
 
 ### Resumo
 
 | | O quê | De quem / para quem | Como chega / sai |
 |---|---|---|---|
-| **Recebe** | `PlanoManejo` para enviar | ciclo do Leandro (plano gerado pelo João) | argumento de `enviar_plano(conn, plano, atualizado)` |
-| **Recebe** | o plano atual, para achar a movimentação clicada | João | `carregar_plano_atual(conn, fazenda_id) -> PlanoManejo \| None` |
+| **Recebe** | plano para enviar | rotina do Leandro (plano gerado pelo João) | `enviar_plano(conn, plano, atualizado)` |
+| **Recebe** | plano candidato + o que mudou | rotina do Leandro | `avisar_plano_candidato(conn, plano, diferencas)` |
+| **Recebe** | pedido de lembrete diário | rotina do Leandro | `lembrar_pendentes(conn, fazenda_id, hoje)` |
 | **Recebe** | mensagens e cliques do produtor | Telegram | `POST /telegram/webhook` (JSON do Telegram, campos abaixo) |
-| **Recebe** | nomes e posições de lotes e piquetes | banco (tabelas derivadas do Kauê) | SQL em `estado_lote`, `estado_piquete`, `fazenda` |
-| **Entrega** | mensagem do plano no celular | produtor | `enviar_plano(...) -> bool` (chamada pelo Leandro) |
+| **Usa** | planos gravados | João | `carregar_plano_atual`, `carregar_candidato`, `carregar_plano`, `status_do_plano`, `promover_candidato`, `descartar_plano`, `ids_respondidos` (`persistencia/planos.py`) e `comparar_planos` (`planner/comparacao.py`) |
+| **Usa** | nomes e posições de lotes e piquetes | banco (derivadas do Kauê) | SQL em `estado_lote`, `estado_piquete`, `fazenda` |
 | **Entrega** | respostas do produtor como eventos | banco → Kauê (estado) → João (próximo plano) | `registrar_evento` + `reconstruir_projecao` + `commit` |
-| **Entrega** | confirmação por omissão | banco | `confirmar_por_omissao(conn, fazenda_id, hoje) -> int` (chamada pelo Leandro, sem commit) |
-| **Chama** | recálculo do plano | Leandro | `executar_ciclo(conn, fazenda_id, ingerir_satelite=False, atualizado=True) -> PlanoManejo` |
+| **Chama** | recálculo imediato | Leandro | `executar_ciclo(conn, fazenda_id, ingerir_satelite=False, atualizado=True) -> PlanoManejo` (já salva como vigente e envia) |
 
 ### Assinaturas exatas que outros chamam
 
 ```python
-# src/seugado/delivery/envio.py
-def enviar_plano(conn: psycopg.Connection[Any], plano: PlanoManejo,
-                 atualizado: bool = False, canal: Canal | None = None) -> bool: ...
+# src/seugado/delivery/envio.py   (conn: psycopg.Connection[Any])
+def enviar_plano(conn, plano: PlanoManejo, atualizado: bool = False,
+                 canal: Canal | None = None) -> bool: ...
     # True = enviou; False = fazenda sem Telegram vinculado (não é erro)
+def avisar_plano_candidato(conn, plano: PlanoManejo, diferencas: tuple[DiferencaLote, ...],
+                           canal: Canal | None = None) -> bool: ...
 
 # src/seugado/delivery/confirmacao.py
-def confirmar_por_omissao(conn: psycopg.Connection[Any], fazenda_id: UUID, hoje: date) -> int: ...
-    # quantas movimentações foram confirmadas por omissão; NÃO faz commit
+def lembrar_pendentes(conn, fazenda_id: UUID, hoje: date,
+                      canal: Canal | None = None) -> int: ...
+    # quantas movimentações pendentes foram lembradas; NÃO faz commit
 
 # src/seugado/api/rotas_telegram.py
 # POST /telegram/webhook
@@ -90,10 +103,20 @@ def confirmar_por_omissao(conn: psycopg.Connection[Any], fazenda_id: UUID, hoje:
 {"update_id": 2, "callback_query": {"id": "4382...", "data": "f:33333333-3333-4333-8333-000000000001",
   "message": {"message_id": 11, "chat": {"id": 123456789}}}}
 ```
-- `chat.id` é `int` (guarde em `fazenda.telegram_chat_id`).
+- `chat.id` é `int` (guarde em `fazenda.telegram_chat_id`; um chat só pode estar numa fazenda).
 - `callback_query.id` vai para `responder_clique`.
-- `callback_query.data` é o texto do botão, com no máximo 64 bytes, nos formatos `m:`, `f:`, `n:`,
-  `d:`, `a:` e `o:` da tarefa T5.
+- `callback_query.data` é o texto do botão, com no máximo 64 bytes (formatos na T6).
+
+### `DiferencaLote`: o que mudou entre o plano vigente e o candidato (`seugado.contratos`)
+
+| Campo | Tipo | Significado |
+|---|---|---|
+| `lote_id`, `lote_nome` | `UUID`, `str` | Lote afetado |
+| `antes` | `tuple[PassoPlano, ...]` | Movimentações pendentes do lote no plano vigente |
+| `depois` | `tuple[PassoPlano, ...]` | Movimentações do lote no plano novo |
+
+`PassoPlano` = `data: date`, `piquete_destino_nome: str`. Uma tupla vazia quer dizer "nenhuma
+movimentação".
 
 ### Formatos
 
@@ -136,7 +159,7 @@ TypeScript em `frontend/src/lib/tipos.ts`. Exemplo completo: `tests/fixtures/pla
 
 | Campo | Tipo | Em JSON | Significado |
 |---|---|---|---|
-| `tipo` | `TipoAlerta` | um de: `sem_piquete_apto`, `capacidade_excedida`, `aguardando_parametro`, `estimativa_indisponivel`, `continuo_acima_maxima`, `continuo_abaixo_minima`, `lote_sem_piquete`, `sem_dia_de_manejo` | Tipo do aviso |
+| `tipo` | `TipoAlerta` | um de: `sem_piquete_apto`, `capacidade_excedida`, `aguardando_parametro`, `estimativa_indisponivel`, `continuo_acima_maxima`, `continuo_abaixo_minima`, `lote_sem_piquete`, `sem_dia_de_manejo`, `passando_do_ponto` | Tipo do aviso |
 | `data` | `date` | `"2026-10-01"` | Dia a que se refere |
 | `texto` | `str` | texto | Frase pronta para o produtor |
 | `confianca` / `motivo_confianca` | `Confianca` / `str` | texto | Como na movimentação |
@@ -172,26 +195,33 @@ ADR-022). Sem dependência nova.
 - `src/seugado/delivery/mensagem.py`: textos (funções puras)
 - `src/seugado/delivery/canais/base.py`: interface `Canal`
 - `src/seugado/delivery/canais/telegram.py`: implementação Telegram
-- `src/seugado/delivery/envio.py`: `enviar_plano`
-- `src/seugado/delivery/confirmacao.py`: registro das respostas + confirmação por omissão
+- `src/seugado/delivery/envio.py`: `enviar_plano`, `avisar_plano_candidato`
+- `src/seugado/delivery/confirmacao.py`: registro das respostas e lembretes
 - `src/seugado/delivery/bot.py`: a conversa (quem clicou em quê)
 - `src/seugado/api/rotas_telegram.py`: webhook (já existe, vazio)
 - `scripts/telegram_polling.py`
 - `tests/delivery/*`
 
-**Você usa, mas não edita:** `contratos.py` (`PlanoManejo`, `Movimentacao`…),
-`persistencia/eventos.py` (`registrar_evento`), `persistencia/projecao_db.py`
-(`reconstruir_projecao`), `persistencia/planos.py` (`carregar_plano_atual`, do João),
-`jobs/ciclo.py` (`executar_ciclo`, do Leandro), `api/deps.py`.
+**Você usa, mas não edita:** `contratos.py`, `persistencia/eventos.py`,
+`persistencia/projecao_db.py`, `persistencia/planos.py` e `planner/comparacao.py` (do João),
+`jobs/ciclo.py` (do Leandro), `api/deps.py`.
+
+**Módulos que ainda não estão na sua branch.** `executar_ciclo` (Leandro) e as funções de plano
+do João só chegam na `main` na integração de segunda. **Importe-os dentro das funções que os
+usam**, não no topo do arquivo, e nos testes injete módulos falsos com
+`monkeypatch.setitem(sys.modules, "seugado.jobs.ciclo", modulo_falso)` (idem para
+`seugado.persistencia.planos` e `seugado.planner.comparacao`). Para desenvolver com dados, use
+`tests/fixtures/plano_exemplo.json` com `plano_de_dict`.
 
 A interface `Canal` existe porque o WhatsApp vem depois (ADR-006): trocar de canal deve ser só
-escrever um novo adaptador, sem tocar no resto.
+escrever um novo adaptador.
 
 ---
 
 ## 3. Preparar o ambiente
 
-> **Importante:** o Python não lê o `.env` sozinho. Todo comando `uv run` local leva `--env-file .env` (como nos exemplos abaixo); sem isso a API responde erro 500 e os testes de banco são pulados.
+> **Importante:** o Python não lê o `.env` sozinho. Todo comando `uv run` local leva
+> `--env-file .env`; sem isso os testes de banco são pulados.
 
 1. Instale Git e **uv** (docs.astral.sh/uv). Clone e crie a branch `feat/leo-telegram`.
    `uv sync --group dev`.
@@ -199,43 +229,24 @@ escrever um novo adaptador, sem tocar no resto.
    - `SeuGado` (produção; o webhook vai apontar para o Render);
    - `SeuGado Dev` (o seu, para testar local com polling).
 
-   Não dá para usar webhook e polling no mesmo bot ao mesmo tempo. Guarde os dois tokens.
+   Não dá para usar webhook e polling no mesmo bot ao mesmo tempo.
 3. No BotFather, `/setcommands` nos dois bots:
-   `plano - Ver o plano da semana` · `mover - Registrar que mudei um lote de piquete` ·
-   `ajuda - Como usar`.
+   `plano - Ver o plano da semana` · `alturas - Ver e corrigir a altura dos piquetes` ·
+   `mover - Registrar que mudei um lote de piquete` · `ajuda - Como usar`.
 4. `.env` (a partir do `.env.example`): `DATABASE_URL` (o Kauê manda em privado),
-   `TELEGRAM_BOT_TOKEN` e `TELEGRAM_BOT_USERNAME` (do bot **Dev**, localmente) e
-   `TELEGRAM_WEBHOOK_SECRET` (qualquer texto aleatório longo). Mande os dados do bot de
-   **produção** ao Leandro, em privado, para o deploy.
+   `TELEGRAM_BOT_TOKEN` e `TELEGRAM_BOT_USERNAME` (do bot **Dev**, localmente),
+   `TELEGRAM_WEBHOOK_SECRET` (texto aleatório longo). Mande os dados do bot de **produção** ao
+   Leandro, em privado, para o deploy.
 5. Rode local com polling: `uv run --env-file .env python scripts/telegram_polling.py`.
 
 **Antes do PR:** `uv run ruff check .`, `uv run mypy` e `uv run --env-file .env pytest` sem erro.
 
 ---
 
-## 4. O que chega até você: o `PlanoManejo`
+## 4. A regra de gravação do projeto
 
-Exemplo completo em `tests/fixtures/plano_exemplo.json`. Carregue com
-`plano_de_dict(json.load(...))` e desenvolva tudo em cima dele. Campos que você usa:
-
-```python
-plano.id, plano.fazenda_id, plano.data_inicio, plano.horizonte_dias
-plano.movimentacoes: tuple[Movimentacao, ...]
-  mov.id, mov.data, mov.lote_id, mov.lote_nome,
-  mov.piquete_origem_id, mov.piquete_origem_nome,
-  mov.piquete_destino_id, mov.piquete_destino_nome,
-  mov.altura_destino_cm, mov.altura_entrada_alvo_cm, mov.dias_previstos,
-  mov.motivo (frase pronta), mov.confianca ("alta"/"media"/"baixa"), mov.motivo_confianca
-plano.alertas: tuple[Alerta, ...]            # alerta.texto é frase pronta
-plano.pedidos_validacao: tuple[PedidoValidacao, ...]   # piquete_id, piquete_nome, motivo
-```
-
----
-
-## 5. A regra de gravação do projeto
-
-Toda resposta do produtor vira **evento**, sempre com `ocorrido_em = datetime.now(UTC)` (a
-data real do fato vai **dentro** do payload), seguido de `reconstruir_projecao` e `commit`:
+Toda resposta do produtor vira **evento**, sempre com `ocorrido_em = datetime.now(UTC)` (a data
+real vai **dentro** do payload), seguido de `reconstruir_projecao` e `commit`:
 
 ```python
 registrar_evento(conn, fazenda_id, TipoEvento.MANEJO_CONFIRMADO, OrigemEvento.PRODUTOR,
@@ -256,7 +267,7 @@ conn.commit()
 # Fiz diferente → manejo_divergente
 {"entidade_id": mov.id, "lote_id": mov.lote_id, "piquete_real_id": "<uuid>",
  "data_execucao": "2026-09-29", "observacao": None}
-# Movimentação avulsa → manejo_confirmado com entidade_id NOVO (uuid4), sem chave de idempotência
+# Movimentação avulsa → manejo_confirmado com entidade_id NOVO (uuid4), sem chave
 {"entidade_id": "<uuid4>", "lote_id": "<uuid>", "piquete_destino_id": "<uuid>",
  "data_execucao": "2026-09-29"}
 # Altura medida pelo bot → altura_medida
@@ -264,50 +275,21 @@ conn.commit()
  "altura_cm": 35.0, "meio": "bot"}
 ```
 
-**`chave_idempotencia = f"resposta:{mov.id}"`** em Fiz, Não fiz, Fiz diferente e na omissão:
-garante **uma resposta por movimentação**, mesmo que o produtor toque duas vezes.
+**`chave_idempotencia = f"resposta:{mov.id}"`** em Fiz, Não fiz e Fiz diferente: garante **uma
+resposta por movimentação**, mesmo com dois toques.
 
 **Tabelas que você lê ou escreve:**
 
 | Tabela | Uso |
 |---|---|
 | `fazenda` | `id, nome, timezone, telegram_chat_id, codigo_vinculo_telegram`. Você faz `UPDATE fazenda SET telegram_chat_id` no `/start` |
-| `estado_lote` (derivada) | `lote_id, nome, piquete_atual_id` (lista de lotes no /mover; conferência da omissão) |
-| `estado_piquete` (derivada) | `piquete_id, nome, ativo, lote_atual_id` (lista de piquetes) |
-| `evento` | só leitura, para saber se uma movimentação já foi respondida: `SELECT tipo FROM evento WHERE fazenda_id = %s AND entidade_id = %s AND tipo IN ('manejo_confirmado','manejo_recusado','manejo_divergente')` |
-| `telegram_conversa` | `chat_id (PK), estado, dados (jsonb), atualizado_em`. Guarda em que passo da conversa o produtor está |
+| `estado_lote` (derivada) | `lote_id, nome, piquete_atual_id` |
+| `estado_piquete` (derivada) | `piquete_id, nome, ativo, lote_atual_id` |
+| `telegram_conversa` | `chat_id (PK), estado, dados (jsonb), atualizado_em`: em que passo da conversa o produtor está |
 
 ---
 
-## 6. Contratos da sua parte (outros chamam)
-
-```python
-# delivery/envio.py (o ciclo do Leandro chama)
-def enviar_plano(conn, plano: PlanoManejo, atualizado: bool = False) -> bool
-    # False se a fazenda não tem Telegram vinculado; True se enviou
-
-# delivery/confirmacao.py (o ciclo do Leandro chama ANTES de gerar o plano)
-def confirmar_por_omissao(conn, fazenda_id: UUID, hoje: date) -> int
-    # quantas movimentações foram confirmadas por omissão; NÃO faz commit
-```
-
-E você chama o ciclo do Leandro para recalcular:
-```python
-from seugado.jobs.ciclo import executar_ciclo
-executar_ciclo(conn, fazenda_id, ingerir_satelite=False, atualizado=True)
-# gera um plano novo, salva e manda com o cabeçalho "Plano atualizado"
-```
-
----
-
-## 7. Tarefas (na ordem)
-
-**Módulos que ainda não estão na sua branch.** `executar_ciclo` (Leandro) e
-`carregar_plano_atual` (João) só chegam na `main` na integração de segunda. **Importe-os dentro
-das funções que os usam**, não no topo do arquivo, e nos testes injete módulos falsos com
-`monkeypatch.setitem(sys.modules, "seugado.jobs.ciclo", modulo_falso)` (idem para
-`seugado.persistencia.planos`). Para desenvolver com dados, carregue o plano de
-`tests/fixtures/plano_exemplo.json` com `plano_de_dict`.
+## 5. Tarefas (na ordem)
 
 ### T1: Interface e canal Telegram (`canais/base.py`, `canais/telegram.py`)
 
@@ -326,25 +308,24 @@ class Canal(Protocol):
     def responder_clique(self, id_clique: str, texto: str | None = None) -> None: ...
 ```
 `CanalTelegram(token)`:
-- `enviar_texto` → `POST https://api.telegram.org/bot<token>/sendMessage`, com
-  `{"chat_id", "text", "parse_mode": "HTML", "reply_markup": {"inline_keyboard":
-  [[{"text", "callback_data"}]]}}` (sem `reply_markup` quando não há botões). Use
+- `enviar_texto` → `POST https://api.telegram.org/bot<token>/sendMessage`, com `{"chat_id",
+  "text", "parse_mode": "HTML", "reply_markup": {"inline_keyboard": [[{"text",
+  "callback_data"}]]}}` (sem `reply_markup` quando não há botões). Use
   `httpx.post(..., timeout=15)` e `raise_for_status()`.
-- `responder_clique` → `answerCallbackQuery` com `callback_query_id` (e `text` opcional).
-- `canal_padrao() -> CanalTelegram` lê `TELEGRAM_BOT_TOKEN` do ambiente.
-- Nome de piquete ou lote dentro de texto HTML passa por `html.escape`.
-- Rejeite `Botao.dados` com mais de 64 bytes (`ValueError`).
+- `responder_clique` → `answerCallbackQuery`.
+- `canal_padrao()` lê `TELEGRAM_BOT_TOKEN`.
+- Nomes dentro de texto HTML passam por `html.escape`.
+- `Botao.dados` com mais de 64 bytes → `ValueError`.
 
 **Critérios de aceite:**
 - [ ] Testes com `httpx.post` falso conferem URL, corpo e teclado.
 - [ ] Nenhum teste chama o Telegram de verdade.
 
-**Fora do escopo:** fotos, áudio, localização, grupos.
-
 ### T2: Textos (`mensagem.py`, puro)
 
-**Por quê:** é o que o produtor lê. Regras do `07` §6: **sempre o motivo junto da ordem**,
-números em **cm** (nunca kg, NDVI ou termos técnicos) e **um plano por mensagem**.
+**Por quê:** é o que o produtor lê, e é a única coisa que ele vê do SeuGado. Regras: **sempre o
+motivo junto da ordem**, números em **cm** (nunca kg, NDVI ou termos técnicos), **um plano por
+mensagem**.
 
 **Como:**
 ```python
@@ -352,146 +333,189 @@ def texto_plano(plano: PlanoManejo, fazenda_nome: str, atualizado: bool = False)
 def botoes_plano(plano: PlanoManejo) -> list[list[Botao]]
 def texto_movimentacao(mov: Movimentacao) -> str
 def botoes_movimentacao(mov: Movimentacao) -> list[list[Botao]]
+def texto_alturas(plano: PlanoManejo) -> str
+def botoes_alturas(plano: PlanoManejo) -> list[list[Botao]]
+def texto_diferencas(diferencas: Sequence[DiferencaLote]) -> str
+def texto_lembrete(pendentes: Sequence[Movimentacao]) -> str
 ```
-Formato de `texto_plano` para `plano_exemplo.json` (é a referência; os seus testes devem conferir
-estas linhas):
+Formato de `texto_plano` para `plano_exemplo.json` (é a referência; seus testes conferem estas
+linhas):
 ```
 🌱 <b>SeuGado — Fazenda Exemplo</b>
 Plano da semana: seg 28/09 a dom 04/10
 
 📅 <b>Segunda, 28/09</b>
-▸ <b>Mover Recria: Piquete 2 → Piquete 1</b>
-O Piquete 2 chegaria a 11,6 cm antes do próximo dia de manejo (qui 01/10), abaixo da saída de 15 cm. O Piquete 1 está em 31,5 cm (ponto de entrada: 30 cm).
-Previsão: 3 dias no piquete · Confiança: média
+▸ <b>Mover Recria: Piquete 2 → Piquete 6</b>
+O Piquete 2 chegaria a 11,6 cm antes do próximo dia de manejo (qui 01/10), abaixo da saída de 15 cm. O Piquete 6 está em 34 cm (ponto de entrada: 30 cm).
+Previsão: 7 dias no piquete · Confiança: média
 <i>(a altura de entrada do Marandu no pastejo rotacionado vem de fonte com confiança média)</i>
 
-▸ <b>Mover Vacas com bezerro: Piquete 5 → Piquete 6</b>
+▸ <b>Mover Vacas com bezerro: Piquete 5 → Piquete 1</b>
 …
 
 📅 <b>Quinta, 01/10</b>
-▸ <b>Mover Recria: Piquete 1 → Piquete 3</b>
+▸ <b>Mover Vacas com bezerro: Piquete 1 → Piquete 3</b>
 …
 
 ⚠️ <b>Avisos</b>
 • O Piquete 8 (Mombaça) ainda não recebe recomendação: …
 • O Piquete 7 (pastejo contínuo) está em 38 cm, …
-• Nenhum piquete estará pronto para o lote Vacas com bezerro na quinta (01/10). …
 
 📏 <b>Medições pedidas</b>
 • Piquete 4: última imagem de satélite sem nuvem há 18 dias. Meça a altura com uma régua.
 
-Toque abaixo para dizer o que você fez ou mandar uma medição.
+Toque abaixo para dizer o que você fez, conferir as alturas ou mandar uma medição.
 ```
-- Com `atualizado=True`, a primeira linha vira `🔄 <b>Plano atualizado — {fazenda}</b>`.
-- Plano sem movimentações: `"Nenhuma movimentação necessária nesta semana."` no lugar dos dias.
+- `atualizado=True` → primeira linha `🔄 <b>Plano atualizado — {fazenda}</b>`.
+- Sem movimentações → `"Nenhuma movimentação necessária nesta semana."`.
 - Seções sem itens não aparecem.
-- Limite do Telegram: 4.096 caracteres. Se passar, corte os avisos e termine com
-  `"… veja o plano completo no site."`
-- Dia por extenso: `Segunda … Domingo`; abreviado: `seg ter qua qui sex sáb dom`.
-- Confiança: `alta` / `média` / `baixa`.
+- Limite de 4.096 caracteres: corte os avisos e termine com `"… (mais avisos omitidos)"`.
+- Dia por extenso `Segunda … Domingo`; abreviado `seg ter qua qui sex sáb dom`; confiança
+  `alta` / `média` / `baixa`.
 
-`botoes_plano`:
-- uma linha por movimentação: texto `"{n}. {ddd dd/mm} · {lote} → {destino}"`, dados
-  `"m:{mov.id}"`;
-- uma linha por pedido: texto `"📏 Informar altura do {piquete}"`, dados
-  `"a:{piquete_id}"`.
+`botoes_plano`, uma linha por botão:
+- por movimentação: `"{n}. {ddd dd/mm} · {lote} → {destino}"`, dados `"m:{mov.id}"`;
+- por pedido de medição: `"📏 Informar altura do {piquete}"`, dados `"a:{piquete_id}"`;
+- no fim: `"📏 Conferir alturas dos piquetes"`, dados `"h:"`.
 
-`botoes_movimentacao`: uma linha com `✅ Fiz` (`"f:{id}"`), `❌ Não fiz` (`"n:{id}"`) e
-`🔄 Fiz diferente` (`"d:{id}"`).
+`botoes_movimentacao`: `✅ Fiz` (`"f:{id}"`), `❌ Não fiz` (`"n:{id}"`), `🔄 Fiz diferente`
+(`"d:{id}"`).
+
+`texto_alturas`: uma linha por piquete do `plano.piquetes`:
+- `"• Piquete 1: ~31,5 cm (confiança alta)"`;
+- `altura_hoje_cm` nulo → `"• Piquete 8: sem estimativa"`.
+
+Termina com *"Se alguma estiver diferente do que você vê no pasto, toque no piquete e mande a
+altura medida com régua. Quando terminar, toque em Refazer o plano."* `botoes_alturas`: um botão
+por piquete, `"Corrigir {piquete}"` → `"a:{piquete_id}"`, e no fim
+`"✅ Terminei — refazer o plano"` → `"r:"`.
+
+`texto_diferencas`, por lote:
+```
+▸ <b>Recria</b>
+  antes: qui 01/10 → Piquete 3
+  agora: qui 01/10 → Piquete 4
+```
+Lista vazia → `antes: nenhuma movimentação` (ou `agora: …`).
+
+`texto_lembrete`: *"Você ainda não me disse se fez estas movimentações:"* + uma linha por
+movimentação (`"• seg 28/09 · Recria → Piquete 6"`). Os botões são os `"m:{id}"`.
 
 **Critérios de aceite:**
 - [ ] `texto_plano(plano_exemplo, "Fazenda Exemplo")` reproduz as linhas acima.
 - [ ] Nenhum texto contém "NDVI", "kg" ou "MS".
 - [ ] Todos os `dados` de botão com ≤ 64 bytes.
 
-**Fora do escopo:** emojis por tipo de alerta além dos acima; tradução.
-
 ### T3: Envio (`envio.py`)
 
-**Por quê:** é a porta que o ciclo semanal usa.
+**Por quê:** é a porta que a rotina do Leandro usa.
 
-**Como:** `enviar_plano(conn, plano, atualizado=False)`:
-1. `SELECT nome, telegram_chat_id FROM fazenda WHERE id = %s`. Se `telegram_chat_id` for nulo,
-   devolva `False` (sem erro: a fazenda ainda não vinculou).
-2. `canal_padrao().enviar_texto(chat_id, texto_plano(...), botoes_plano(plano))` e devolva
-   `True`.
-
-Aceite um `canal: Canal | None = None` opcional como último parâmetro, para os testes.
+**Como:**
+1. `enviar_plano(conn, plano, atualizado=False, canal=None)`:
+   - `SELECT nome, telegram_chat_id FROM fazenda WHERE id = %s`; sem chat → `False`;
+   - senão, `canal.enviar_texto(chat_id, texto_plano(...), botoes_plano(plano))` → `True`.
+2. `avisar_plano_candidato(conn, plano, diferencas, canal=None)`: sem chat → `False`. Senão,
+   manda *"🛰️ Chegaram imagens novas do satélite e o plano da semana mudou para {n} lote(s).
+   Você pode manter o seu plano ou ver as mudanças."*, com os botões
+   `👀 Ver mudanças` (`"pv:{plano.id}"`) e `👍 Manter meu plano` (`"pk:{plano.id}"`).
 
 **Critérios de aceite:**
 - [ ] Sem chat vinculado → `False`, sem chamada HTTP.
 
-### T4: Respostas e omissão (`confirmacao.py`)
+### T4: Respostas e lembretes (`confirmacao.py`)
 
-**Por quê:** é o que fecha o ciclo (F-013). Sem saber o que o produtor fez, o próximo plano parte
-de uma fazenda que não existe.
+**Por quê:** é o que fecha o ciclo. Sem saber o que o produtor fez, o próximo plano parte de uma
+fazenda que não existe. E **só ele confirma**: por isso o lembrete.
 
 **Como:**
 ```python
-def resposta_existente(conn, fazenda_id: UUID, mov_id: UUID) -> str | None   # tipo do evento ou None
+def resposta_existente(conn, fazenda_id: UUID, mov_id: UUID) -> str | None
 def registrar_fiz(conn, fazenda_id, mov: Movimentacao, hoje: date, ator: str) -> None
 def registrar_nao_fiz(conn, fazenda_id, mov: Movimentacao, ator: str) -> None
 def registrar_diferente(conn, fazenda_id, mov: Movimentacao, piquete_real_id: UUID, data_execucao: date, ator: str) -> None
 def registrar_avulsa(conn, fazenda_id, lote_id: UUID, piquete_id: UUID, data_execucao: date, ator: str) -> None
 def registrar_altura(conn, fazenda_id, piquete_id: UUID, altura_cm: float, hoje: date, ator: str) -> None
-def confirmar_por_omissao(conn, fazenda_id: UUID, hoje: date) -> int
+def lembrar_pendentes(conn, fazenda_id: UUID, hoje: date, canal: Canal | None = None) -> int
 ```
-1. `registrar_fiz`: `data_execucao = min(mov.data, hoje)`. Se ele tocou antes do dia, fez hoje;
-   se tocou depois, vale o dia do plano.
+1. `registrar_fiz`: `data_execucao = min(mov.data, hoje)` (se tocou antes do dia, fez hoje;
+   se depois, vale o dia do plano).
 2. Todas as funções de registro chamam `reconstruir_projecao`, mas **não** fazem commit: o
    `bot.py` faz.
-3. `registrar_diferente` e `registrar_avulsa`: o piquete precisa existir, estar ativo e ser
-   diferente do atual do lote; `data_execucao` não pode ser futura.
+3. `registrar_diferente` e `registrar_avulsa`: o piquete precisa existir, estar ativo, ser
+   diferente do atual do lote e estar **vazio** (`estado_piquete.lote_atual_id IS NULL`), e
+   `data_execucao` não pode ser futura. Dois lotes nunca dividem um piquete no MVP.
 4. `registrar_altura`: `0 < altura_cm <= 400`.
-5. `confirmar_por_omissao(conn, fazenda_id, hoje)`:
-   - pegue o plano atual (`carregar_plano_atual`);
-   - para cada movimentação com `mov.data < hoje`, sem resposta, **e** cujo lote ainda está no
-     `piquete_origem_id` **e** cujo destino está vazio (`estado_lote`, `estado_piquete`),
-     registre `manejo_confirmado` com `OrigemEvento.SISTEMA`, `ator="omissao"`,
-     `data_execucao = mov.data` e a mesma chave `resposta:{mov.id}`;
-   - devolva quantas foram confirmadas. O estado projetado usa `origem = sistema` para baixar a
-     confiança do piquete.
+5. `lembrar_pendentes`:
+   - pegue o plano vigente (`carregar_plano_atual`) e as movimentações com `mov.data < hoje`
+     **não** respondidas (`ids_respondidos`);
+   - se houver alguma e a fazenda tiver chat, envie `texto_lembrete` com os botões `"m:{id}"`;
+   - devolva quantas eram. **Não** registra nada: enquanto o produtor não responde, o lote
+     continua onde estava.
 
 **Critérios de aceite:**
 - [ ] Tocar "Fiz" duas vezes gera um único evento.
-- [ ] A omissão não confirma movimentação cujo lote já foi movido para outro lugar.
-- [ ] A omissão ignora movimentações de hoje em diante.
+- [ ] `lembrar_pendentes` não grava nenhum evento.
+- [ ] "Fiz diferente" não oferece nem aceita piquete ocupado.
 
-### T5: A conversa (`bot.py`)
+### T5: Plano candidato: ver mudanças, manter ou trocar (no `bot.py`)
 
-**Por quê:** é onde os toques viram eventos, sem o produtor digitar nada além de um número.
+**Por quê:** o produtor pode já ter se planejado com o plano que recebeu. Ele decide se quer ver
+o que mudou e, vendo, se fica com o antigo ou troca pelo novo.
 
-**Como:** `processar_update(conn, update: dict, canal: Canal, hoje: date) -> None`. O `update` é
-o JSON que o Telegram manda.
+**Como:** cliques:
+- `pv:<plano_id>` ("Ver mudanças"):
+  - se `status_do_plano != "candidato"`, responda *"Essa atualização não vale mais."*;
+  - senão, calcule `comparar_planos(carregar_plano_atual(...), carregar_plano(plano_id),
+    ids_respondidos(...), hoje)` e mande `texto_diferencas(...)` com os botões
+    `✅ Usar o plano novo` (`"pu:<id>"`) e `↩️ Manter o anterior` (`"pk:<id>"`).
+- `pu:<plano_id>`: se ainda `candidato` → `promover_candidato` → commit → `enviar_plano(conn,
+  plano, atualizado=True)`.
+- `pk:<plano_id>`: se ainda `candidato` → `descartar_plano` → commit → *"Combinado, seguimos com
+  o plano que você já tem."*
+
+**Critérios de aceite:**
+- [ ] Ver → Usar: o plano novo vira vigente e chega completo.
+- [ ] Manter: nada muda e o candidato fica `descartado`.
+- [ ] Clicar num candidato velho responde "não vale mais".
+
+### T6: A conversa (`bot.py`)
+
+**Por quê:** é onde os toques viram eventos, sem o produtor digitar nada além de números.
+
+**Como:** `processar_update(conn, update: dict, canal: Canal, hoje: date) -> None`.
 
 **Identificação:**
-- `chat_id` vem de `update["message"]["chat"]["id"]` ou de
+- `chat_id` de `update["message"]["chat"]["id"]` ou de
   `update["callback_query"]["message"]["chat"]["id"]`.
 - Fazenda: `SELECT id, nome FROM fazenda WHERE telegram_chat_id = %s`.
-- Sem fazenda, só `/start <codigo>` funciona; qualquer outra coisa responde *"Para conectar sua
-  fazenda, abra o link da página Configurações do SeuGado."*
+- Sem fazenda, só `/start <codigo>` funciona; o resto responde *"Este chat ainda não está ligado
+  a uma fazenda. Peça o link à equipe SeuGado."*
 
 **Mensagens de texto:**
 
 | Texto | Ação |
 |---|---|
-| `/start <codigo>` | `UPDATE fazenda SET telegram_chat_id = chat_id WHERE codigo_vinculo_telegram = codigo` → *"Pronto! A {fazenda} está conectada. Toda segunda você recebe o plano da semana aqui."* Código inválido → mensagem de erro amigável |
-| `/plano` | manda `texto_plano` + `botoes_plano` do plano atual (ou *"Ainda não há plano."*) |
-| `/mover` | inicia a movimentação avulsa (abaixo) |
-| `/ajuda` | explica os 3 comandos e os botões |
-| número (`35`, `35,5`, `35 cm`) com conversa no estado `altura` | `registrar_altura` → *"Anotado: {piquete} com 35 cm hoje."* |
-| qualquer outro | *"Não entendi. Use /plano, /mover ou toque nos botões do plano."* |
+| `/start <codigo>` | `UPDATE fazenda SET telegram_chat_id = chat_id WHERE codigo_vinculo_telegram = codigo` → *"Pronto! A {fazenda} está conectada. Você vai receber o plano da semana aqui."* Código inválido, ou chat já ligado a outra fazenda → mensagem amigável |
+| `/plano` | manda `texto_plano` + `botoes_plano` do plano vigente (ou *"Ainda não há plano."*) |
+| `/alturas` | manda `texto_alturas` + `botoes_alturas` do plano vigente |
+| `/mover` | inicia a movimentação avulsa |
+| `/ajuda` | explica os comandos e os botões |
+| número (`35`, `35,5`, `35 cm`) com a conversa no estado `altura` | `registrar_altura` → commit → *"Anotado: {piquete} com 35 cm hoje."* e manda de novo `texto_alturas` + `botoes_alturas` (estado limpo) |
+| qualquer outro | *"Não entendi. Use /plano, /alturas, /mover ou toque nos botões."* |
 
 **Cliques** (sempre chame `responder_clique` primeiro):
 
 | Dados | Ação |
 |---|---|
-| `m:<id>` | acha a movimentação no plano atual e manda `texto_movimentacao` + `botoes_movimentacao`. Não achou → *"Esta movimentação é de um plano antigo. Use /plano."* Já respondida → *"Você já respondeu esta movimentação."* |
+| `m:<id>` | acha a movimentação no plano vigente e manda `texto_movimentacao` + `botoes_movimentacao`. Não achou → *"Esta movimentação é de um plano antigo. Use /plano."* Já respondida → *"Você já respondeu esta movimentação."* |
 | `f:<id>` | `registrar_fiz` → commit → *"✅ Anotado: {lote} no {destino}."* |
-| `n:<id>` | `registrar_nao_fiz` → commit → *"Entendido. Vou refazer o plano da semana…"* → **recalcular** |
-| `d:<id>` | pergunta *"Para qual piquete o {lote} foi?"*, com os piquetes ativos (menos a origem) como opções → depois *"Quando?"* (`Hoje`, `Ontem`, `Anteontem`) → `registrar_diferente` → commit → **recalcular** |
+| `n:<id>` | `registrar_nao_fiz` → commit → *"Entendido. Vou refazer o plano…"* → **recalcular** |
+| `d:<id>` | *"Para qual piquete o {lote} foi?"*, com os piquetes ativos **e vazios** (menos a origem) → *"Quando?"* (`Hoje`, `Ontem`, `Anteontem`) → `registrar_diferente` → commit → **recalcular** |
 | `a:<piquete_id>` | estado `altura` → *"Digite a altura do {piquete} em centímetros (só o número)."* |
-| `o:<n>` | a opção número `n` do passo atual da conversa (veja abaixo) |
+| `h:` | manda `texto_alturas` + `botoes_alturas` |
+| `r:` | *"Refazendo o plano com as alturas novas…"* → **recalcular** |
+| `pv:` / `pu:` / `pk:` | T5 |
+| `o:<n>` | a opção número `n` do passo atual da conversa (abaixo) |
 
 **Conversa com vários passos** (`telegram_conversa`, um registro por chat, sobrescrito a cada
 passo com `INSERT … ON CONFLICT (chat_id) DO UPDATE`):
@@ -499,82 +523,75 @@ passo com `INSERT … ON CONFLICT (chat_id) DO UPDATE`):
 | `estado` | `dados` | Próximo passo |
 |---|---|---|
 | `divergente_piquete` | `{"mov_id", "opcoes": [piquete_ids]}` | `o:<n>` → `divergente_data` |
-| `divergente_data` | `{"mov_id", "piquete_id"}` | `o:0` / `o:1` / `o:2` = hoje / ontem / anteontem → registrar |
+| `divergente_data` | `{"mov_id", "piquete_id"}` | `o:0/1/2` = hoje/ontem/anteontem → registrar |
 | `mover_lote` | `{"opcoes": [lote_ids]}` | `o:<n>` → `mover_piquete` |
-| `mover_piquete` | `{"lote_id", "opcoes": [piquete_ids]}` | `o:<n>` → `mover_data` |
+| `mover_piquete` | `{"lote_id", "opcoes": [piquete_ids]}` (só ativos e vazios) | `o:<n>` → `mover_data` |
 | `mover_data` | `{"lote_id", "piquete_id"}` | `o:0/1/2` → `registrar_avulsa` → commit → **recalcular** |
 | `altura` | `{"piquete_id"}` | texto numérico → `registrar_altura` → commit |
 
-Ao terminar um fluxo, apague o estado. Opções como botões: uma por linha, texto = nome, dados =
-`o:<índice>`.
-
-**Recalcular:** mande *"Recalculando o plano…"* e chame
-`executar_ciclo(conn, fazenda_id, ingerir_satelite=False, atualizado=True)`. Ele já salva e
-envia o plano novo. Se falhar, responda *"Não consegui recalcular agora. O plano novo chega na
-próxima segunda."* e registre o erro no log.
+**Recalcular:** mande *"Recalculando o plano…"* e chame `executar_ciclo(conn, fazenda_id,
+ingerir_satelite=False, atualizado=True)`. Ele salva o plano novo como vigente e envia com o
+cabeçalho "Plano atualizado". Se falhar: *"Não consegui recalcular agora. Tento de novo na
+próxima rotina."* e registre no log.
 
 **Critérios de aceite:**
-- [ ] Com um `Canal` falso e banco de teste (pulando se `SEUGADO_TEST_DATABASE_URL` não
-      existir): `/start` vincula; `f:` gera `manejo_confirmado`; `d:` → `o:1` → `o:0` gera
-      `manejo_divergente` e chama o recálculo (monkeypatch).
-- [ ] Cliques de outro chat nunca mexem na fazenda errada.
+- [ ] Com `Canal` falso e banco de teste (pulando se `SEUGADO_TEST_DATABASE_URL` não existir):
+  - `/start` vincula;
+  - `f:` gera `manejo_confirmado`;
+  - `d:` → `o:1` → `o:0` gera `manejo_divergente` e chama o recálculo (monkeypatch);
+  - `a:` → `28` gera `altura_medida`, e `r:` chama o recálculo.
 - [ ] Nenhuma exceção sobe sem resposta ao produtor.
 
-**Fora do escopo:** linguagem natural ou IA para interpretar texto (fica como ideia registrada);
-lembrete diário; foto de validação (F-017); vários usuários por fazenda.
+**Fora do escopo:** IA ou linguagem natural para interpretar texto; imagens e mapas no bot
+(pós-MVP); vários usuários por fazenda; WhatsApp.
 
-### T6: Webhook e polling (`rotas_telegram.py`, `scripts/telegram_polling.py`)
-
-**Por quê:** em produção, o Telegram chama a nossa API (webhook). No seu computador, você busca
-as mensagens (polling).
+### T7: Webhook e polling (`rotas_telegram.py`, `scripts/telegram_polling.py`)
 
 **Como:**
 1. `POST /telegram/webhook`:
-   - confira o cabeçalho `X-Telegram-Bot-Api-Secret-Token` contra `TELEGRAM_WEBHOOK_SECRET`
-     (diferente → 403);
-   - agende `processar_update` em `BackgroundTasks`, com **conexão própria** (abra e feche
-     dentro da tarefa; não use a `Conexao` da rota);
-   - responda `{"ok": true}` na hora.
+   - confere `X-Telegram-Bot-Api-Secret-Token` (diferente → 403);
+   - agenda `processar_update` em `BackgroundTasks`, com **conexão própria** aberta e fechada
+     dentro da tarefa;
+   - responde `{"ok": true}` na hora.
 
    `hoje` = data atual em `America/Fortaleza`.
-2. `scripts/telegram_polling.py`:
-   - chame `deleteWebhook`;
-   - em laço: `getUpdates` com `offset` e `timeout=30`; para cada update, abra uma conexão,
-     chame `processar_update` e feche.
-3. Registrar o webhook do bot de produção (depois do deploy do Leandro), uma vez, pelo
-   navegador:
+2. `scripts/telegram_polling.py`: `deleteWebhook`; em laço, `getUpdates` com `offset` e
+   `timeout=30`; para cada update, abre conexão, chama `processar_update` e fecha.
+3. Depois do deploy do Leandro, registre uma vez:
    `https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<api>.onrender.com/telegram/webhook&secret_token=<SEGREDO>`.
    Confira com `getWebhookInfo`.
 
 **Critérios de aceite:**
 - [ ] Sem o cabeçalho certo → 403.
-- [ ] O webhook responde em < 1 s, mesmo quando o recálculo demora.
-- [ ] O polling local funciona com o bot Dev.
+- [ ] O webhook responde em < 1 s mesmo quando o recálculo demora.
 
-### T7: Testes e PR
+### T8: Testes e PR
 
-`tests/delivery/test_mensagem.py` (sem banco, com a fixture), `test_telegram.py` (HTTP falso),
-`test_confirmacao.py` e `test_bot.py` (banco de teste, pulando sem a variável). Depois,
-`ruff`, `mypy`, `pytest` e o PR `feat/leo-telegram` → `main`, com prints do bot.
+- `tests/delivery/test_mensagem.py` (sem banco, com a fixture);
+- `test_telegram.py` (HTTP falso);
+- `test_confirmacao.py` e `test_bot.py` (banco de teste).
+
+Depois, `ruff`, `mypy`, `pytest` e o PR `feat/leo-telegram` → `main`, com prints do bot.
 
 ---
 
-## 8. Roteiro da demo (terça)
+## 6. Roteiro da demo (terça)
 
-1. No site, Configurações → link do Telegram → o celular abre o bot → *"Pronto!"*
-2. "Gerar plano agora" → o plano chega no celular.
-3. Toque na movimentação de segunda → "Fiz diferente" → escolha outro piquete → "Hoje" → em
-   segundos chega o **plano atualizado**.
-4. Toque em "📏 Informar altura do Piquete 4" → digite `28` → *"Anotado"*.
+1. A equipe manda o link do Telegram ao "produtor" → `/start` → *"Pronto!"*
+2. No painel, "Gerar e enviar plano agora" → o plano chega no celular.
+3. `/alturas` → corrigir o Piquete 4 para `28` → "Terminei" → chega o **plano atualizado**.
+4. Tocar na movimentação de segunda → "Fiz diferente" → outro piquete → "Hoje" → plano
+   atualizado de novo.
+5. Mostrar (rodando a rotina diária com imagem nova) a pergunta *"quer ver as mudanças?"*.
 
-## 9. Usando IA no seu fluxo
+## 7. Usando IA no seu fluxo
 
 Dê à IA este documento, `src/seugado/contratos.py` e `tests/fixtures/plano_exemplo.json`, e
 peça uma tarefa por vez:
 
-> "Leia docs/equipe/LEO.md (seções 4, 5, 6 e a tarefa T2) e contratos.py. Implemente
-> src/seugado/delivery/mensagem.py com funções puras que reproduzam o formato do exemplo. Não
-> altere outros arquivos nem adicione dependências."
+> "Leia docs/equipe/LEO.md (seções 'Entradas e saídas', 4 e a tarefa T2) e contratos.py.
+> Implemente src/seugado/delivery/mensagem.py com funções puras que reproduzam o formato do
+> exemplo. Não altere outros arquivos nem adicione dependências."
 
 Se a IA quiser usar `python-telegram-bot`, IA para interpretar texto, ou mexer em arquivo de
 outra pessoa, a resposta é não: fale com o Kauê.

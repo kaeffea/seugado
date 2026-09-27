@@ -17,6 +17,45 @@ bloco B termine de madrugada.
 
 ---
 
+## 0. Atualização de 27/09 (ADR-025): faça isto primeiro
+
+A revisão do fluxo mudou o produto. Estado das suas specs:
+
+| Spec | Situação | Ordem |
+|---|---|---|
+| SPEC-007 a 010, 014A | feitas | — |
+| **SPEC-015** admin, agenda, categorias com sexo, status do plano, contratos novos | **nova** | **1ª (desbloqueia a equipe)** |
+| **SPEC-016** painel admin: seletor de fazenda, página Clientes, tipos TS | **nova** | **2ª (desbloqueia a equipe)** |
+| SPEC-011 clima | igual | 3ª |
+| SPEC-012 SAFER | igual | 4ª |
+| **SPEC-013** satélite | **reescrita: Sentinel-2 a 10 m + Cloud Score+** (piquetes de 0,1–0,5 ha) | 5ª |
+| SPEC-014 estado projetado | igual (completa o `estado.py`) | 6ª |
+
+**O que muda para a equipe** (documentos já atualizados):
+- **Leandro:** painel **só de admin** (clientes e fazendas, sem onboarding), mão de obra em
+  animais, envio no dia e hora do produtor, rotina de hora em hora (diária + semanal +
+  candidato).
+- **Leo:** sem confirmação por omissão (lembrete diário), plano candidato ("ver mudanças /
+  manter / trocar") e `/alturas` para o produtor corrigir e recalcular.
+- **João:** capacidade em animais, destino "mais passado do ponto", alertas
+  `passando_do_ponto` e `sem_dia_de_manejo`, `comparar_planos` e planos com status.
+- **Ezequiel:** só Marandu rotacionado, altura inicial obrigatória, sem a tela de "altura que
+  falta".
+
+**Prompts para o Muse:**
+```
+Implement specs/SPEC-015-admin-agenda-categorias.md. Read only that spec and the files it lists. Do not apply the migration yourself. Update your own tests only where the spec changes behaviour; do not touch tests/conformance/. At the end run `uv run ruff check .`, `uv run mypy` and `uv run --env-file .env pytest` and report. No new dependencies.
+```
+```
+Implement specs/SPEC-016-web-admin.md. Read only that spec and the files it lists. Copy the R1 TypeScript declarations verbatim. Do not implement page content. At the end run `npm run build` inside frontend/ and report. No new dependencies.
+```
+Depois de cada uma: `Teste com revisoes/KIT-ACEITE-015.md (ou 016), aplique db/migrations/0003_admin_agenda.sql no Supabase (só na 015), ajuste as suítes de conformidade antigas afetadas (mudança intencional, ADR-025) e commite.`
+
+**No Supabase (manual):**
+- *Authentication → Sign In / Providers*: desligue "Allow new users to sign up".
+- *Authentication → Users → Add user*: crie as 5 contas da equipe e mande a cada um o e-mail e
+  a senha.
+
 ## 1. O que foi decidido hoje
 
 Tudo abaixo já está registrado em `docs/12-REGISTRO-DE-DECISOES-ADR.md` (ADRs 022, 023 e 024)
@@ -71,14 +110,13 @@ densidade nem RUE com fonte. Elas entram no catálogo e aparecem no mapa, mas se
                                     rotas_plano.py ─────┘
  Telegram         ── Leo ─────▶     rotas_telegram.py  ── registrar_evento + recálculo
 
- Ciclo semanal (jobs/ciclo.py — Leandro), toda segunda 05:00 e sob demanda:
-   1. confirmar_por_omissao(...)          Leo       delivery/confirmacao.py
-   2. ingerir_leituras(...)               KAUÊ      sensing/ingestao.py        (Earth Engine)
-   3. reconstruir_projecao(...)           KAUÊ      persistencia/projecao_db.py
-   4. montar_estado_projetado(...)        KAUÊ      planner/carga.py           (Open-Meteo + SAFER)
-   5. gerar_plano(estado, fazenda)        João      planner/otimizador.py
-   6. salvar_plano(conn, plano)           João      persistencia/planos.py
-   7. enviar_plano(conn, plano)           Leo       delivery/envio.py          (Telegram)
+ Rotina (jobs/ciclo.py — Leandro), de hora em hora via GitHub Actions:
+   diária (06h local): lembrar_pendentes (Leo) → ingerir_leituras (KAUÊ, Sentinel-2)
+                       → reconstruir_projecao (KAUÊ) → montar_estado_projetado (KAUÊ)
+                       → gerar_plano (João) → comparar_planos (João)
+                       → se mudou: salvar_plano(candidato) (João) + avisar_plano_candidato (Leo)
+   semanal (dia/hora do produtor): mesma cadeia → salvar_plano(vigente) → enviar_plano (Leo)
+   recálculo (bot ou painel): executar_ciclo sem satélite → vigente → enviar_plano(atualizado)
 ```
 
 Os tipos que atravessam as setas estão em `src/seugado/contratos.py` (SPEC-009):
@@ -91,8 +129,8 @@ Leandro (página do plano) e no Ezequiel (cores do mapa).
 |---|---|
 | **Kauê** | `db/migrations/*`, `core/*`, `persistencia/eventos.py`, `persistencia/projecao_db.py`, `persistencia/catalogo.py`, `contratos.py`, `sensing/*`, `planner/estado.py`, `planner/carga.py`, `api/main.py`, `api/deps.py`, `api/auth.py`, `pyproject.toml`, `uv.lock`, `frontend/package.json`, `frontend/src/lib/*`, `frontend/src/componentes/*`, `frontend/src/App.tsx`, `tests/fixtures/*` |
 | **Ezequiel** | `api/rotas_piquetes.py`, `cadastro/piquetes.py`, `frontend/src/paginas/Mapa.tsx`, `frontend/src/componentes/mapa/*`, `tests/cadastro/test_piquetes.py` |
-| **João** | `planner/otimizador.py`, `planner/confianca.py`, `planner/geo.py`, `persistencia/planos.py`, `tests/planner/test_otimizador.py`, `tests/planner/test_confianca.py`, `tests/persistencia/test_planos.py` |
-| **Leandro** | `api/rotas_fazenda.py`, `api/rotas_lotes.py`, `api/rotas_plano.py`, `cadastro/fazenda.py`, `cadastro/lotes.py`, `jobs/ciclo.py`, `.github/workflows/*`, `render.yaml`, `frontend/src/paginas/{Login,Onboarding,Configuracoes,Lotes,Plano}.tsx`, `frontend/src/estilo/*`, `tests/cadastro/test_fazenda.py`, `tests/cadastro/test_lotes.py`, `tests/jobs/*` |
+| **João** | `planner/otimizador.py`, `planner/confianca.py`, `planner/geo.py`, `planner/comparacao.py`, `persistencia/planos.py`, `tests/planner/test_otimizador.py`, `tests/planner/test_confianca.py`, `tests/persistencia/test_planos.py` |
+| **Leandro** | `api/rotas_fazenda.py`, `api/rotas_lotes.py`, `api/rotas_plano.py`, `cadastro/fazenda.py`, `cadastro/clientes.py`, `cadastro/lotes.py`, `jobs/ciclo.py`, `.github/workflows/*`, `render.yaml`, `frontend/src/paginas/{Login,Clientes,Configuracoes,Lotes,Plano}.tsx`, `frontend/src/estilo/*`, `tests/cadastro/test_fazenda.py`, `tests/cadastro/test_lotes.py`, `tests/jobs/*` |
 | **Leo** | `delivery/*`, `api/rotas_telegram.py`, `scripts/telegram_polling.py`, `tests/delivery/*` |
 
 Se alguém precisar de dependência nova ou mudar contrato, pede a você. Você decide aqui comigo.

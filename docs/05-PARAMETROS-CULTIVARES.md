@@ -442,6 +442,11 @@ consumo e erra na direção do subpastejo, que é o erro barato. `pct_consumo` p
 novilho 2,2 % e adulto 2,4 % (tabela de pesos abaixo); bezerro sem valor próprio usa o
 `consumo_pct_pv_default` de 2,4 %.
 
+**Categorias com sexo (ADR-025, 27/09/2026).** bezerro/bezerra 0,25 UA · novilho/novilha 0,75 UA ·
+vaca/boi 1,00 UA · touro 1,25 UA (linha própria da tabela). Não há fonte de peso de reserva por
+sexo; a diferença entre machos e fêmeas entra quando o peso real é informado. `pct_consumo`
+segue a idade: bezerros 2,4 %, novilhos/novilhas 2,2 %, adultos 2,4 %.
+
 ⚠️ **Direção do erro, registrada na ADR-014.** Bezerro por esta tabela dá 0,25 × 450 =
 **112,5 kg**, abaixo do peso de desmama registrado adiante (180–210 kg, confiança baixa).
 Subestimar peso subestima consumo e **superestima** dias de ocupação — erro na direção do

@@ -6,9 +6,18 @@ date: "27/09/2026"
 
 # Ezequiel: piquetes e mapa
 
-**Sua parte em uma frase:** a tela em que a fazenda ganha forma. O produtor (ou nós, por ele)
-desenha cada piquete sobre a imagem de satélite, diz qual capim tem ali e a altura que mediu, e
-depois vê no mesmo mapa como está cada piquete e para onde o gado vai nesta semana.
+**Sua parte em uma frase:** a tela em que a fazenda ganha forma. **Nós, a equipe**, desenhamos
+cada piquete do cliente sobre a imagem de satélite, informamos o capim e a altura medida, e
+depois vemos no mesmo mapa como está cada piquete e para onde o gado vai nesta semana.
+
+> **Regras do MVP (ADR-025):**
+> - O site é **só da equipe (admin)**. O produtor nunca entra no site; ele usa só o bot do
+>   Telegram.
+> - A fazenda em que se trabalha vem do seletor no topo: `useFazenda().fazenda`.
+> - **Só Marandu, só pastejo rotacionado.**
+> - **Altura inicial obrigatória** no cadastro de cada piquete.
+> - Piquetes são pequenos (**0,1 a 0,5 ha** é comum). O satélite é o Sentinel-2 de 10 m, que
+>   enxerga esse tamanho.
 
 **Você entrega:** backend dos piquetes (serviço e rotas) + página **Mapa** no site.
 
@@ -37,7 +46,6 @@ Nada disso funciona sem saber **onde** estão os piquetes. Esse é o seu trabalh
 | **Cultivar** | O tipo de capim (Marandu, Mombaça…). Cada um tem suas alturas ideais |
 | **Método de pastejo** | `rotacionado` (o gado gira entre piquetes) ou `continuo` (o gado fica sempre no mesmo) |
 | **Altura medida** | A altura do capim, em cm, medida com régua pelo produtor. É o ponto de partida da estimativa |
-| **Parâmetro faltante** | Algumas combinações de capim × método não têm altura publicada. Nesse caso, o sistema pergunta ao produtor qual altura ele usa |
 | **Evento** | Um registro imutável de algo que aconteceu ("piquete criado", "altura medida"). O sistema nunca edita o passado: registra um evento novo |
 | **Tabelas derivadas** | Tabelas reconstruídas a partir dos eventos (`estado_piquete`, `altura_atual`…). **Você lê delas, mas nunca escreve nelas** |
 
@@ -55,7 +63,7 @@ Esta seção é o seu contrato com o resto da equipe. **Nomes, tipos e formatos 
 | **Recebe** | usuário logado e fazenda dele | Kauê (`api/auth.py`) e Leandro (`GET /me`) | dependências `Usuario`, `FazendaAutorizada`; no front, `useFazenda()` |
 | **Recebe** | catálogo de capins com as alturas | Kauê (`persistencia/catalogo.py`) | funções `carregar_catalogo`, `resolver_alturas`, `faltantes_calibracao` |
 | **Recebe** | o plano da semana, para pintar o mapa | Leandro (rota), gerado pelo João | `GET /fazendas/{id}/plano/atual` → `PlanoManejo` (JSON) ou 404 |
-| **Entrega** | piquetes gravados como eventos | banco → Kauê (satélite, estado) → João (plano) | `piquete_criado`, `piquete_alterado`, `altura_medida`, `parametro_alterado` |
+| **Entrega** | piquetes gravados como eventos | banco → Kauê (satélite, estado) → João (plano) | `piquete_criado`, `piquete_alterado`, `altura_medida` |
 | **Entrega** | lista de piquetes | Leandro (formulário de lotes: "onde o lote está") | `GET /fazendas/{id}/piquetes` → `Piquete[]` |
 | **Entrega** | registrar altura medida | Leandro (página do plano, "Medições pedidas") | `POST /fazendas/{id}/piquetes/{piquete_id}/alturas` |
 
@@ -121,7 +129,7 @@ TypeScript em `frontend/src/lib/tipos.ts`. Exemplo completo: `tests/fixtures/pla
 
 | Campo | Tipo | Em JSON | Significado |
 |---|---|---|---|
-| `tipo` | `TipoAlerta` | um de: `sem_piquete_apto`, `capacidade_excedida`, `aguardando_parametro`, `estimativa_indisponivel`, `continuo_acima_maxima`, `continuo_abaixo_minima`, `lote_sem_piquete`, `sem_dia_de_manejo` | Tipo do aviso |
+| `tipo` | `TipoAlerta` | um de: `sem_piquete_apto`, `capacidade_excedida`, `aguardando_parametro`, `estimativa_indisponivel`, `continuo_acima_maxima`, `continuo_abaixo_minima`, `lote_sem_piquete`, `sem_dia_de_manejo`, `passando_do_ponto` | Tipo do aviso |
 | `data` | `date` | `"2026-10-01"` | Dia a que se refere |
 | `texto` | `str` | texto | Frase pronta para o produtor |
 | `confianca` / `motivo_confianca` | `Confianca` / `str` | texto | Como na movimentação |
@@ -191,8 +199,9 @@ página). Se precisar de algo neles, peça ao Kauê. **Não adicione dependênci
 6. Frontend: `cd frontend && npm install && npm run dev`. Abra `http://localhost:5173`.
 7. **Comece pelo backend (E1 a E3).** O site só deixa entrar na página Mapa depois que a rota
    `GET /me` do Leandro estiver na `main` (ele sobe primeiro, até ~10h). Quando ele avisar, dê
-   `git pull origin main` e faça merge na sua branch. Crie a sua conta na tela de login e a sua
-   fazenda pelo `/docs` da API (`POST /fazendas`), até a tela de onboarding ficar pronta.
+   `git pull origin main` e faça merge na sua branch. A sua conta de admin é criada pelo Kauê no
+   Supabase (não há cadastro aberto). Para ter uma fazenda de teste, use a página "Clientes e
+   fazendas" do Leandro ou o `POST /fazendas` pelo `/docs`.
 
 **Antes de cada PR:** `uv run ruff check .` e `uv run --env-file .env pytest` sem erro, e `npm run build` sem
 erro.
@@ -236,9 +245,6 @@ conn.commit()                            # a ROTA faz o commit, uma vez, no fim
 {"entidade_id": "<uuid novo>", "piquete_id": "<uuid do piquete>", "data": "2026-09-27",
  "altura_cm": 28.0, "meio": "cadastro"}          # "cadastro" | "web" | "bot"
 
-# parametro_alterado (altura que o produtor usa, quando o capim não tem fonte)
-{"entidade_id": "<uuid novo>", "cultivar_id": "<uuid>", "metodo_pastejo": "rotacionado",
- "campo": "altura_entrada_cm", "valor": 35.0, "origem": "produtor", "confianca": "baixa"}
 ```
 
 GeoJSON usa **[longitude, latitude]**, nessa ordem. O primeiro ponto do anel se repete no fim.
@@ -259,8 +265,8 @@ O Leaflet/Geoman já entrega nesse formato com `layer.toGeoJSON().geometry`.
 
 ### 5.1 Rotas (o frontend e você combinam exatamente isto)
 
-Todas exigem login. As que têm `{fazenda_id}` usam `FazendaAutorizada`, que devolve 403 se a
-fazenda não for do usuário.
+Todas exigem login. As que têm `{fazenda_id}` usam `FazendaAutorizada`, que devolve 404 se a fazenda não existe (todo usuário logado é admin
+e vê todas as fazendas).
 
 | Método e caminho | Corpo | Resposta |
 |---|---|---|
@@ -270,15 +276,13 @@ fazenda não for do usuário.
 | `PUT /fazendas/{fazenda_id}/piquetes/{piquete_id}` | `PiqueteIn` (sem altura) | `Piquete` |
 | `DELETE /fazendas/{fazenda_id}/piquetes/{piquete_id}` | — | `204`; `409` se estiver ocupado |
 | `POST /fazendas/{fazenda_id}/piquetes/{piquete_id}/alturas` | `{"altura_cm": 28.0, "data": "2026-09-27"}` | `201` |
-| `GET /fazendas/{fazenda_id}/parametros-pendentes` | — | `ParametroPendente[]` |
-| `POST /fazendas/{fazenda_id}/parametros` | `{"cultivar_id", "metodo_pastejo", "campo", "valor"}` | `201` |
 
 ```jsonc
 // PiqueteIn
 { "nome": "Piquete 1",
   "geometria": {"type": "Polygon", "coordinates": [[[-36.09,-9.78],[-36.088,-9.78],[-36.088,-9.782],[-36.09,-9.782],[-36.09,-9.78]]]},
   "cultivar_id": "…", "metodo_pastejo": "rotacionado",
-  "altura_atual_cm": 28.0,          // opcional, só no POST
+  "altura_atual_cm": 28.0,          // OBRIGATÓRIO no POST (não existe no PUT)
   "data_medicao": "2026-09-27" }    // opcional; padrão: hoje
 
 // Piquete (resposta)
@@ -291,10 +295,6 @@ fazenda não for do usuário.
 { "id": "…", "slug": "marandu", "nome": "Marandu",
   "regimes_disponiveis": ["rotacionado", "continuo"],   // métodos com altura publicada
   "calibrada": true, "faltantes_calibracao": [] }
-
-// ParametroPendente
-{ "cultivar_id": "…", "cultivar_nome": "Xaraés", "metodo_pastejo": "rotacionado",
-  "faltantes": ["altura_entrada_cm", "altura_saida_cm"] }
 ```
 
 Os tipos TypeScript desses objetos **já existem** em `frontend/src/lib/tipos.ts`. Use-os, sem
@@ -349,13 +349,11 @@ não têm estimativa no SeuGado (hoje só o Marandu tem todos os números).
 def area_ha(conn, geometria: dict) -> float
 def criar_piquete(conn, fazenda_id: UUID, ator: str, nome: str, geometria: dict,
                   cultivar_id: UUID, metodo: MetodoPastejo,
-                  altura_atual_cm: float | None, data_medicao: date | None) -> UUID
+                  altura_atual_cm: float, data_medicao: date | None) -> UUID
 def editar_piquete(conn, fazenda_id, ator, piquete_id, nome, geometria, cultivar_id, metodo) -> None
 def desativar_piquete(conn, fazenda_id, ator, piquete_id) -> None
 def listar_piquetes(conn, fazenda_id) -> list[dict]
 def registrar_altura(conn, fazenda_id, ator, piquete_id, altura_cm: float, data: date, meio: str) -> None
-def parametros_pendentes(conn, fazenda_id) -> list[dict]
-def registrar_parametro(conn, fazenda_id, ator, cultivar_id, metodo, campo: str, valor: float) -> None
 ```
 
 **Como:**
@@ -367,7 +365,7 @@ def registrar_parametro(conn, fazenda_id, ator, cultivar_id, metodo, campo: str,
      que a cultivar existe (`SELECT 1 FROM cultivar WHERE id = %s`);
    - gere `piquete_id = uuid4()`, calcule a área (arredonde para 2 casas) e registre
      `PIQUETE_CRIADO`;
-   - se veio `altura_atual_cm`, registre também `ALTURA_MEDIDA` com `meio: "cadastro"` e
+   - registre também `ALTURA_MEDIDA` (obrigatória) com `meio: "cadastro"` e
      `data = data_medicao or date.today()`;
    - chame `reconstruir_projecao(conn, fazenda_id)` e devolva o id. **Não faça commit aqui.**
 3. `editar_piquete`: leia o piquete em `estado_piquete` (não existe → `LookupError`), recalcule
@@ -380,25 +378,16 @@ def registrar_parametro(conn, fazenda_id, ator, cultivar_id, metodo, campo: str,
    `ST_AsGeoJSON(geometria)::json`. Ordene por nome.
 6. `registrar_altura`: valide `0 < altura_cm <= 400` e `data <= hoje`; registre
    `ALTURA_MEDIDA` com o `meio` recebido.
-7. `parametros_pendentes`: para cada par (cultivar, método) usado por piquetes ativos, rode
-   `resolver_alturas(catalogo[cultivar_id], metodo)` (de `persistencia/catalogo.py`). Se
-   `faltantes` não for vazio, entra na lista.
-8. `registrar_parametro`: o `campo` precisa combinar com o método. No rotacionado:
-   `altura_entrada_cm` ou `altura_saida_cm`; no contínuo: `altura_maxima_cm` ou
-   `altura_minima_cm`. `valor` entre 1 e 400. Registre `PARAMETRO_ALTERADO` com
-   `origem: "produtor"` e `confianca: "baixa"`. Isso é a ADR-014: a altura vale **só para esta
-   fazenda** e fica marcada como informada pelo produtor.
-9. Todos os eventos: `OrigemEvento.PRODUTOR`, `ocorrido_em=datetime.now(UTC)`,
+7. Todos os eventos: `OrigemEvento.PRODUTOR`, `ocorrido_em=datetime.now(UTC)`,
    `ator=str(usuario.id)`.
 
 **Critérios de aceite:**
-- [ ] Criar um piquete gera 1 evento `piquete_criado` (+1 `altura_medida` se houver altura) e
+- [ ] Criar um piquete gera 1 evento `piquete_criado` + 1 `altura_medida` e
       uma linha em `estado_piquete` com a geometria.
 - [ ] Um quadrado de ~200 m × 200 m dá cerca de 4,0 ha.
 - [ ] Polígono que se cruza → erro claro, nenhum evento gravado.
 - [ ] Desativar piquete ocupado → recusado.
-- [ ] Xaraés em rotacionado aparece em `parametros_pendentes`; depois de informar entrada e
-      saída, some.
+- [ ] `POST` sem `altura_atual_cm` → 400.
 
 **Fora do escopo:** apagar evento; piquete com buraco ou multipolígono; importar KML/shapefile;
 checar sobreposição entre piquetes.
@@ -408,8 +397,7 @@ checar sobreposição entre piquetes.
 **Por quê:** é por elas que o site conversa com o banco.
 
 **Como:**
-1. Modelos Pydantic de entrada e saída iguais à seção 5.1 (`PiqueteIn`, `AlturaIn`,
-   `ParametroIn`). Valide `metodo_pastejo` com `Literal["rotacionado", "continuo"]`.
+1. Modelos Pydantic de entrada e saída iguais à seção 5.1 (`PiqueteIn`, `AlturaIn`). Valide `metodo_pastejo` com `Literal["rotacionado", "continuo"]` (a tela sempre manda `"rotacionado"`).
 2. Cada rota: recebe `fazenda_id: FazendaAutorizada`, `usuario: Usuario`, `conn: Conexao` →
    chama o serviço → `conn.commit()` → devolve.
 3. Converta erros: `ValueError` e `ValidationError` → 400 (com a mensagem);
@@ -417,15 +405,15 @@ checar sobreposição entre piquetes.
 4. Depois de criar ou editar, devolva o piquete relido de `listar_piquetes`.
 
 **Critérios de aceite:**
-- [ ] As 8 rotas aparecem em `/docs` e funcionam por lá.
-- [ ] Fazenda de outro usuário → 403.
+- [ ] As 6 rotas aparecem em `/docs` e funcionam por lá.
+- [ ] Fazenda inexistente → 404.
 - [ ] Nenhuma rota escreve direto em tabela derivada.
 
 **Fora do escopo:** paginação; filtros; upload de arquivo.
 
 ### E4: Página Mapa: desenhar e cadastrar
 
-**Por quê:** o desenho dos piquetes é a única tarefa chata do onboarding (ADR-004). Tem que ser
+**Por quê:** o desenho dos piquetes é a tarefa mais trabalhosa do cadastro de um cliente (ADR-004). Tem que ser
 rápido e à prova de erro.
 
 **Como:**
@@ -433,7 +421,8 @@ rápido e à prova de erro.
    embaixo.
 2. Mapa com `react-leaflet` (`MapContainer`, `TileLayer`). Fundo de **imagem de satélite**:
    `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`
-   com atribuição `Tiles © Esri`. Sem ver o pasto, ninguém desenha piquete.
+   com atribuição `Tiles © Esri`, `maxZoom: 20` e `maxNativeZoom: 19`. Sem ver o pasto, ninguém
+   desenha piquete, e piquetes de 0,1 ha (≈ 30 × 30 m) exigem zoom alto.
 3. Posição inicial: se houver piquetes, enquadre todos (`fitBounds`). Senão, centro do Brasil
    (`-14.2, -51.9`, zoom 4), com:
    - um campo **"Ir para coordenadas"** (aceita `-9.78, -36.09`, que é como o Google Maps
@@ -447,11 +436,12 @@ rápido e à prova de erro.
    a camada temporária e abra o formulário.
 5. Formulário "Novo piquete":
    - **Nome** (sugira "Piquete N+1");
-   - **Capim**, um `select` de `GET /cultivares`, com "(sem estimativa ainda)" ao lado dos não
-     calibrados e Marandu no topo;
-   - **Método**, rádio "Rotacionado" / "Contínuo", com uma frase de ajuda em cada;
-   - **Altura medida hoje (cm)**, opcional, mas com o aviso *"Sem essa medida o SeuGado não
-     consegue estimar este piquete"*;
+   - **Capim**: no MVP, só as cultivares com `calibrada: true` de `GET /cultivares`, ou seja,
+     só o **Marandu**, já selecionado;
+   - **Método**: fixo em "Rotacionado" (mostre como texto, sem opção). Envie
+     `"rotacionado"`;
+   - **Altura média medida (cm)**, **obrigatória**: a altura média do capim no piquete, medida
+     com régua;
    - **Data da medida**, com hoje como padrão.
 
    Salvar → `POST`. Mostre a área calculada que voltou ("4,02 ha").
@@ -471,23 +461,7 @@ rápido e à prova de erro.
 
 **Fora do escopo:** desenhar cercas, bebedouros ou corredores; camadas extras; modo offline.
 
-### E5: Perguntar a altura que falta
-
-**Por quê:** se o produtor usa um capim sem altura publicada naquele método (ex.: Xaraés
-rotacionado), o piquete fica parado até ele dizer a altura que usa (ADR-014). É uma pergunta
-curta, e não um bloqueio.
-
-**Como:** no topo do painel, se `GET /parametros-pendentes` não vier vazio, mostre um cartão por
-item: *"O SeuGado não tem a altura de **entrada** do **Xaraés** no pastejo **rotacionado**. Qual
-altura você usa? [__] cm"*. Cada campo faltante vira um input. Salvar → `POST /parametros` (uma
-chamada por campo) → recarregue as pendências.
-
-**Critérios de aceite:**
-- [ ] Criar um piquete Xaraés rotacionado faz o cartão aparecer; respondido, ele some.
-
-**Fora do escopo:** editar alturas de capins que já têm fonte.
-
-### E6: O mapa mostra o plano
+### E5: O mapa mostra o plano
 
 **Por quê:** é a imagem da demo: a fazenda inteira, colorida pelo estado de cada piquete, com
 as mudanças da semana.
@@ -520,7 +494,7 @@ as mudanças da semana.
 
 **Fora do escopo:** gerar o plano (é do Leandro e do João); histórico de planos; animação.
 
-### E7: Testes e PR
+### E6: Testes e PR
 
 1. `tests/cadastro/test_piquetes.py`:
    - validação de `campo` × método (sem banco);
