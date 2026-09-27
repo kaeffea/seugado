@@ -9,9 +9,10 @@ import logging
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import psycopg
 from psycopg.types.json import Json
@@ -70,6 +71,8 @@ from seugado.delivery.mensagem import (
 )
 
 log = logging.getLogger(__name__)
+
+FUSO_DO_BOT = ZoneInfo("America/Fortaleza")
 
 _NUMERO = re.compile(r"\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?\s*", re.IGNORECASE)
 _DIAS_PARA_TRAS = 3  # o:0 today, o:1 yesterday, o:2 the day before
@@ -137,6 +140,32 @@ def processar_update(
         log.exception("update %s failed for chat %s", update.get("update_id"), chat_id)
         _desfazer(conn)
         _avisar(canal, chat_id, ERRO_INESPERADO)
+
+
+def hoje_local() -> date:
+    """The conversation's today: America/Fortaleza for webhook and polling (LEO.md, T7)."""
+    return datetime.now(FUSO_DO_BOT).date()
+
+
+def processar_update_isolado(
+    url_banco: str, update: dict[str, Any], canal: Canal, hoje: date
+) -> None:
+    """processar_update on a connection of its own, opened and closed here.
+
+    If the database cannot even be reached, the producer is still told something went wrong.
+    """
+    try:
+        conn = psycopg.connect(url_banco, autocommit=False)
+    except Exception:
+        log.exception("no database connection for update %s", update.get("update_id"))
+        chat_id = _chat_id(update)
+        if chat_id is not None:
+            _avisar(canal, chat_id, ERRO_INESPERADO)
+        return
+    try:
+        processar_update(conn, update, canal, hoje)
+    finally:
+        conn.close()
 
 
 def _chat_id(update: dict[str, Any]) -> int | None:

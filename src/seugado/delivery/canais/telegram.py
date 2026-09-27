@@ -44,20 +44,24 @@ class CanalTelegram:
         ]
         if teclado:
             corpo["reply_markup"] = {"inline_keyboard": teclado}
-        self._chamar("sendMessage", corpo)
+        self.chamar_api("sendMessage", corpo)
 
     def responder_clique(self, id_clique: str, texto: str | None = None) -> None:
         """Answer a callback query so Telegram stops the button's loading spinner."""
         corpo: dict[str, Any] = {"callback_query_id": id_clique}
         if texto is not None:
             corpo["text"] = texto
-        self._chamar("answerCallbackQuery", corpo)
+        self.chamar_api("answerCallbackQuery", corpo)
 
-    def _chamar(self, metodo: str, corpo: dict[str, Any]) -> None:
+    def chamar_api(self, metodo: str, corpo: dict[str, Any], timeout: float = TIMEOUT_S) -> Any:  # noqa: ANN401
+        """Call any Bot API method; return its `result`, JSON shaped by the method (hence Any).
+
+        getUpdates long-polls, so the caller passes a timeout above the polling wait.
+        """
         # `from None` drops httpx's own exception, whose message and request carry the URL.
         try:
             resposta = httpx.post(
-                f"{URL_API}/bot{self._token}/{metodo}", json=corpo, timeout=TIMEOUT_S
+                f"{URL_API}/bot{self._token}/{metodo}", json=corpo, timeout=timeout
             )
             resposta.raise_for_status()
         except httpx.HTTPStatusError as e:
@@ -66,6 +70,10 @@ class CanalTelegram:
             raise ErroTelegram(f"Telegram {metodo}: HTTP {codigo} {descricao}".rstrip()) from None
         except httpx.HTTPError as e:
             raise ErroTelegram(f"Telegram {metodo}: {type(e).__name__}") from None
+        try:
+            return resposta.json().get("result")
+        except (ValueError, AttributeError):
+            raise ErroTelegram(f"Telegram {metodo}: invalid response body") from None
 
 
 def canal_padrao() -> CanalTelegram:

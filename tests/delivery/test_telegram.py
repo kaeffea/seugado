@@ -154,3 +154,22 @@ def test_guarda_bloqueia_rede_real() -> None:
     """The autouse guard in conftest makes an unpatched call fail instead of hitting Telegram."""
     with pytest.raises(AssertionError, match="must not call the network"):
         CanalTelegram(TOKEN).enviar_texto(1, "oi")
+
+
+def test_chamar_api_devolve_o_result_com_o_timeout_pedido(post: _PostFalso) -> None:
+    post.corpo = {"ok": True, "result": [{"update_id": 1}]}
+    resultado = CanalTelegram(TOKEN).chamar_api("getUpdates", {"timeout": 30}, timeout=40)
+    assert resultado == [{"update_id": 1}]
+    assert post.chamadas == [
+        {"url": f"{URL_BASE}/getUpdates", "json": {"timeout": 30}, "timeout": 40}
+    ]
+
+
+def test_chamar_api_com_resposta_que_nao_e_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    def post_html(url: str, *, json: dict[str, Any], timeout: float) -> httpx.Response:
+        return httpx.Response(200, content=b"<html>", request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx, "post", post_html)
+    with pytest.raises(ErroTelegram, match="invalid response body") as info:
+        CanalTelegram(TOKEN).chamar_api("deleteWebhook", {})
+    assert TOKEN not in "".join(traceback.format_exception(info.value))
