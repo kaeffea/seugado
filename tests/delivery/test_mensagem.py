@@ -1,23 +1,21 @@
 """T2: producer texts and buttons, checked against the reference format in LEO.md."""
 
-import json
 import re
 import uuid
 from dataclasses import replace
 from datetime import date
-from pathlib import Path
 
-import pytest
-
-from seugado.contratos import DiferencaLote, PassoPlano, PlanoManejo, plano_de_dict
+from seugado.contratos import DiferencaLote, PassoPlano, PlanoManejo
 from seugado.delivery.canais.base import Botao
 from seugado.delivery.mensagem import (
     LIMITE_TEXTO_TELEGRAM,
     botoes_alturas,
+    botoes_candidato,
     botoes_lembrete,
     botoes_movimentacao,
     botoes_plano,
     texto_alturas,
+    texto_candidato,
     texto_diferencas,
     texto_lembrete,
     texto_movimentacao,
@@ -79,19 +77,17 @@ RODAPE_ALTURAS = (
 )
 
 
-@pytest.fixture
-def plano() -> PlanoManejo:
-    path = Path(__file__).resolve().parents[1] / "fixtures" / "plano_exemplo.json"
-    with path.open(encoding="utf-8") as f:
-        return plano_de_dict(json.load(f))
-
-
 def _utf16(texto: str) -> int:
     return len(texto.encode("utf-16-le")) // 2
 
 
 def _todos_os_botoes(plano: PlanoManejo) -> list[Botao]:
-    teclados = [botoes_plano(plano), botoes_alturas(plano), botoes_lembrete(plano.movimentacoes)]
+    teclados = [
+        botoes_plano(plano),
+        botoes_alturas(plano),
+        botoes_lembrete(plano.movimentacoes),
+        botoes_candidato(plano.id),
+    ]
     teclados += [botoes_movimentacao(mov) for mov in plano.movimentacoes]
     return [botao for teclado in teclados for linha in teclado for botao in linha]
 
@@ -287,6 +283,21 @@ def test_lembrete(plano: PlanoManejo) -> None:
     ]
 
 
+def test_texto_e_botoes_candidato(plano: PlanoManejo) -> None:
+    diferenca = DiferencaLote(uuid.uuid4(), "Recria", (), ())
+    assert texto_candidato([diferenca, diferenca]) == (
+        "🛰️ Chegaram imagens novas do satélite e o plano da semana mudou para 2 lotes."
+        " Você pode manter o seu plano ou ver as mudanças."
+    )
+    assert "mudou para 1 lote." in texto_candidato([diferenca])
+    assert botoes_candidato(plano.id) == [
+        [
+            Botao("👀 Ver mudanças", f"pv:{plano.id}"),
+            Botao("👍 Manter meu plano", f"pk:{plano.id}"),
+        ]
+    ]
+
+
 def test_nenhum_texto_tem_termo_tecnico(plano: PlanoManejo) -> None:
     diferencas = [DiferencaLote(uuid.uuid4(), "Recria", (), (PassoPlano(date(2026, 10, 1), "P"),))]
     textos = [
@@ -294,6 +305,7 @@ def test_nenhum_texto_tem_termo_tecnico(plano: PlanoManejo) -> None:
         texto_plano(plano, "Fazenda Exemplo", atualizado=True),
         texto_alturas(plano),
         texto_diferencas(diferencas),
+        texto_candidato(diferencas),
         texto_lembrete(plano.movimentacoes),
         *(texto_movimentacao(mov) for mov in plano.movimentacoes),
         *(botao.texto for botao in _todos_os_botoes(plano)),

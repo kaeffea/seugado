@@ -188,6 +188,22 @@ def texto_diferencas(diferencas: Sequence[DiferencaLote]) -> str:
     )
 
 
+def texto_candidato(diferencas: Sequence[DiferencaLote]) -> str:
+    """Mid-week notice that new satellite data changed what the producer has not done yet."""
+    lotes = "1 lote" if len(diferencas) == 1 else f"{len(diferencas)} lotes"
+    return (
+        f"🛰️ Chegaram imagens novas do satélite e o plano da semana mudou para {lotes}."
+        " Você pode manter o seu plano ou ver as mudanças."
+    )
+
+
+def botoes_candidato(plano_id: UUID) -> list[list[Botao]]:
+    """See the changes or keep the current plan."""
+    return [
+        [Botao("👀 Ver mudanças", f"pv:{plano_id}"), Botao("👍 Manter meu plano", f"pk:{plano_id}")]
+    ]
+
+
 def texto_lembrete(pendentes: Sequence[Movimentacao]) -> str:
     """Daily reminder of past movements still without an answer."""
     linhas = [
