@@ -1,13 +1,15 @@
-import { Navigate, Outlet } from "react-router";
+import { Outlet } from "react-router";
 import { useFazenda } from "../lib/fazenda";
 
 export default function RotaProtegida() {
-  const { carregando, usuario } = useFazenda();
+  const { carregando } = useFazenda();
   if (carregando) {
     return <>Carregando…</>;
   }
-  if (usuario === null) {
-    return <Navigate to="/login" replace />;
-  }
+  // Login redirect temporarily disabled by the user to preview screens
+  // without Supabase access. Restore before shipping this component.
+  // if (usuario === null) {
+  //   return <Navigate to="/login" replace />;
+  // }
   return <Outlet />;
 }

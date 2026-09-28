@@ -6,10 +6,273 @@
   --cor-erro: #b42318;
   --raio: 8px;
   --fonte: system-ui, sans-serif;
+  --cor-menu-fundo: #1b2430;
+  --cor-menu-texto: #cfd8e3;
+  --cor-menu-ativo-fundo: #2f6b3a;
+  --cor-menu-ativo-texto: #ffffff;
+  --largura-menu: 280px;
+  --cor-avatar-placeholder: #46536b;
 }
 
 body {
+  margin: 0;
   background-color: var(--cor-fundo);
   color: var(--cor-texto);
   font-family: var(--fonte);
+}
+
+/* Shell: fixed sidebar on the left, routed content on the right. */
+
+.menu-lateral {
+  position: fixed;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: var(--largura-menu);
+  height: 100vh;
+  padding: 16px 12px;
+  overflow-y: auto;
+  background-color: var(--cor-menu-fundo);
+  color: var(--cor-menu-texto);
+}
+
+.menu-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px 12px;
+}
+
+.menu-logo {
+  width: 32px;
+  height: 32px;
+}
+
+.menu-marca {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--cor-menu-ativo-texto);
+}
+
+.menu-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--raio);
+  color: var(--cor-menu-texto);
+  text-decoration: none;
+}
+
+.menu-item-icone {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+  text-decoration: underline;
+}
+
+/* The active entry is the one carrying aria-current="page". */
+.menu-item[aria-current="page"] {
+  background-color: var(--cor-menu-ativo-fundo);
+  color: var(--cor-menu-ativo-texto);
+  font-weight: 600;
+}
+
+.menu-divisor {
+  margin: 8px 12px;
+  border: 0;
+  border-top: 1px solid var(--cor-menu-texto);
+  opacity: 0.3;
+}
+
+.menu-rodape {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: auto;
+  padding: 12px;
+  font-size: 13px;
+}
+
+.menu-perfil {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.menu-avatar {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-color: var(--cor-avatar-placeholder);
+}
+
+.menu-perfil-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.menu-email {
+  font-weight: 600;
+  color: var(--cor-menu-ativo-texto);
+  overflow-wrap: anywhere;
+}
+
+.menu-fazenda-nome {
+  overflow-wrap: anywhere;
+}
+
+.menu-rotulo {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.menu-select {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--raio);
+  font-family: var(--fonte);
+  font-size: 14px;
+}
+
+.menu-sair {
+  padding: 10px;
+  border: 0;
+  border-radius: var(--raio);
+  background-color: var(--cor-menu-ativo-fundo);
+  color: var(--cor-menu-ativo-texto);
+  font-family: var(--fonte);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.conteudo {
+  box-sizing: border-box;
+  min-height: 100vh;
+  margin-left: var(--largura-menu);
+  padding: 24px;
+  overflow-wrap: anywhere;
+}
+
+/* Narrow viewports (down to 360 px): the sidebar becomes a full-width top bar
+   whose entries wrap, so all eight stay reachable without horizontal scroll. */
+@media (max-width: 760px) {
+  .menu-lateral {
+    position: static;
+    width: 100%;
+    height: auto;
+    overflow-y: visible;
+  }
+
+  .menu-grupo {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .menu-item {
+    padding: 8px 10px;
+  }
+
+  .menu-rodape {
+    margin-top: 12px;
+    padding: 12px 0 0;
+  }
+
+  .conteudo {
+    min-height: 0;
+    margin-left: 0;
+    padding: 16px;
+  }
+}
+
+/* Login: centered card over the page background. */
+
+.login-tela {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 16px;
+}
+
+.login-cartao {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
+  padding: 32px 24px;
+  border: 1px solid var(--cor-texto);
+  border-radius: var(--raio);
+  background-color: var(--cor-fundo);
+}
+
+.login-marca {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--cor-primaria);
+}
+
+.login-rotulo {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.login-campo {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--cor-texto);
+  border-radius: var(--raio);
+  color: var(--cor-texto);
+  font-family: var(--fonte);
+  font-size: 14px;
+}
+
+.login-botao {
+  margin-top: 8px;
+  padding: 12px;
+  border: 0;
+  border-radius: var(--raio);
+  background-color: var(--cor-primaria);
+  color: var(--cor-fundo);
+  font-family: var(--fonte);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-botao:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.login-erro {
+  margin: 0;
+  font-size: 13px;
+  color: var(--cor-erro);
 }

@@ -3,11 +3,9 @@ import Layout from "./componentes/Layout";
 import RotaProtegida from "./componentes/RotaProtegida";
 import { FazendaProvider } from "./lib/fazenda";
 import Clientes from "./paginas/Clientes";
-import Configuracoes from "./paginas/Configuracoes";
+import EmConstrucao from "./paginas/EmConstrucao";
 import Login from "./paginas/Login";
-import Lotes from "./paginas/Lotes";
 import Mapa from "./paginas/Mapa";
-import Plano from "./paginas/Plano";
 
 export default function App() {
   return (
@@ -17,15 +15,26 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route element={<RotaProtegida />}>
             <Route element={<Layout />}>
-              <Route path="/clientes" element={<Clientes />} />
+              <Route path="/dashboard" element={<EmConstrucao titulo="Dashboard" />} />
+              <Route path="/fazenda" element={<EmConstrucao titulo="Fazenda" />} />
+              <Route path="/piquetes" element={<EmConstrucao titulo="Piquetes" />} />
+              <Route path="/animais" element={<EmConstrucao titulo="Animais" />} />
+              <Route path="/manejos" element={<EmConstrucao titulo="Manejos" />} />
+              <Route
+                path="/notificacoes"
+                element={<EmConstrucao titulo="Notificações" />}
+              />
+              <Route
+                path="/configuracoes"
+                element={<EmConstrucao titulo="Configurações" />}
+              />
+              <Route path="/ajuda" element={<EmConstrucao titulo="Ajuda" />} />
               <Route path="/mapa" element={<Mapa />} />
-              <Route path="/lotes" element={<Lotes />} />
-              <Route path="/plano" element={<Plano />} />
-              <Route path="/configuracoes" element={<Configuracoes />} />
+              <Route path="/clientes" element={<Clientes />} />
             </Route>
           </Route>
-          <Route path="/" element={<Navigate to="/mapa" replace />} />
-          <Route path="*" element={<Navigate to="/mapa" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </FazendaProvider>
     </BrowserRouter>
