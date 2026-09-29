@@ -6,6 +6,7 @@ import Clientes from "./paginas/Clientes";
 import Dashboard from "./paginas/Dashboard";
 import EmConstrucao from "./paginas/EmConstrucao";
 import Login from "./paginas/Login";
+import Manejos from "./paginas/Manejo";
 import Mapa from "./paginas/Mapa";
 import Piquetes from "./paginas/Piquetes";
 
@@ -21,7 +22,7 @@ export default function App() {
               <Route path="/fazenda" element={<EmConstrucao titulo="Fazenda" />} />
               <Route path="/piquetes" element={<Piquetes />} />
               <Route path="/animais" element={<EmConstrucao titulo="Animais" />} />
-              <Route path="/manejos" element={<EmConstrucao titulo="Manejos" />} />
+              <Route path="/manejos" element={<Manejos />} />
               <Route
                 path="/notificacoes"
                 element={<EmConstrucao titulo="Notificações" />}
