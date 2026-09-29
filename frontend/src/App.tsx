@@ -3,6 +3,7 @@ import Layout from "./componentes/Layout";
 import RotaProtegida from "./componentes/RotaProtegida";
 import { FazendaProvider } from "./lib/fazenda";
 import Clientes from "./paginas/Clientes";
+import Dashboard from "./paginas/Dashboard";
 import EmConstrucao from "./paginas/EmConstrucao";
 import Login from "./paginas/Login";
 import Mapa from "./paginas/Mapa";
@@ -15,7 +16,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route element={<RotaProtegida />}>
             <Route element={<Layout />}>
-              <Route path="/dashboard" element={<EmConstrucao titulo="Dashboard" />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/fazenda" element={<EmConstrucao titulo="Fazenda" />} />
               <Route path="/piquetes" element={<EmConstrucao titulo="Piquetes" />} />
               <Route path="/animais" element={<EmConstrucao titulo="Animais" />} />
