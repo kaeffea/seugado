@@ -59,11 +59,12 @@ def test_five_router_modules_are_empty_stubs() -> None:
         "rotas_plano.py",
         "rotas_telegram.py",
     )
-    # rotas_fazenda.py, rotas_lotes.py, rotas_piquetes.py and rotas_telegram.py are implemented
+    # All five routers are implemented now; the stub check below no longer applies to any.
     implemented = {
         "rotas_fazenda.py",
         "rotas_lotes.py",
         "rotas_piquetes.py",
+        "rotas_plano.py",
         "rotas_telegram.py",
     }
     for name in router_files:
