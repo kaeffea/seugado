@@ -122,3 +122,103 @@ def test_usuario_atual_token_invalido(
     with pytest.raises(HTTPException) as excinfo:
         auth.usuario_atual("Bearer bad")
     assert excinfo.value.status_code == 401
+
+
+def test_obter_token_sucesso(monkeypatch: pytest.MonkeyPatch) -> None:
+    """POST /auth/token with valid credentials returns access_token."""
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "anon-key")
+
+    class RespostaToken:
+        status_code = 200
+
+        def json(self) -> dict[str, str]:
+            return {"access_token": "token123", "token_type": "bearer"}
+
+    def fake_post(*args: object, **kwargs: object) -> RespostaToken:
+        return RespostaToken()
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    response = client.post("/auth/token", data={"username": "user@test.com", "password": "pass"})
+    assert response.status_code == 200
+    assert response.json() == {"access_token": "token123", "token_type": "bearer"}
+
+
+def test_obter_token_credenciais_invalidas(monkeypatch: pytest.MonkeyPatch) -> None:
+    """POST /auth/token with invalid credentials returns 401."""
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "anon-key")
+
+    class RespostaErro:
+        status_code = 400
+
+        def json(self) -> dict[str, str]:
+            return {"error": "invalid_grant"}
+
+    def fake_post(*args: object, **kwargs: object) -> RespostaErro:
+        return RespostaErro()
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    response = client.post("/auth/token", data={"username": "user@test.com", "password": "wrong"})
+    assert response.status_code == 401
+
+
+def test_openapi_authorize_button_and_security() -> None:
+    """OpenAPI schema defines OAuth2PasswordBearer with /auth/token and secures routes."""
+    docs_resp = client.get("/docs")
+    assert docs_resp.status_code == 200
+
+    openapi_resp = client.get("/openapi.json")
+    assert openapi_resp.status_code == 200
+    schema = openapi_resp.json()
+
+    sec_schemes = schema["components"]["securitySchemes"]
+    assert "OAuth2PasswordBearer" in sec_schemes
+    oauth_config = sec_schemes["OAuth2PasswordBearer"]
+    assert oauth_config["type"] == "oauth2"
+    assert oauth_config["flows"]["password"]["tokenUrl"] == "/auth/token"
+
+    # Verify that POST /clientes requires the OAuth2 scheme
+    post_clientes = schema["paths"]["/clientes"]["post"]
+    assert any("OAuth2PasswordBearer" in s for s in post_clientes.get("security", []))
+
+
+def test_criar_cliente_apos_autorizacao(monkeypatch: pytest.MonkeyPatch) -> None:
+    """POST /clientes works when authenticated with bearer token."""
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "anon-key")
+    user_id = str(uuid.uuid4())
+
+    class RespostaUserOk:
+        status_code = 200
+
+        def json(self) -> dict[str, str]:
+            return {"id": user_id, "email": "admin@seugado.com"}
+
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: RespostaUserOk())
+
+    from seugado.cadastro import clientes
+    from seugado.cadastro.clientes import Cliente
+
+    cliente_mock = Cliente(
+        id=uuid.uuid4(),
+        nome="Cliente Teste",
+        telefone="82999990000",
+        observacoes=None,
+    )
+    monkeypatch.setattr(clientes, "criar_cliente", lambda conn, dados: cliente_mock)
+
+    # 1. Without token: returns 401
+    resp_unauth = client.post(
+        "/clientes", json={"nome": "Cliente Teste", "telefone": "82999990000"}
+    )
+    assert resp_unauth.status_code == 401
+
+    # 2. With token: returns 201
+    resp_auth = client.post(
+        "/clientes",
+        json={"nome": "Cliente Teste", "telefone": "82999990000"},
+        headers={"Authorization": "Bearer valid_token"},
+    )
+    assert resp_auth.status_code == 201
+    assert resp_auth.json()["nome"] == "Cliente Teste"
