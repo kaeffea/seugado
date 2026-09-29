@@ -7,6 +7,7 @@ import Dashboard from "./paginas/Dashboard";
 import EmConstrucao from "./paginas/EmConstrucao";
 import Login from "./paginas/Login";
 import Mapa from "./paginas/Mapa";
+import Piquetes from "./paginas/Piquetes";
 
 export default function App() {
   return (
@@ -18,7 +19,7 @@ export default function App() {
             <Route element={<Layout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/fazenda" element={<EmConstrucao titulo="Fazenda" />} />
-              <Route path="/piquetes" element={<EmConstrucao titulo="Piquetes" />} />
+              <Route path="/piquetes" element={<Piquetes />} />
               <Route path="/animais" element={<EmConstrucao titulo="Animais" />} />
               <Route path="/manejos" element={<EmConstrucao titulo="Manejos" />} />
               <Route
