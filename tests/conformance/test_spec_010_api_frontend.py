@@ -59,8 +59,13 @@ def test_five_router_modules_are_empty_stubs() -> None:
         "rotas_plano.py",
         "rotas_telegram.py",
     )
-    # rotas_fazenda.py, rotas_lotes.py, and rotas_piquetes.py are implemented
-    implemented = {"rotas_fazenda.py", "rotas_lotes.py", "rotas_piquetes.py"}
+    # rotas_fazenda.py, rotas_lotes.py, rotas_piquetes.py and rotas_telegram.py are implemented
+    implemented = {
+        "rotas_fazenda.py",
+        "rotas_lotes.py",
+        "rotas_piquetes.py",
+        "rotas_telegram.py",
+    }
     for name in router_files:
         path = API_DIR / name
         assert path.exists(), f"Missing router stub: {name}"
