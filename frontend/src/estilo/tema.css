@@ -843,6 +843,10 @@ body {
   background-color: #fff;
 }
 
+.modal-cartao-largo {
+  max-width: 640px;
+}
+
 .modal-cabecalho {
   display: flex;
   align-items: flex-start;
@@ -1071,5 +1075,205 @@ body {
 
   .pendente-acoes .modal-botao {
     flex: 1;
+  }
+}
+
+/* Animais: lote listing + shared add/edit form with a dynamic composição list. */
+
+.animais-pagina {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.animais-titulo-pagina {
+  margin: 0 0 4px;
+  font-size: 26px;
+}
+
+.animais-subtitulo-pagina {
+  margin: 0;
+  opacity: 0.6;
+  font-size: 14px;
+}
+
+.animais-cabecalho-pagina {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.animais-cabecalho-acoes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.animais-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lote-nome-celula {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lote-raca {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.lote-piquete-atual {
+  font-weight: 600;
+  color: var(--cor-primaria);
+}
+
+.lote-form-grade {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.lote-form-grade-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.composicao-secao {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.composicao-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.badge-em-desenvolvimento {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background-color: #eef0f2;
+  color: #5b6472;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.composicao-bloqueada {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--raio);
+  background-color: var(--cor-fundo);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.composicao-cabecalho,
+.composicao-linha {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 32px;
+  gap: 8px;
+  align-items: center;
+}
+
+.composicao-cabecalho span {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.6;
+}
+
+.composicao-remover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--cor-cartao-borda);
+  border-radius: 6px;
+  background-color: #fff;
+  color: var(--cor-erro);
+  opacity: 0.75;
+  cursor: pointer;
+}
+
+.composicao-remover:hover {
+  opacity: 1;
+}
+
+.composicao-adicionar {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border: 1px dashed var(--cor-cartao-borda);
+  border-radius: var(--raio);
+  background-color: transparent;
+  color: var(--cor-primaria);
+  font-family: var(--fonte);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.composicao-totais {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 14px 16px;
+  border-radius: var(--raio);
+  background-color: var(--cor-fundo);
+}
+
+.composicao-totais > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.composicao-total-rotulo {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.composicao-total-valor {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.composicao-total-nota {
+  margin: 0 0 0 auto;
+  font-size: 11px;
+  opacity: 0.55;
+  text-align: right;
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .lote-form-grade {
+    grid-template-columns: 1fr;
+  }
+
+  .composicao-cabecalho {
+    display: none;
+  }
+
+  .composicao-linha {
+    grid-template-columns: 1fr;
+  }
+
+  .composicao-total-nota {
+    margin-left: 0;
+    text-align: left;
   }
 }

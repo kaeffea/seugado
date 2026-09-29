@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import Layout from "./componentes/Layout";
 import RotaProtegida from "./componentes/RotaProtegida";
 import { FazendaProvider } from "./lib/fazenda";
+import Animais from "./paginas/Animais";
 import Clientes from "./paginas/Clientes";
 import Dashboard from "./paginas/Dashboard";
 import EmConstrucao from "./paginas/EmConstrucao";
@@ -21,7 +22,7 @@ export default function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/fazenda" element={<EmConstrucao titulo="Fazenda" />} />
               <Route path="/piquetes" element={<Piquetes />} />
-              <Route path="/animais" element={<EmConstrucao titulo="Animais" />} />
+              <Route path="/animais" element={<Animais />} />
               <Route path="/manejos" element={<Manejos />} />
               <Route
                 path="/notificacoes"
