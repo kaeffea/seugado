@@ -227,9 +227,7 @@ def lembrar_pendentes(
 
     Records nothing and does not commit: until the producer answers, the lote stays put.
     """
-    # Imported here, not at the top: persistencia/planos.py (João) only reaches main at the
-    # Monday integration (LEO.md, section 2). The ignore covers both before and after it.
-    from seugado.persistencia.planos import (  # type: ignore[import-not-found, unused-ignore]  # noqa: PLC0415
+    from seugado.persistencia.planos import (  # noqa: PLC0415
         carregar_plano_atual,
         ids_respondidos,
     )

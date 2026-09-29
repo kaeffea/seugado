@@ -429,9 +429,7 @@ def tratar_plano_candidato(ctx: Contexto, acao: str, plano_id: UUID) -> None:
     The plan id comes from callback data, which a modified client can forge (Bot API docs),
     so it only counts when it is a plan of this chat's own farm.
     """
-    # Imported here, not at the top: persistencia/planos.py and planner/comparacao.py (João)
-    # only reach main at the Monday integration (LEO.md, section 2). The ignores hold either way.
-    from seugado.persistencia.planos import (  # type: ignore[import-not-found, unused-ignore]  # noqa: PLC0415
+    from seugado.persistencia.planos import (  # noqa: PLC0415
         carregar_plano,
         carregar_plano_atual,
         descartar_plano,
@@ -449,7 +447,7 @@ def tratar_plano_candidato(ctx: Contexto, acao: str, plano_id: UUID) -> None:
         ctx.responder(CANDIDATO_JA_EM_USO if status == "vigente" else CANDIDATO_VENCIDO)
         return
     if acao == "pv":
-        from seugado.planner.comparacao import (  # type: ignore[import-not-found, unused-ignore]  # noqa: PLC0415
+        from seugado.planner.comparacao import (  # noqa: PLC0415
             comparar_planos,
         )
 
@@ -484,8 +482,7 @@ def _recalcular(ctx: Contexto, aviso: str) -> None:
     """
     ctx.responder(aviso)
     try:
-        # Imported here: jobs/ciclo.py (Leandro) only reaches main at the Monday integration.
-        from seugado.jobs.ciclo import (  # type: ignore[import-not-found, unused-ignore]  # noqa: PLC0415
+        from seugado.jobs.ciclo import (  # noqa: PLC0415
             executar_ciclo,
         )
 
@@ -500,7 +497,7 @@ def _recalcular(ctx: Contexto, aviso: str) -> None:
 
 
 def _plano_vigente(ctx: Contexto) -> PlanoManejo | None:
-    from seugado.persistencia.planos import (  # type: ignore[import-not-found, unused-ignore]  # noqa: PLC0415
+    from seugado.persistencia.planos import (  # noqa: PLC0415
         carregar_plano_atual,
     )
 
