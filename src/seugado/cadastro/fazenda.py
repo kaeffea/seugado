@@ -34,7 +34,9 @@ class FazendaIn(BaseModel):
 class FazendaOut(FazendaIn):
     """Fazenda API response."""
     id: UUID
-    cliente_nome: str
+    # Fazendas antigas podem não ter cliente vinculado.
+    cliente_id: UUID | None = None  # type: ignore[assignment]
+    cliente_nome: str | None = None
 
 
 def listar_fazendas(conn: psycopg.Connection[Any]) -> list[FazendaOut]:

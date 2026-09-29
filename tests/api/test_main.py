@@ -1,6 +1,7 @@
 """API smoke tests."""
 
 import uuid
+from unittest.mock import MagicMock
 
 import httpx
 import pytest
@@ -8,6 +9,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from seugado.api import auth
+from seugado.api.deps import obter_conexao
 from seugado.api.main import app
 
 client = TestClient(app)
@@ -207,18 +209,22 @@ def test_criar_cliente_apos_autorizacao(monkeypatch: pytest.MonkeyPatch) -> None
         observacoes=None,
     )
     monkeypatch.setattr(clientes, "criar_cliente", lambda conn, dados: cliente_mock)
+    app.dependency_overrides[obter_conexao] = lambda: MagicMock()
 
-    # 1. Without token: returns 401
-    resp_unauth = client.post(
-        "/clientes", json={"nome": "Cliente Teste", "telefone": "82999990000"}
-    )
-    assert resp_unauth.status_code == 401
+    try:
+        # 1. Without token: returns 401
+        resp_unauth = client.post(
+            "/clientes", json={"nome": "Cliente Teste", "telefone": "82999990000"}
+        )
+        assert resp_unauth.status_code == 401
 
-    # 2. With token: returns 201
-    resp_auth = client.post(
-        "/clientes",
-        json={"nome": "Cliente Teste", "telefone": "82999990000"},
-        headers={"Authorization": "Bearer valid_token"},
-    )
-    assert resp_auth.status_code == 201
-    assert resp_auth.json()["nome"] == "Cliente Teste"
+        # 2. With token: returns 201
+        resp_auth = client.post(
+            "/clientes",
+            json={"nome": "Cliente Teste", "telefone": "82999990000"},
+            headers={"Authorization": "Bearer valid_token"},
+        )
+        assert resp_auth.status_code == 201
+        assert resp_auth.json()["nome"] == "Cliente Teste"
+    finally:
+        app.dependency_overrides.pop(obter_conexao, None)
