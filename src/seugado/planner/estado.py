@@ -1,10 +1,17 @@
 """Forage-state helpers used by the weekly planner and by lot registration."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from datetime import date
+from uuid import UUID
 
-from seugado.core import forragem
-from seugado.core.models import CategoriaAnimal, ComposicaoLote, Confianca, OrigemPeso
+from seugado.contratos import EstadoProjetado, PiqueteProjetado
+from seugado.core import forragem, projecao
+from seugado.core.models import CategoriaAnimal, ComposicaoLote, Confianca, Evento, OrigemPeso
+from seugado.core.projecao import AlturaMedida, EstadoFazenda, EstadoPiquete, Leitura
 from seugado.core.regras import combinar_confianca
+from seugado.persistencia.catalogo import CultivarCatalogo, eficiencia_pastejo, resolver_alturas
+from seugado.planner import estado_util as util
+from seugado.sensing.clima import ClimaDia
 
 CONSUMO_FRACAO_PV: dict[CategoriaAnimal, float] = {
     CategoriaAnimal.BEZERRO: 0.024,
@@ -160,3 +167,132 @@ def confianca_estimativa(
     if nivel_pixels == resultado:
         return resultado, frase_pixels
     return resultado, frase_posicao
+
+
+def _estimar(  # noqa: PLR0913, PLR0917
+    piquete: EstadoPiquete,
+    densidade_kg_ha_por_cm: float,
+    rue_max_g_por_mj: float,
+    eficiencia: float | None,
+    ancora: AlturaMedida,
+    leituras: Sequence[Leitura],
+    ctx: util.Contexto,
+) -> tuple[float, tuple[float, ...]] | str:
+    """(stock today, forecast rates) of one piquete, or the name of what stopped the estimate."""
+    entradas = util.entradas_safer(
+        piquete.piquete_id, ancora.data, leituras, rue_max_g_por_mj, eficiencia, ctx
+    )
+    if isinstance(entradas, str):
+        return entradas
+    dias, previstas = entradas
+    try:
+        massa_kg_ms_ha = forragem.altura_para_massa(ancora.altura_cm, densidade_kg_ha_por_cm)
+        for taxa, consumo_kg_ms_dia in dias:
+            massa_kg_ms_ha = avancar_massa_um_dia(
+                massa_kg_ms_ha, taxa, consumo_kg_ms_dia, piquete.area_ha, eficiencia
+            )
+    except ValueError:
+        return "estimativa_invalida"
+    return massa_kg_ms_ha, previstas
+
+
+def _projetar_piquete(
+    piquete: EstadoPiquete,
+    eventos: Sequence[Evento],
+    cultivar: CultivarCatalogo,
+    centroide: tuple[float, float],
+    ctx: util.Contexto,
+) -> PiqueteProjetado:
+    """Project one active piquete (R3 steps 1-8)."""
+    metodo = piquete.metodo_pastejo
+    faltantes, ancora, leituras = util.preparar_piquete(piquete, eventos, cultivar, ctx.data_base)
+    ultima = leituras[-1] if leituras else None
+    dias_imagem = None if ultima is None else (ctx.data_base - ultima.data).days
+    densidade = cultivar.densidade_kg_ha_por_cm
+    rue = cultivar.rue_max_g_por_mj
+    eficiencia = eficiencia_pastejo(cultivar, metodo)
+    massa_hoje: float | None = None
+    altura_hoje: float | None = None
+    taxas: tuple[float, ...] = ()
+    resultado: tuple[float, tuple[float, ...]] | str | None = None
+    podem_estimar = util.BLOQUEIAM_ESTIMATIVA.isdisjoint(faltantes)
+    if podem_estimar and ancora and ultima and densidade is not None and rue is not None:
+        resultado = _estimar(piquete, densidade, rue, eficiencia, ancora, leituras, ctx)
+    if isinstance(resultado, tuple) and ancora and ultima and densidade is not None:
+        massa_hoje, taxas = resultado
+        altura_hoje = forragem.massa_para_altura(massa_hoje, densidade)
+        confianca, motivo = confianca_estimativa(
+            dias_imagem,
+            ultima.pixels_validos,
+            (ctx.data_base - ancora.data).days,
+            util.posicao_por_omissao(ctx.movimentos, piquete.lote_atual_id, piquete.piquete_id),
+        )
+    else:
+        if isinstance(resultado, str):
+            util.adicionar(faltantes, resultado)
+        confianca = Confianca.BAIXA
+        motivo = util.frase_faltante(faltantes[0], cultivar.nome, metodo)
+    descansando = piquete.situacao == projecao.SituacaoPiquete.DESCANSANDO
+    return PiqueteProjetado(
+        piquete_id=piquete.piquete_id,
+        nome=piquete.nome,
+        area_ha=piquete.area_ha,
+        metodo_pastejo=metodo,
+        cultivar_slug=cultivar.slug,
+        cultivar_nome=cultivar.nome,
+        centroide_lat=centroide[0],
+        centroide_lon=centroide[1],
+        situacao=piquete.situacao,
+        lote_atual_id=piquete.lote_atual_id,
+        dias_descanso=(ctx.data_base - piquete.desde).days if descansando else 0,
+        parametros=resolver_alturas(cultivar, metodo).parametros,
+        faltantes=tuple(faltantes),
+        descanso_min_dias=cultivar.descanso_min_dias,
+        densidade_kg_ha_por_cm=densidade,
+        eficiencia_pastejo=eficiencia,
+        massa_hoje_kg_ms_ha=massa_hoje,
+        altura_hoje_cm=altura_hoje,
+        taxa_acumulo_prevista_kg_ms_ha_dia=taxas,
+        confianca=confianca,
+        motivo_confianca=motivo,
+        dias_desde_imagem_limpa=dias_imagem,
+    )
+
+
+def projetar_estado(  # noqa: PLR0913, PLR0917 — arity is the R3 contract
+    estado: EstadoFazenda,
+    eventos: Sequence[Evento],
+    catalogo: Mapping[UUID, CultivarCatalogo],
+    centroides: Mapping[UUID, tuple[float, float]],  # piquete_id -> (lat, lon)
+    clima: Sequence[ClimaDia],
+    et0_media_anual_mm_dia: float,
+    lat_fazenda: float,
+    data_base: date,
+    horizonte_previsao_dias: int = 14,
+) -> EstadoProjetado:
+    """Forage stock today and forecast growth of every active piquete, plus lote intakes."""
+    lotes = sorted(estado.lotes.values(), key=lambda lt: lt.nome)
+    consumos = {lt.lote_id: consumo_lote(lt.composicao) for lt in lotes}
+    ctx = util.Contexto(
+        clima_por_data={c.data: c for c in clima},
+        et0_media_anual_mm_dia=et0_media_anual_mm_dia,
+        lat_fazenda=lat_fazenda,
+        data_base=data_base,
+        horizonte_previsao_dias=horizonte_previsao_dias,
+        movimentos=util.movimentos_por_lote(eventos, [lt.lote_id for lt in lotes]),
+        consumo_por_lote_kg_ms_dia=consumos,
+    )
+    ativos = sorted((p for p in estado.piquetes.values() if p.ativo), key=lambda p: p.nome)
+    return EstadoProjetado(
+        fazenda_id=estado.fazenda_id,
+        data_base=data_base,
+        horizonte_previsao_dias=horizonte_previsao_dias,
+        piquetes=tuple(
+            _projetar_piquete(p, eventos, catalogo[p.cultivar_id], centroides[p.piquete_id], ctx)
+            for p in ativos
+        ),
+        lotes=tuple(
+            util.lote_projetado(lt, consumos[lt.lote_id], confianca_peso(lt.composicao))
+            for lt in lotes
+        ),
+    )

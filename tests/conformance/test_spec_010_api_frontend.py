@@ -51,7 +51,7 @@ def test_deps_py_no_commit_and_closed_in_finally() -> None:
 
 
 def test_five_router_modules_are_empty_stubs() -> None:
-    """Five router files only have docstring + APIRouter instantiation."""
+    """Five router files instantiate APIRouter; unimplemented ones remain stubs."""
     router_files = (
         "rotas_fazenda.py",
         "rotas_lotes.py",
@@ -59,11 +59,25 @@ def test_five_router_modules_are_empty_stubs() -> None:
         "rotas_plano.py",
         "rotas_telegram.py",
     )
+    # rotas_fazenda.py, rotas_lotes.py, and rotas_piquetes.py are implemented
+    implemented = {"rotas_fazenda.py", "rotas_lotes.py", "rotas_piquetes.py"}
     for name in router_files:
         path = API_DIR / name
         assert path.exists(), f"Missing router stub: {name}"
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        # Must only contain docstring, imports, and router = APIRouter(...)
+        has_router = any(
+            isinstance(stmt, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "router"
+                for target in stmt.targets
+            )
+            and isinstance(stmt.value, ast.Call)
+            for stmt in tree.body
+        )
+        assert has_router, f"Router not instantiated in {name}"
+        if name in implemented:
+            continue
+        # Unimplemented routers must only contain docstring, imports, and router = APIRouter(...)
         for stmt in tree.body:
             if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant):
                 continue

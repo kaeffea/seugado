@@ -557,6 +557,7 @@ def test_ac12_pyproject_has_no_dependencies_if_present():
     deps = data.get("project", {}).get("dependencies", [])
     # ADR-020 (F-004) authorized psycopg[binary] and pydantic
     # SPEC-010 precondition authorized fastapi, uvicorn[standard], httpx, earthengine-api
+    # OAuth2PasswordRequestForm in FastAPI requires python-multipart
     names = {d.split(">=")[0].split("==")[0].strip() for d in deps}
     assert names <= {
         "psycopg[binary]",
@@ -565,6 +566,7 @@ def test_ac12_pyproject_has_no_dependencies_if_present():
         "uvicorn[standard]",
         "httpx",
         "earthengine-api",
+        "python-multipart",
     }
 
 

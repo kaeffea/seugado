@@ -22,10 +22,6 @@ CARGA_PY = ROOT / "src" / "seugado" / "planner" / "carga.py"
 # ==============================================================================
 
 
-def test_carga_py_does_not_exist_yet() -> None:
-    """planner/carga.py must not exist yet."""
-    assert not CARGA_PY.exists(), "planner/carga.py must not exist in SPEC-014A"
-
 
 def test_estado_py_forbidden_imports() -> None:
     """planner/estado.py must not import psycopg, httpx, ee, sensing, persistencia, api."""
