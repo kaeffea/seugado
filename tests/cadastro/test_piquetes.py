@@ -1,17 +1,27 @@
 """Testes para o cadastro de piquetes."""
 
 import os
-from datetime import UTC, date, datetime
-from uuid import uuid4
+from collections.abc import Iterator
+from datetime import date, datetime
+from typing import Any
+from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
+import psycopg
 import pytest
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from seugado.api.auth import UsuarioAtual, usuario_atual
+from seugado.api.deps import obter_conexao
+from seugado.api.main import app
 from seugado.cadastro.clientes import ClienteIn, criar_cliente
 from seugado.cadastro.fazenda import FazendaIn, criar_fazenda
+from seugado.cadastro.lotes import ComposicaoItemIn, LoteIn, criar_lote
 from seugado.cadastro.piquetes import (
     AlturaIn,
     PiqueteIn,
+    PiqueteOcupadoError,
     area_ha,
     criar_piquete,
     desativar_piquete,
@@ -19,6 +29,7 @@ from seugado.cadastro.piquetes import (
     listar_piquetes,
     registrar_altura,
 )
+from seugado.core.models import CategoriaAnimal
 
 
 # Testes sem banco
@@ -140,7 +151,7 @@ def test_ciclo_piquete_com_banco(db_conn, fazenda_id):
         fazenda_id,
         p_id,
         usuario_id,
-        AlturaIn(altura_cm=35.0, data=datetime.now(UTC).date()),
+        AlturaIn(altura_cm=35.0, data=datetime.now(ZoneInfo("America/Fortaleza")).date()),
     )
     lista3 = listar_piquetes(db_conn, fazenda_id)
     assert lista3[0].ultima_altura_cm == 35.0
@@ -167,3 +178,203 @@ def test_area_ha_valida_poligono_invalido(db_conn):
     }
     with pytest.raises(ValueError, match="Polígono inválido"):
         area_ha(db_conn, geometria)
+
+
+# Regras de cadastro (E2/E3): validações antes do evento, nome único, área, 409 só p/ ocupado
+
+# Irregular quadrilateral whose raw area has many decimals.
+GEOMETRIA_IRREGULAR = {
+    "type": "Polygon",
+    "coordinates": [
+        [
+            [-46.0, -23.0],
+            [-46.0017, -23.0003],
+            [-46.0021, -23.0019],
+            [-46.0003, -23.0023],
+            [-46.0, -23.0],
+        ]
+    ],
+}
+
+
+class _ConexaoSemCommit:
+    """Delegates to the test connection but ignores commit/rollback from the routes.
+
+    Keeps everything inside the fixture's transaction, which db_conn rolls back at the end,
+    so the shared database is never written.
+    """
+
+    def __init__(self, conn: Any) -> None:
+        self._conn = conn
+
+    def commit(self) -> None:
+        return None
+
+    def rollback(self) -> None:
+        return None
+
+    def __getattr__(self, nome: str) -> Any:
+        return getattr(self._conn, nome)
+
+
+@pytest.fixture
+def api(db_conn: psycopg.Connection[Any]) -> Iterator[TestClient]:
+    """TestClient logged in, using the test transaction as the request connection."""
+    conexao = _ConexaoSemCommit(db_conn)
+
+    def _conexao() -> Iterator[Any]:
+        yield conexao
+
+    app.dependency_overrides[obter_conexao] = _conexao
+    app.dependency_overrides[usuario_atual] = lambda: UsuarioAtual(id=uuid4(), email=None)
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.pop(obter_conexao, None)
+        app.dependency_overrides.pop(usuario_atual, None)
+
+
+def _cultivar_id(db_conn: psycopg.Connection[Any]) -> UUID:
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT id FROM cultivar ORDER BY nome LIMIT 1")
+        row = cur.fetchone()
+    assert row is not None, "catálogo de cultivares vazio"
+    return UUID(str(row[0]))
+
+
+def _corpo(nome: str, cultivar_id: UUID) -> dict[str, Any]:
+    return {
+        "nome": nome,
+        "geometria": GEOMETRIA_IRREGULAR,
+        "cultivar_id": str(cultivar_id),
+        "metodo_pastejo": "rotacionado",
+        "altura_atual_cm": 30.0,
+    }
+
+
+def _contar_eventos(db_conn: psycopg.Connection[Any], fazenda_id: UUID) -> int:
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM evento WHERE fazenda_id = %s", (fazenda_id,))
+        row = cur.fetchone()
+    assert row is not None
+    return int(row[0])
+
+
+def test_criar_com_cultivar_inexistente_da_400_sem_evento(db_conn, fazenda_id, api):
+    antes = _contar_eventos(db_conn, fazenda_id)
+    resp = api.post(f"/fazendas/{fazenda_id}/piquetes", json=_corpo("Piquete X", uuid4()))
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "Cultivar não encontrada"
+    assert _contar_eventos(db_conn, fazenda_id) == antes
+
+
+def test_criar_com_nome_repetido_da_400_sem_evento(db_conn, fazenda_id, api):
+    cultivar_id = _cultivar_id(db_conn)
+    primeiro = api.post(f"/fazendas/{fazenda_id}/piquetes", json=_corpo("Piquete 1", cultivar_id))
+    assert primeiro.status_code == 201
+    antes = _contar_eventos(db_conn, fazenda_id)
+
+    repetido = api.post(f"/fazendas/{fazenda_id}/piquetes", json=_corpo("Piquete 1", cultivar_id))
+    assert repetido.status_code == 400
+    assert repetido.json()["detail"] == "Já existe um piquete ativo com esse nome"
+    assert _contar_eventos(db_conn, fazenda_id) == antes
+
+
+def test_editar_com_nome_de_outro_piquete_da_400(db_conn, fazenda_id, api):
+    cultivar_id = _cultivar_id(db_conn)
+    api.post(f"/fazendas/{fazenda_id}/piquetes", json=_corpo("Piquete 1", cultivar_id))
+    segundo = api.post(f"/fazendas/{fazenda_id}/piquetes", json=_corpo("Piquete 2", cultivar_id))
+    corpo = _corpo("Piquete 1", cultivar_id)
+    del corpo["altura_atual_cm"]
+    resp = api.put(f"/fazendas/{fazenda_id}/piquetes/{segundo.json()['id']}", json=corpo)
+    assert resp.status_code == 400
+
+
+def test_editar_mantendo_o_proprio_nome_funciona(db_conn, fazenda_id):
+    cultivar_id = _cultivar_id(db_conn)
+    usuario_id = uuid4()
+    dados = PiqueteIn(
+        nome="Piquete Fixo",
+        geometria=GEOMETRIA_IRREGULAR,
+        cultivar_id=cultivar_id,
+        metodo_pastejo="rotacionado",
+        altura_atual_cm=30.0,
+    )
+    p_id = criar_piquete(db_conn, fazenda_id, usuario_id, dados)
+    editar_piquete(
+        db_conn,
+        fazenda_id,
+        p_id,
+        usuario_id,
+        dados.model_copy(update={"metodo_pastejo": "continuo", "altura_atual_cm": None}),
+    )
+    [p] = listar_piquetes(db_conn, fazenda_id)
+    assert p.nome == "Piquete Fixo"
+    assert p.metodo_pastejo == "continuo"
+
+
+def test_area_arredondada_em_duas_casas(db_conn, fazenda_id):
+    bruta = area_ha(db_conn, GEOMETRIA_IRREGULAR)
+    assert bruta != round(bruta, 2)  # the fixture really has more than 2 decimals
+
+    p_id = criar_piquete(
+        db_conn,
+        fazenda_id,
+        uuid4(),
+        PiqueteIn(
+            nome="Piquete Area",
+            geometria=GEOMETRIA_IRREGULAR,
+            cultivar_id=_cultivar_id(db_conn),
+            metodo_pastejo="rotacionado",
+            altura_atual_cm=30.0,
+        ),
+    )
+    with db_conn.cursor() as cur:
+        cur.execute(
+            "SELECT payload->>'area_ha' FROM evento"
+            " WHERE fazenda_id = %s AND tipo = 'piquete_criado'",
+            (fazenda_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None
+    assert float(row[0]) == round(bruta, 2)
+    [p] = listar_piquetes(db_conn, fazenda_id)
+    assert p.id == p_id
+    assert p.area_ha == round(bruta, 2)
+
+
+def test_delete_de_piquete_ocupado_da_409(db_conn, fazenda_id, api):
+    cultivar_id = _cultivar_id(db_conn)
+    criado = api.post(
+        f"/fazendas/{fazenda_id}/piquetes", json=_corpo("Piquete Ocupado", cultivar_id)
+    )
+    assert criado.status_code == 201
+    p_id = UUID(criado.json()["id"])
+    criar_lote(
+        db_conn,
+        fazenda_id,
+        str(uuid4()),
+        LoteIn(
+            nome="Lote Teste",
+            composicao=[ComposicaoItemIn(categoria=CategoriaAnimal.NOVILHO, n_animais=10)],
+            piquete_atual_id=p_id,
+        ),
+    )
+    with pytest.raises(PiqueteOcupadoError):
+        desativar_piquete(db_conn, fazenda_id, p_id, uuid4())
+
+    resp = api.delete(f"/fazendas/{fazenda_id}/piquetes/{p_id}")
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == "Tire o lote do piquete antes de desativá-lo"
+
+
+def test_registrar_altura_no_futuro_da_fazenda_da_400(db_conn, fazenda_id, api):
+    cultivar_id = _cultivar_id(db_conn)
+    criado = api.post(f"/fazendas/{fazenda_id}/piquetes", json=_corpo("Piquete H", cultivar_id))
+    hoje_fazenda = datetime.now(ZoneInfo("America/Fortaleza")).date()
+    amanha = date.fromordinal(hoje_fazenda.toordinal() + 1)
+    url = f"/fazendas/{fazenda_id}/piquetes/{criado.json()['id']}/alturas"
+    hoje_ok = api.post(url, json={"altura_cm": 25.0, "data": hoje_fazenda.isoformat()})
+    assert hoje_ok.status_code == 201
+    futuro = api.post(url, json={"altura_cm": 25.0, "data": amanha.isoformat()})
+    assert futuro.status_code == 400

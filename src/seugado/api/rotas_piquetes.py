@@ -11,6 +11,7 @@ from seugado.api.deps import Conexao
 from seugado.cadastro.piquetes import (
     AlturaIn,
     PiqueteIn,
+    PiqueteOcupadoError,
     PiqueteOut,
     criar_piquete,
     desativar_piquete,
@@ -87,9 +88,12 @@ def api_desativar_piquete(
     except LookupError as e:
         conn.rollback()
         raise HTTPException(status_code=404, detail=str(e)) from e
-    except ValueError as e:
+    except PiqueteOcupadoError as e:
         conn.rollback()
         raise HTTPException(status_code=409, detail=str(e)) from e
+    except ValueError as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.post("/fazendas/{fazenda_id}/piquetes/{piquete_id}/alturas", status_code=201)

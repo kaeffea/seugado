@@ -2,6 +2,7 @@ import json
 from datetime import UTC, date, datetime
 from typing import Any, Literal
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 import psycopg
 from psycopg.rows import dict_row
@@ -41,6 +42,45 @@ class PiqueteOut(BaseModel):
     ultima_altura_data: date | None
 
 
+class PiqueteOcupadoError(ValueError):
+    """The piquete has a lote in it and cannot be deactivated (the route answers 409)."""
+
+
+def _hoje_na_fazenda(conn: psycopg.Connection[Any], fazenda_id: UUID) -> date:
+    """Today's date in the farm's timezone, not UTC."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT timezone FROM fazenda WHERE id = %s", (fazenda_id,))
+        row = cur.fetchone()
+    if row is None:
+        raise LookupError("Fazenda não encontrada")
+    return datetime.now(ZoneInfo(str(row[0]))).date()
+
+
+def _validar_cultivar(conn: psycopg.Connection[Any], cultivar_id: UUID) -> None:
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM cultivar WHERE id = %s", (cultivar_id,))
+        if cur.fetchone() is None:
+            raise ValueError("Cultivar não encontrada")
+
+
+def _validar_nome_piquete(
+    conn: psycopg.Connection[Any],
+    fazenda_id: UUID,
+    nome: str,
+    ignorar_piquete_id: UUID | None = None,
+) -> None:
+    """Names are unique among the farm's active piquetes; editing may keep its own name."""
+    query = "SELECT 1 FROM estado_piquete WHERE fazenda_id = %s AND ativo = TRUE AND nome = %s"
+    params: list[Any] = [fazenda_id, nome]
+    if ignorar_piquete_id is not None:
+        query += " AND piquete_id != %s"
+        params.append(ignorar_piquete_id)
+    with conn.cursor() as cur:
+        cur.execute(query, tuple(params))
+        if cur.fetchone() is not None:
+            raise ValueError("Já existe um piquete ativo com esse nome")
+
+
 def area_ha(conn: psycopg.Connection[Any], geometria: dict[str, Any]) -> float:
     """Calcula a área em hectares via PostGIS e verifica validade."""
     with conn.cursor() as cur:
@@ -70,7 +110,11 @@ def criar_piquete(
     if dados.altura_atual_cm is None:
         raise ValueError("altura_atual_cm é obrigatória na criação")
 
-    area = area_ha(conn, dados.geometria)
+    # Every check runs before the first event, so a failure records nothing.
+    _validar_cultivar(conn, dados.cultivar_id)
+    _validar_nome_piquete(conn, fazenda_id, dados.nome)
+    area = round(area_ha(conn, dados.geometria), 2)
+    hoje = _hoje_na_fazenda(conn, fazenda_id)
     piquete_id = uuid4()
     agora = datetime.now(UTC)
 
@@ -94,7 +138,7 @@ def criar_piquete(
     )
 
     # Evento ALTURA_MEDIDA
-    data_med = dados.data_medicao or agora.date()
+    data_med = dados.data_medicao or hoje
     registrar_evento(
         conn=conn,
         fazenda_id=fazenda_id,
@@ -131,7 +175,9 @@ def editar_piquete(
         if not cur.fetchone():
             raise LookupError("Piquete não encontrado")
 
-    area = area_ha(conn, dados.geometria)
+    _validar_cultivar(conn, dados.cultivar_id)
+    _validar_nome_piquete(conn, fazenda_id, dados.nome, ignorar_piquete_id=piquete_id)
+    area = round(area_ha(conn, dados.geometria), 2)
     agora = datetime.now(UTC)
 
     registrar_evento(
@@ -179,7 +225,7 @@ def desativar_piquete(
         raise LookupError("Piquete não encontrado")
     
     if row["lote_atual_id"] is not None:
-        raise ValueError("Tire o lote do piquete antes de desativá-lo")
+        raise PiqueteOcupadoError("Tire o lote do piquete antes de desativá-lo")
 
     agora = datetime.now(UTC)
     registrar_evento(
@@ -220,9 +266,9 @@ def registrar_altura(
         if not cur.fetchone():
             raise LookupError("Piquete não encontrado")
 
-    agora = datetime.now(UTC)
-    if dados.data > agora.date():
+    if dados.data > _hoje_na_fazenda(conn, fazenda_id):
         raise ValueError("Data da medição não pode ser no futuro")
+    agora = datetime.now(UTC)
 
     registrar_evento(
         conn=conn,
