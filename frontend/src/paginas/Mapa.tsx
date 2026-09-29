@@ -1,11 +1,10 @@
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, Polygon, Tooltip, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "@geoman-io/leaflet-geoman-free";
 import { useFazenda } from "../lib/fazenda";
 import { api, ErroApi } from "../lib/api";
 import type { Piquete, Cultivar, PlanoManejo, GeoJsonPolygon } from "../lib/tipos";
-import planoMock from "../componentes/mapa/plano_exemplo.json";
 import "./Mapa.css";
 
 function ControlesMapa({
@@ -113,7 +112,8 @@ export default function Mapa() {
   const [piquetes, setPiquetes] = useState<Piquete[]>([]);
   const [cultivares, setCultivares] = useState<Cultivar[]>([]);
   const [plano, setPlano] = useState<PlanoManejo | null>(null);
-  
+  const [semPlano, setSemPlano] = useState(false);
+
   const [novoPiqueteGeometria, setNovoPiqueteGeometria] = useState<GeoJsonPolygon | null>(null);
   const [nome, setNome] = useState("");
   const [cultivarId, setCultivarId] = useState("");
@@ -127,9 +127,12 @@ export default function Mapa() {
 
   const [confirmarDesativacaoId, setConfirmarDesativacaoId] = useState<string | null>(null);
 
+  // Incrementing it reloads piquetes and plano (after a failed save or a cancelled edit).
+  const [recarga, setRecarga] = useState(0);
+  const carregarPiquetesEPlano = useCallback(() => setRecarga(n => n + 1), []);
+
   useEffect(() => {
     if (!fazenda) return;
-    
     api<Cultivar[]>("/cultivares")
       .then(dados => {
         setCultivares(dados);
@@ -137,31 +140,41 @@ export default function Mapa() {
         if (marandu) setCultivarId(marandu.id);
       })
       .catch(console.error);
-      
-    carregarPiquetesEPlano();
   }, [fazenda]);
 
-  const carregarPiquetesEPlano = async () => {
+  useEffect(() => {
     if (!fazenda) return;
-    try {
-      const p = await api<Piquete[]>(`/fazendas/${fazenda.id}/piquetes`);
-      setPiquetes(p);
-      setNome(`Piquete ${p.length + 1}`);
-      try {
-        const pl = await api<PlanoManejo>(`/fazendas/${fazenda.id}/plano/atual`);
+    let cancelado = false;
+
+    api<Piquete[]>(`/fazendas/${fazenda.id}/piquetes`)
+      .then(p => {
+        if (cancelado) return;
+        setPiquetes(p);
+        setNome(`Piquete ${p.length + 1}`);
+      })
+      .catch(console.error);
+
+    api<PlanoManejo>(`/fazendas/${fazenda.id}/plano/atual`)
+      .then(pl => {
+        if (cancelado) return;
         setPlano(pl);
-      } catch (e) {
+        setSemPlano(false);
+      })
+      .catch(e => {
+        if (cancelado) return;
         if (e instanceof ErroApi && e.status === 404) {
-          // Fallback para o mock conforme regra E5 para testes
-          setPlano(planoMock as unknown as PlanoManejo);
+          // Sem plano ainda: piquetes em cinza ("sem estimativa") e aviso no painel.
+          setPlano(null);
+          setSemPlano(true);
         } else {
           console.error(e);
         }
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [fazenda, recarga]);
 
   const aoSalvarNovo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -405,7 +418,7 @@ export default function Mapa() {
         ) : (
           <div>
             <h2>Piquetes ({piquetes.length})</h2>
-            {!plano && <p style={{fontSize: '0.9em', color: '#666'}}>Ainda não há plano. Gere na página Plano da semana.</p>}
+            {semPlano && <p style={{fontSize: '0.9em', color: '#666'}}>Ainda não há plano para esta fazenda</p>}
             <ul className="lista-piquetes">
               {piquetes.map(p => (
                 <li 
