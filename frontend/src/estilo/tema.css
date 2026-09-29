@@ -43,7 +43,8 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 12px 12px;
+  padding: 20px 12px 12px;
+  margin-bottom: 16px;
 }
 
 .menu-logo {
@@ -60,7 +61,7 @@ body {
 .menu-grupo {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 12px;
 }
 
 .menu-item {
@@ -101,7 +102,7 @@ body {
 .menu-rodape {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 20px;
   margin-top: auto;
   padding: 12px;
   font-size: 13px;
@@ -128,31 +129,14 @@ body {
   min-width: 0;
 }
 
-.menu-email {
+.menu-perfil-principal {
   font-weight: 600;
   color: var(--cor-menu-ativo-texto);
   overflow-wrap: anywhere;
 }
 
-.menu-fazenda-nome {
+.menu-perfil-secundario {
   overflow-wrap: anywhere;
-}
-
-.menu-rotulo {
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.menu-select {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 100%;
-  padding: 8px;
-  border: 0;
-  border-radius: var(--raio);
-  font-family: var(--fonte);
-  font-size: 14px;
 }
 
 .menu-sair {

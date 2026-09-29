@@ -36,7 +36,7 @@ const MENU_SECUNDARIO: ItemMenu[] = [
 ];
 
 export default function Layout() {
-  const { usuario, fazendas, fazenda, selecionar } = useFazenda();
+  const { fazenda } = useFazenda();
   const localizacao = useLocation();
 
   async function sair(): Promise<void> {
@@ -76,27 +76,10 @@ export default function Layout() {
           <div className="menu-perfil">
             <span className="menu-avatar" aria-hidden="true" />
             <div className="menu-perfil-texto">
-              <span className="menu-email">{usuario?.email ?? "sem e-mail"}</span>
-              <span className="menu-fazenda-nome">
-                {fazenda?.nome ?? "nenhuma fazenda"}
-              </span>
+              <span className="menu-perfil-principal">Fazenda Bela Vista</span>
+              <span className="menu-perfil-secundario">Kauê Fortaleza</span>
             </div>
           </div>
-          <label className="menu-rotulo" htmlFor="seletor-fazenda">
-            Fazenda ativa
-          </label>
-          <select
-            id="seletor-fazenda"
-            className="menu-select"
-            value={fazenda?.id ?? ""}
-            onChange={(evento) => selecionar(evento.target.value)}
-          >
-            {fazendas.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.nome}
-              </option>
-            ))}
-          </select>
           <button type="button" className="menu-sair" onClick={() => void sair()}>
             Sair
           </button>
