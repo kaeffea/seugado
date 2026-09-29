@@ -3,6 +3,7 @@
 Every register function rebuilds the projection but never commits: bot.py does.
 """
 
+import logging
 from datetime import UTC, date, datetime
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -13,10 +14,13 @@ import psycopg
 from seugado.contratos import Movimentacao, PlanoManejo
 from seugado.core.models import OrigemEvento, TipoEvento
 from seugado.delivery.canais.base import Canal
+from seugado.delivery.canais.telegram import ErroTelegram
 from seugado.delivery.envio import enviar_lembrete
 from seugado.delivery.mensagem import ALTURA_FORA_DA_FAIXA, JA_RESPONDIDA
 from seugado.persistencia.eventos import registrar_evento
 from seugado.persistencia.projecao_db import reconstruir_projecao
+
+log = logging.getLogger(__name__)
 
 ALTURA_MAXIMA_CM = 400.0
 
@@ -235,6 +239,12 @@ def lembrar_pendentes(
         return 0
     respondidas: frozenset[UUID] = ids_respondidos(conn, fazenda_id)
     pendentes = [m for m in plano.movimentacoes if m.data < hoje and m.id not in respondidas]
-    if not pendentes or not enviar_lembrete(conn, fazenda_id, pendentes, canal):
+    if not pendentes:
         return 0
-    return len(pendentes)
+    try:
+        enviado = enviar_lembrete(conn, fazenda_id, pendentes, canal)
+    except (ErroTelegram, RuntimeError):
+        # A failed reminder must not stop the daily cycle; tomorrow's run tries again.
+        log.exception("falha ao enviar lembrete da fazenda %s", fazenda_id)
+        return 0
+    return len(pendentes) if enviado else 0
