@@ -1,0 +1,32 @@
+.plano-gerar { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.plano-checkbox { display: flex; align-items: center; gap: 8px; font-size: .85rem; }
+.plano-checkbox input { accent-color: var(--cor-primaria); }
+.plano-periodo { margin: 0; padding-bottom: 16px; border-bottom: 1px solid var(--cor-borda); font-weight: 500; }
+.plano-demonstracao { border: 1px solid var(--cor-alerta); font-weight: 600; margin: 0; }
+.plano-secao, .plano-dia { display: grid; gap: 12px; }
+.plano-dia + .plano-dia { margin-top: 12px; }
+.plano-dia-titulo { color: var(--cor-texto-suave); font-size: .95rem; text-transform: capitalize; }
+.plano-movimento { border: 1px solid var(--cor-borda); border-left: 4px solid var(--cor-primaria); overflow-wrap: anywhere; }
+.plano-movimento-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.plano-movimento-topo h4 { flex: 1; min-width: 220px; font-size: 1rem; }
+.plano-seta { color: var(--cor-primaria); }
+.plano-movimento p { margin: 10px 0 0; }
+.plano-previsao { font-weight: 500; }
+.plano-alertas { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.plano-alerta { display: flex; align-items: flex-start; gap: 12px; margin: 0; border: 1px solid var(--cor-alerta-suave); }
+.plano-alerta p { margin: 4px 0; }
+.plano-alerta-icone { font-size: 1.4rem; min-width: 24px; text-align: center; }
+.plano-medicao { border: 1px solid var(--cor-borda); }
+.plano-medicao-campos { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.plano-medicao-campos .campo { flex: 1; min-width: 140px; }
+.plano-vazio { padding-block: 40px; text-align: center; }
+.plano-vazio p { margin-top: 12px; }
+.plano-spinner { width: 16px; height: 16px; border: 2px solid var(--cor-primaria-suave); border-top-color: var(--cor-superficie); border-radius: 50%; animation: plano-girar 1s linear infinite; }
+@keyframes plano-girar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .plano-spinner { animation: none; } }
+@media (max-width: 540px) {
+  .plano-gerar { align-items: flex-start; width: 100%; }
+  .plano-gerar .botao { width: 100%; }
+  .plano-movimento-topo h4 { min-width: 0; flex-basis: 100%; }
+  .plano-medicao-campos { flex-direction: column; align-items: stretch; }
+}
