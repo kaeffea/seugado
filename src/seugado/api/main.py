@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from seugado.api import (
     auth,
+    rotas_cultivares,
     rotas_fazenda,
     rotas_lotes,
     rotas_piquetes,
@@ -37,6 +38,7 @@ def saude() -> dict[str, bool]:
 
 
 app.include_router(auth.router)
+app.include_router(rotas_cultivares.router)
 app.include_router(rotas_fazenda.router)
 app.include_router(rotas_lotes.router)
 app.include_router(rotas_piquetes.router)
