@@ -34,12 +34,18 @@ def obter_token(
     """Exchange username (email) and password for a Supabase access token."""
     supabase_url = os.environ["SUPABASE_URL"]
     anon_key = os.environ["SUPABASE_ANON_KEY"]
-    response = httpx.post(
-        f"{supabase_url}/auth/v1/token?grant_type=password",
-        headers={"apikey": anon_key},
-        json={"email": form_data.username, "password": form_data.password},
-        timeout=10.0,
-    )
+    try:
+        response = httpx.post(
+            f"{supabase_url}/auth/v1/token?grant_type=password",
+            headers={"apikey": anon_key},
+            json={"email": form_data.username, "password": form_data.password},
+            timeout=10.0,
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Falha ao contatar o Supabase",
+        ) from exc
     if response.status_code != _HTTP_OK:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -74,11 +80,17 @@ def usuario_atual(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     supabase_url = os.environ["SUPABASE_URL"]
     anon_key = os.environ["SUPABASE_ANON_KEY"]
-    response = httpx.get(
-        f"{supabase_url}/auth/v1/user",
-        headers={"apikey": anon_key, "Authorization": f"Bearer {token_puro}"},
-        timeout=10.0,
-    )
+    try:
+        response = httpx.get(
+            f"{supabase_url}/auth/v1/user",
+            headers={"apikey": anon_key, "Authorization": f"Bearer {token_puro}"},
+            timeout=10.0,
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Falha ao contatar o Supabase",
+        ) from exc
     if response.status_code != _HTTP_OK:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     body: Any = response.json()
