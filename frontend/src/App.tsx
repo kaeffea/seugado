@@ -2,12 +2,14 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import Layout from "./componentes/Layout";
 import RotaProtegida from "./componentes/RotaProtegida";
 import { FazendaProvider } from "./lib/fazenda";
+import Animais from "./paginas/Animais";
 import Clientes from "./paginas/Clientes";
-import Configuracoes from "./paginas/Configuracoes";
+import Dashboard from "./paginas/Dashboard";
+import EmConstrucao from "./paginas/EmConstrucao";
 import Login from "./paginas/Login";
-import Lotes from "./paginas/Lotes";
+import Manejos from "./paginas/Manejo";
 import Mapa from "./paginas/Mapa";
-import Plano from "./paginas/Plano";
+import Piquetes from "./paginas/Piquetes";
 
 export default function App() {
   return (
@@ -17,15 +19,26 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route element={<RotaProtegida />}>
             <Route element={<Layout />}>
-              <Route path="/clientes" element={<Clientes />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/fazenda" element={<EmConstrucao titulo="Fazenda" />} />
+              <Route path="/piquetes" element={<Piquetes />} />
+              <Route path="/animais" element={<Animais />} />
+              <Route path="/manejos" element={<Manejos />} />
+              <Route
+                path="/notificacoes"
+                element={<EmConstrucao titulo="Notificações" />}
+              />
+              <Route
+                path="/configuracoes"
+                element={<EmConstrucao titulo="Configurações" />}
+              />
+              <Route path="/ajuda" element={<EmConstrucao titulo="Ajuda" />} />
               <Route path="/mapa" element={<Mapa />} />
-              <Route path="/lotes" element={<Lotes />} />
-              <Route path="/plano" element={<Plano />} />
-              <Route path="/configuracoes" element={<Configuracoes />} />
+              <Route path="/clientes" element={<Clientes />} />
             </Route>
           </Route>
-          <Route path="/" element={<Navigate to="/mapa" replace />} />
-          <Route path="*" element={<Navigate to="/mapa" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </FazendaProvider>
     </BrowserRouter>

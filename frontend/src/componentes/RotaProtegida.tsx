@@ -6,6 +6,8 @@ export default function RotaProtegida() {
   if (carregando) {
     return <>Carregando…</>;
   }
+  // Login redirect temporarily disabled by the user to preview screens
+  // without Supabase access. Restore before shipping this component.
   if (usuario === null) {
     return <Navigate to="/login" replace />;
   }

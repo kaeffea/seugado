@@ -1,7 +1,7 @@
-export default function Login() {
+export default function Fazenda() {
   return (
     <>
-      <h1>Login</h1>
+      <h1>Fazenda</h1>
       <p>Em construção — responsável: Leandro</p>
     </>
   );
