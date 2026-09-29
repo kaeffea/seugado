@@ -32,7 +32,7 @@ export default function Login() {
       }
       navigate("/mapa");
     } catch {
-      setErro("Não foi possível conectar. Tente novamente.");
+      setErro("E-mail ou senha incorretos");
     } finally {
       setEnviando(false);
     }

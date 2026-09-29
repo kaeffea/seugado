@@ -18,7 +18,7 @@ type EstadoTelegram =
   | { tipo: "ok"; status: StatusTelegram };
 
 function estadoDeErro(falha: unknown): EstadoTelegram {
-  // 404: a rota ainda não existe nesta versão da API
+  // A fazenda ou a rota pode estar indisponível; permita consultar novamente.
   if (falha instanceof ErroApi && falha.status === 404) {
     return { tipo: "indisponivel" };
   }
@@ -28,8 +28,12 @@ function estadoDeErro(falha: unknown): EstadoTelegram {
 function CartaoTelegram({ fazendaId }: { fazendaId: string }) {
   const [estado, setEstado] = useState<EstadoTelegram>({ tipo: "carregando" });
   const [copiado, setCopiado] = useState(false);
+  const [erroCopia, setErroCopia] = useState<string | null>(null);
 
   async function consultar(): Promise<void> {
+    setEstado({ tipo: "carregando" });
+    setCopiado(false);
+    setErroCopia(null);
     try {
       const status = await api<StatusTelegram>(`/fazendas/${fazendaId}/telegram`);
       setEstado({ tipo: "ok", status });
@@ -46,11 +50,13 @@ function CartaoTelegram({ fazendaId }: { fazendaId: string }) {
   }, [fazendaId]);
 
   async function copiar(link: string): Promise<void> {
+    setErroCopia(null);
     try {
       await navigator.clipboard.writeText(link);
       setCopiado(true);
     } catch {
       setCopiado(false);
+      setErroCopia("Não foi possível copiar. Selecione o link e copie manualmente.");
     }
   }
 
@@ -74,8 +80,15 @@ function CartaoTelegram({ fazendaId }: { fazendaId: string }) {
           <p>
             Mande este link para o produtor abrir no celular e tocar em <strong>Começar</strong>
           </p>
-          <code className="configuracoes-link">{estado.status.link}</code>
-          <div className="formulario-acoes">
+          <a className="configuracoes-link" href={estado.status.link} target="_blank" rel="noreferrer">
+            {estado.status.link}
+          </a>
+        </>
+      ) : null}
+      {erroCopia !== null ? <p className="aviso-erro" role="alert">{erroCopia}</p> : null}
+      {estado.tipo !== "ok" || !estado.status.vinculado ? (
+        <div className="formulario-acoes">
+          {estado.tipo === "ok" ? (
             <button
               type="button"
               className="botao botao-primario"
@@ -83,15 +96,16 @@ function CartaoTelegram({ fazendaId }: { fazendaId: string }) {
             >
               {copiado ? "Copiado ✓" : "Copiar"}
             </button>
-            <button
-              type="button"
-              className="botao botao-secundario"
-              onClick={() => void consultar()}
-            >
-              Atualizar status
-            </button>
-          </div>
-        </>
+          ) : null}
+          <button
+            type="button"
+            className="botao botao-secundario"
+            disabled={estado.tipo === "carregando"}
+            onClick={() => void consultar()}
+          >
+            Atualizar status
+          </button>
+        </div>
       ) : null}
     </section>
   );

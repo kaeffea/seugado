@@ -13,6 +13,7 @@
   padding: 10px 12px;
   border-radius: var(--raio-pequeno);
   background: var(--cor-fundo);
+  color: var(--cor-primaria);
   border: 1px solid var(--cor-borda);
   font-size: 0.85rem;
   word-break: break-all;

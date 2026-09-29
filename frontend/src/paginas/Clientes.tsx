@@ -183,6 +183,7 @@ export default function Clientes() {
   }
 
   async function aoCriarCliente(): Promise<void> {
+    await recarregar();
     setRecarga((n) => n + 1);
     setNovoCliente(false);
   }
