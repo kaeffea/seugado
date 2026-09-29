@@ -355,6 +355,11 @@ def test_inicializar_earth_engine_missing_env_raises_runtime_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Missing SEUGADO_GEE_PROJECT or JSON raises RuntimeError naming it."""
+    monkeypatch.setenv("SEUGADO_GEE_SERVICE_ACCOUNT_JSON", '{"client_email": "x"}')
     monkeypatch.delenv("SEUGADO_GEE_PROJECT", raising=False)
     with pytest.raises(RuntimeError, match="SEUGADO_GEE_PROJECT"):
+        inicializar_earth_engine()
+
+    monkeypatch.delenv("SEUGADO_GEE_SERVICE_ACCOUNT_JSON", raising=False)
+    with pytest.raises(RuntimeError, match="SEUGADO_GEE_SERVICE_ACCOUNT_JSON"):
         inicializar_earth_engine()

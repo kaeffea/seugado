@@ -1,7 +1,7 @@
 """Testes para o cadastro de piquetes."""
 
 import os
-from datetime import date
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 import pytest
@@ -136,7 +136,11 @@ def test_ciclo_piquete_com_banco(db_conn, fazenda_id):
 
     # 4. Registrar Altura
     registrar_altura(
-        db_conn, fazenda_id, p_id, usuario_id, AlturaIn(altura_cm=35.0, data=date.today())
+        db_conn,
+        fazenda_id,
+        p_id,
+        usuario_id,
+        AlturaIn(altura_cm=35.0, data=datetime.now(UTC).date()),
     )
     lista3 = listar_piquetes(db_conn, fazenda_id)
     assert lista3[0].ultima_altura_cm == 35.0
