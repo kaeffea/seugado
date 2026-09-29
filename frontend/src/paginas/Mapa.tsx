@@ -7,6 +7,11 @@ import { api, ErroApi } from "../lib/api";
 import type { Piquete, Cultivar, PlanoManejo, GeoJsonPolygon } from "../lib/tipos";
 import "./Mapa.css";
 
+// O Leaflet pinta em SVG e não entende var(--x): lemos o valor da variável do tema.
+function corDoTema(variavel: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(variavel).trim();
+}
+
 function ControlesMapa({
   piquetes,
   aoCriar
@@ -274,17 +279,17 @@ export default function Mapa() {
   };
 
   const obterCor = (pId: string) => {
-    if (!plano) return "gray";
+    if (!plano) return corDoTema("--cor-sem-estimativa");
     const resumo = plano.piquetes.find(x => x.piquete_id === pId);
-    if (!resumo) return "gray";
+    if (!resumo) return corDoTema("--cor-sem-estimativa");
 
-    if (resumo.faltantes.length > 0 || resumo.altura_hoje_cm === null) return "gray";
+    if (resumo.faltantes.length > 0 || resumo.altura_hoje_cm === null) return corDoTema("--cor-sem-estimativa");
     if (resumo.situacao === "ocupado") {
-      if (resumo.altura_saida_alvo_cm !== null && resumo.altura_hoje_cm <= resumo.altura_saida_alvo_cm) return "red";
-      return "blue";
+      if (resumo.altura_saida_alvo_cm !== null && resumo.altura_hoje_cm <= resumo.altura_saida_alvo_cm) return corDoTema("--cor-sair");
+      return corDoTema("--cor-ocupado");
     } else {
-      if (resumo.altura_entrada_alvo_cm !== null && resumo.altura_hoje_cm >= resumo.altura_entrada_alvo_cm) return "green";
-      return "yellow";
+      if (resumo.altura_entrada_alvo_cm !== null && resumo.altura_hoje_cm >= resumo.altura_entrada_alvo_cm) return corDoTema("--cor-pronto");
+      return corDoTema("--cor-crescendo");
     }
   };
 
@@ -358,7 +363,7 @@ export default function Mapa() {
                 key={m.id} 
                 positions={[origCenter, destCenter]} 
                 dashArray="10, 10" 
-                color="white" 
+                color={corDoTema("--cor-superficie")}
                 weight={3}
               >
                 <Tooltip permanent direction="center" opacity={0.8}>
@@ -370,11 +375,11 @@ export default function Mapa() {
         </MapContainer>
         
         <div className="legenda-mapa">
-          <div className="legenda-item"><div className="legenda-cor" style={{background: "gray"}}></div> Sem estimativa</div>
-          <div className="legenda-item"><div className="legenda-cor" style={{background: "red"}}></div> Precisa sair</div>
-          <div className="legenda-item"><div className="legenda-cor" style={{background: "blue"}}></div> Com gado</div>
-          <div className="legenda-item"><div className="legenda-cor" style={{background: "green"}}></div> Pronto para entrar</div>
-          <div className="legenda-item"><div className="legenda-cor" style={{background: "yellow"}}></div> Crescendo</div>
+          <div className="legenda-item"><div className="legenda-cor sem-estimativa"></div> Sem estimativa</div>
+          <div className="legenda-item"><div className="legenda-cor sair"></div> Precisa sair</div>
+          <div className="legenda-item"><div className="legenda-cor ocupado"></div> Com gado</div>
+          <div className="legenda-item"><div className="legenda-cor pronto"></div> Pronto para entrar</div>
+          <div className="legenda-item"><div className="legenda-cor crescendo"></div> Crescendo</div>
         </div>
       </div>
 
@@ -409,7 +414,7 @@ export default function Mapa() {
                 Data da medida
                 <input required type="date" value={dataMedida} onChange={e => setDataMedida(e.target.value)} />
               </label>
-              <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
+              <div className="acoes-formulario">
                 <button type="submit" className="botao-acao">Salvar</button>
                 <button type="button" className="botao-acao secundario" onClick={cancelarNovo}>Cancelar</button>
               </div>
@@ -418,7 +423,7 @@ export default function Mapa() {
         ) : (
           <div>
             <h2>Piquetes ({piquetes.length})</h2>
-            {semPlano && <p style={{fontSize: '0.9em', color: '#666'}}>Ainda não há plano para esta fazenda</p>}
+            {semPlano && <p className="texto-suave">Ainda não há plano para esta fazenda</p>}
             <ul className="lista-piquetes">
               {piquetes.map(p => (
                 <li 
@@ -440,7 +445,7 @@ export default function Mapa() {
                         </>
                       ) : confirmarDesativacaoId === p.id ? (
                         <>
-                          <span style={{fontSize: '0.85em', color: '#b42318', fontWeight: 'bold'}}>Desativar mesmo?</span>
+                          <span className="confirmar-desativacao">Desativar mesmo?</span>
                           <button className="botao-acao perigo" onClick={(e) => { e.stopPropagation(); desativar(p.id); }}>Sim</button>
                           <button className="botao-acao secundario" onClick={(e) => { e.stopPropagation(); setConfirmarDesativacaoId(null); }}>Não</button>
                         </>

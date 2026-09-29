@@ -1,0 +1,63 @@
+.clientes-cartao {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.clientes-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.clientes-fazendas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.clientes-fazenda {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.clientes-fazenda:hover,
+.clientes-fazenda-ativa {
+  border-color: var(--cor-primaria);
+}
+
+.clientes-fazenda-ativa {
+  background: var(--cor-primaria-suave);
+}
+
+.clientes-fazenda-nome {
+  font-weight: 600;
+}
+
+.clientes-fazenda-detalhe {
+  color: var(--cor-texto-suave);
+  font-size: 0.8rem;
+}
+
+.clientes-nova-fazenda {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--cor-borda);
+}

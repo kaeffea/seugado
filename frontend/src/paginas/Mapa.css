@@ -1,7 +1,7 @@
 .mapa-container {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 64px); /* Assuming a header exists */
+  height: calc(100vh - var(--altura-topo));
 }
 
 @media (min-width: 768px) {
@@ -25,8 +25,8 @@
 .painel-lateral {
   flex: 1;
   background: var(--cor-fundo);
-  border-left: 1px solid #ccc;
-  border-top: 1px solid #ccc;
+  border-left: 1px solid var(--cor-borda);
+  border-top: 1px solid var(--cor-borda);
   padding: 16px;
   overflow-y: auto;
 }
@@ -39,10 +39,10 @@
 }
 
 .tooltip-piquete {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  box-shadow: var(--sombra);
   color: var(--cor-texto);
   font-weight: bold;
   pointer-events: auto !important;
@@ -55,7 +55,7 @@
   font-size: 0.85em;
   text-align: left;
   margin-top: 4px;
-  border-top: 1px solid #ddd;
+  border-top: 1px solid var(--cor-borda);
   padding-top: 4px;
 }
 
@@ -79,32 +79,35 @@
 .formulario-piquete input,
 .formulario-piquete select {
   padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
   margin-top: 4px;
+  font-family: inherit;
 }
 
 .botao-acao {
   background: var(--cor-primaria);
-  color: white;
+  color: var(--cor-superficie);
   border: none;
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: var(--raio-pequeno);
   cursor: pointer;
+  font-family: inherit;
   font-weight: bold;
 }
 
 .botao-acao:hover {
-  background: #1f4a27;
+  background: var(--cor-primaria-escura);
 }
 
 .botao-acao.secundario {
-  background: #ccc;
-  color: #333;
+  background: var(--cor-borda);
+  color: var(--cor-texto);
 }
 
 .botao-acao.secundario:hover {
-  background: #aaa;
+  background: var(--cor-texto-suave);
+  color: var(--cor-superficie);
 }
 
 .botao-acao.perigo {
@@ -112,16 +115,34 @@
 }
 
 .botao-acao.perigo:hover {
-  background: #8c1a12;
+  background: var(--cor-erro);
+  filter: brightness(0.8);
 }
 
 .mensagem-erro {
-  background: #fee2e2;
+  background: var(--cor-erro-suave);
   color: var(--cor-erro);
   padding: 12px;
-  border-radius: 4px;
+  border-radius: var(--raio-pequeno);
   margin-bottom: 16px;
   font-size: 0.9em;
+}
+
+.texto-suave {
+  font-size: 0.9em;
+  color: var(--cor-texto-suave);
+}
+
+.confirmar-desativacao {
+  font-size: 0.85em;
+  color: var(--cor-erro);
+  font-weight: bold;
+}
+
+.acoes-formulario {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .lista-piquetes {
@@ -134,10 +155,10 @@
 }
 
 .item-piquete {
-  border: 1px solid #ddd;
+  border: 1px solid var(--cor-borda);
   padding: 12px;
-  border-radius: 4px;
-  background: white;
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-superficie);
   cursor: pointer;
 }
 
@@ -158,7 +179,7 @@
 .item-piquete p {
   margin: 2px 0;
   font-size: 0.85em;
-  color: #555;
+  color: var(--cor-texto-suave);
 }
 
 .acoes-piquete {
@@ -169,15 +190,15 @@
 }
 
 .legenda-mapa {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--cor-superficie);
   padding: 8px;
-  border-radius: 4px;
+  border-radius: var(--raio-pequeno);
   font-size: 0.8em;
   position: absolute;
   bottom: 20px;
   right: 20px;
   z-index: 1000;
-  border: 1px solid #ccc;
+  border: 1px solid var(--cor-borda);
 }
 
 .legenda-item {
@@ -190,8 +211,28 @@
 .legenda-cor {
   width: 16px;
   height: 16px;
-  border: 1px solid rgba(0,0,0,0.2);
+  border: 1px solid var(--cor-borda);
   border-radius: 2px;
+}
+
+.legenda-cor.sem-estimativa {
+  background: var(--cor-sem-estimativa);
+}
+
+.legenda-cor.sair {
+  background: var(--cor-sair);
+}
+
+.legenda-cor.ocupado {
+  background: var(--cor-ocupado);
+}
+
+.legenda-cor.pronto {
+  background: var(--cor-pronto);
+}
+
+.legenda-cor.crescendo {
+  background: var(--cor-crescendo);
 }
 
 .controles-topo {
@@ -205,16 +246,18 @@
 
 .controles-topo input {
   padding: 4px 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
   width: 150px;
+  font-family: inherit;
 }
 
 .controles-topo button {
   padding: 4px 8px;
-  background: white;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
   cursor: pointer;
+  font-family: inherit;
 }
 .mapa-cinza { filter: grayscale(1); }

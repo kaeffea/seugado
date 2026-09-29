@@ -1,0 +1,39 @@
+.login-tela {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 16px;
+  background: var(--cor-menu-fundo);
+}
+
+.login-cartao {
+  width: 100%;
+  max-width: 400px;
+  padding: 32px;
+}
+
+.login-marca {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--cor-menu-fundo);
+}
+
+.login-marca h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+.login-marca .marca-destaque {
+  fill: var(--cor-primaria);
+}
+
+.login-cartao .cartao-subtitulo {
+  margin-top: -8px;
+}
+
+.login-cartao .aviso-erro {
+  margin: 0;
+}
