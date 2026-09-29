@@ -289,6 +289,7 @@ on:
 
 Passos: ingestão satélite → ingestão clima → SAFER → projeção de estado →
 (se dia de planejamento) otimizador → envio de mensagem.
+Leitura com SAFER fora da faixa é descartada como nublada; vale a última leitura válida.
 
 Segredos (chaves GEE, Supabase, Telegram) em GitHub Secrets. **Nunca no repositório.**
 

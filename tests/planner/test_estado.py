@@ -1,6 +1,7 @@
 """Smoke checks for the planner estado helpers."""
 
 import ast
+import logging
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -295,6 +296,79 @@ def test_projetar_estado_sem_regua() -> None:
     assert p.confianca == Confianca.BAIXA
     assert p.motivo_confianca == "nenhuma medição de altura com régua registrada para este piquete"
     assert p.dias_descanso == (DATA_BASE - date(2026, 1, 1)).days
+
+
+@pytest.mark.parametrize(
+    "ndvi,red,motivo", [(0.2, RED, "etf"), (0.9, 0.2, "etf"), (1.0, RED, "taxa")]
+)
+@pytest.mark.parametrize("idade_ruim", [0, 1])
+def test_projetar_estado_descarta_leitura_safer_e_usa_anterior(
+    ndvi: float, red: float, motivo: str, idade_ruim: int, caplog: pytest.LogCaptureFixture
+) -> None:
+    log = _Log()
+    pid = log.piquete("P1", MARANDU)
+    log.altura(pid, DATA_BASE - timedelta(days=3), 30.0)
+    log.leitura(pid, DATA_BASE - timedelta(days=6), pixels=3)
+    (esperado,) = _rodar(log).piquetes
+    data_ruim = DATA_BASE - timedelta(days=idade_ruim)
+    log.leitura(pid, data_ruim)
+    ruim = log.eventos[-1].payload
+    ruim.update(ndvi=ndvi, refletancia_red=red)
+    original = ruim.copy()
+
+    with caplog.at_level(logging.WARNING, logger="seugado.planner.estado_util"):
+        (p,) = _rodar(log).piquetes
+
+    assert p == esperado  # Includes stock, forecast, image age, pixels and confidence.
+    assert p.faltantes == ()
+    assert p.dias_desde_imagem_limpa == 6
+    assert len(caplog.records) == 1
+    aviso = caplog.records[0]
+    assert aviso.levelno == logging.WARNING
+    assert str(ruim["entidade_id"]) in aviso.message
+    assert str(pid) in aviso.message
+    assert data_ruim.isoformat() in aviso.message
+    assert motivo in aviso.message
+    assert "outside" in aviso.message
+    assert log.eventos[-1].payload == original  # Discarding does not edit the event log.
+
+
+def test_projetar_estado_so_leituras_safer_fora_da_faixa(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    log = _Log()
+    pid = log.piquete("P1", MARANDU)
+    log.altura(pid, DATA_BASE, 30.0)
+    for idade, ndvi in [(2, 0.2), (0, 1.0)]:
+        log.leitura(pid, DATA_BASE - timedelta(days=idade))
+        log.eventos[-1].payload["ndvi"] = ndvi
+
+    with caplog.at_level(logging.WARNING, logger="seugado.planner.estado_util"):
+        (p,) = _rodar(log).piquetes
+
+    assert p.faltantes == ("estimativa_invalida",)
+    assert p.massa_hoje_kg_ms_ha is None
+    assert p.altura_hoje_cm is None
+    assert p.taxa_acumulo_prevista_kg_ms_ha_dia == ()
+    assert p.confianca == Confianca.BAIXA
+    assert len(caplog.records) == 2
+    assert "taxa" in caplog.records[0].message
+    assert "etf" in caplog.records[1].message
+
+
+def test_descarte_safer_preserva_janela_da_ultima_imagem() -> None:
+    log = _Log()
+    pid = log.piquete("P1", MARANDU)
+    log.altura(pid, DATA_BASE, 30.0)
+    log.leitura(pid, DATA_BASE - timedelta(days=31))
+    (esperado,) = _rodar(log).piquetes
+    log.leitura(pid, DATA_BASE)
+    log.eventos[-1].payload["ndvi"] = 0.2
+
+    (p,) = _rodar(log).piquetes
+
+    assert p == esperado
+    assert p.faltantes == ("imagem_satelite",)
 
 
 def test_projetar_estado_mombaca_sem_densidade_e_ordem_por_nome() -> None:

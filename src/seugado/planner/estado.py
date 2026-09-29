@@ -177,14 +177,14 @@ def _estimar(  # noqa: PLR0913, PLR0917
     ancora: AlturaMedida,
     leituras: Sequence[Leitura],
     ctx: util.Contexto,
-) -> tuple[float, tuple[float, ...]] | str:
-    """(stock today, forecast rates) of one piquete, or the name of what stopped the estimate."""
+) -> tuple[float, tuple[float, ...], Leitura] | str:
+    """Stock, forecast rates and latest valid reading, or what stopped the estimate."""
     entradas = util.entradas_safer(
         piquete.piquete_id, ancora.data, leituras, rue_max_g_por_mj, eficiencia, ctx
     )
     if isinstance(entradas, str):
         return entradas
-    dias, previstas = entradas
+    dias, previstas, ultima = entradas
     try:
         massa_kg_ms_ha = forragem.altura_para_massa(ancora.altura_cm, densidade_kg_ha_por_cm)
         for taxa, consumo_kg_ms_dia in dias:
@@ -193,7 +193,7 @@ def _estimar(  # noqa: PLR0913, PLR0917
             )
     except ValueError:
         return "estimativa_invalida"
-    return massa_kg_ms_ha, previstas
+    return massa_kg_ms_ha, previstas, ultima
 
 
 def _projetar_piquete(
@@ -214,12 +214,17 @@ def _projetar_piquete(
     massa_hoje: float | None = None
     altura_hoje: float | None = None
     taxas: tuple[float, ...] = ()
-    resultado: tuple[float, tuple[float, ...]] | str | None = None
+    resultado: tuple[float, tuple[float, ...], Leitura] | str | None = None
     podem_estimar = util.BLOQUEIAM_ESTIMATIVA.isdisjoint(faltantes)
     if podem_estimar and ancora and ultima and densidade is not None and rue is not None:
         resultado = _estimar(piquete, densidade, rue, eficiencia, ancora, leituras, ctx)
+    if isinstance(resultado, tuple):
+        ultima = resultado[2]
+        dias_imagem = (ctx.data_base - ultima.data).days
+        if not util.imagem_recente(ultima, ctx.data_base):
+            resultado = "imagem_satelite"
     if isinstance(resultado, tuple) and ancora and ultima and densidade is not None:
-        massa_hoje, taxas = resultado
+        massa_hoje, taxas, ultima = resultado
         altura_hoje = forragem.massa_para_altura(massa_hoje, densidade)
         confianca, motivo = confianca_estimativa(
             dias_imagem,

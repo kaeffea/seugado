@@ -1,5 +1,6 @@
 """Pure event-log helpers for projetar_estado: anchors, readings, occupation and sentences."""
 
+import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -11,7 +12,9 @@ from seugado.core.models import Confianca, Evento, MetodoPastejo, OrigemEvento, 
 from seugado.core.projecao import AlturaMedida, EstadoLote, EstadoPiquete, Leitura
 from seugado.persistencia.catalogo import CultivarCatalogo, faltantes_calibracao, resolver_alturas
 from seugado.sensing.clima import ClimaDia, radiacao_extraterrestre_mj_m2_dia
-from seugado.sensing.safer import taxa_acumulo_safer
+from seugado.sensing.safer import SaferForaDaFaixa, taxa_acumulo_safer
+
+logger = logging.getLogger(__name__)
 
 _JANELA_SATELITE_DIAS = 30  # satellite lookback, HIPOTESE-CALIBRAR (ADR-023)
 BLOQUEIAM_ESTIMATIVA = frozenset(
@@ -184,6 +187,11 @@ def adicionar(faltantes: list[str], item: str) -> None:
         faltantes.append(item)
 
 
+def imagem_recente(leitura: Leitura, data_base: date) -> bool:
+    """Whether a reading is within the satellite lookback window."""
+    return leitura.data >= data_base - timedelta(days=_JANELA_SATELITE_DIAS)
+
+
 def preparar_piquete(
     piquete: EstadoPiquete, eventos: Sequence[Evento], cultivar: CultivarCatalogo, data_base: date
 ) -> tuple[list[str], AlturaMedida | None, tuple[Leitura, ...]]:
@@ -199,8 +207,7 @@ def preparar_piquete(
     if ancora is None:
         adicionar(faltantes, "altura_inicial")
     leituras = leituras_piquete(eventos, piquete.piquete_id, data_base)
-    limite_satelite = data_base - timedelta(days=_JANELA_SATELITE_DIAS)
-    if not any(lt.data >= limite_satelite for lt in leituras):
+    if not any(imagem_recente(lt, data_base) for lt in leituras):
         adicionar(faltantes, "imagem_satelite")
     return faltantes, ancora, leituras
 
@@ -259,32 +266,49 @@ def entradas_safer(  # noqa: PLR0913, PLR0917
     rue_max_g_por_mj: float,
     eficiencia_pastejo: float | None,
     ctx: Contexto,
-) -> tuple[list[tuple[float, float]], tuple[float, ...]] | str:
+) -> tuple[list[tuple[float, float]], tuple[float, ...], Leitura] | str:
     """Inputs of the stock simulation and forecast, or the name of what is missing.
 
     First item: (growth rate, lote intake) for each day from `inicio` to data_base − 1.
     Second item: forecast growth rates from data_base on, the latest reading held constant.
+    Third item: latest surviving reading, for image age and confidence.
     """
     dias: list[tuple[float, float]] = []
     previstas: list[float] = []
+    validas = list(leituras)
+    dia = inicio
+    fim = ctx.data_base + timedelta(days=ctx.horizonte_previsao_dias)
     try:
-        dia = inicio
-        while dia < ctx.data_base:
+        while validas and dia < fim:
             clima_dia = ctx.clima_por_data.get(dia)
             if clima_dia is None:
                 return "clima"
-            ocupantes = lotes_no_piquete(ctx.movimentos, piquete_id, dia)
+            ocupantes = (
+                lotes_no_piquete(ctx.movimentos, piquete_id, dia) if dia < ctx.data_base else []
+            )
             if ocupantes and eficiencia_pastejo is None:
                 return "eficiencia_pastejo"
-            taxa = taxa_dia(leitura_do_dia(leituras, dia), clima_dia, rue_max_g_por_mj, ctx)
-            dias.append((taxa, sum(ctx.consumo_por_lote_kg_ms_dia[lt] for lt in ocupantes)))
+            leitura = leitura_do_dia(validas, min(dia, ctx.data_base))
+            try:
+                taxa = taxa_dia(leitura, clima_dia, rue_max_g_por_mj, ctx)
+            except SaferForaDaFaixa as exc:
+                logger.warning(
+                    "Leitura %s de %s do piquete %s descartada no cálculo de %s: %s",
+                    leitura.id, leitura.data, piquete_id, dia, exc,
+                )
+                validas.remove(leitura)
+                # Recompute earlier days too: a discarded reading must contribute nothing.
+                dias.clear()
+                previstas.clear()
+                dia = inicio
+                continue
+            if dia < ctx.data_base:
+                dias.append((taxa, sum(ctx.consumo_por_lote_kg_ms_dia[lt] for lt in ocupantes)))
+            else:
+                previstas.append(taxa)
             dia += timedelta(days=1)
-        leitura_hoje = leitura_do_dia(leituras, ctx.data_base)
-        for i in range(ctx.horizonte_previsao_dias):
-            clima_dia = ctx.clima_por_data.get(ctx.data_base + timedelta(days=i))
-            if clima_dia is None:
-                return "clima"
-            previstas.append(taxa_dia(leitura_hoje, clima_dia, rue_max_g_por_mj, ctx))
-    except ValueError:  # includes SaferForaDaFaixa
+    except ValueError:
         return "estimativa_invalida"
-    return dias, tuple(previstas)
+    if not validas:
+        return "estimativa_invalida"
+    return dias, tuple(previstas), leitura_do_dia(validas, ctx.data_base)
