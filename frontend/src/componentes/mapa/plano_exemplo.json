@@ -1,0 +1,192 @@
+{
+  "id": "44444444-4444-4444-8444-000000000001",
+  "fazenda_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  "data_geracao": "2026-09-28T08:00:00+00:00",
+  "data_inicio": "2026-09-28",
+  "horizonte_dias": 7,
+  "movimentacoes": [
+    {
+      "id": "92e04bc9-414c-5762-908d-ea434ca7500c",
+      "data": "2026-09-28",
+      "lote_id": "22222222-2222-4222-8222-000000000001",
+      "lote_nome": "Recria",
+      "piquete_origem_id": "11111111-1111-4111-8111-000000000002",
+      "piquete_origem_nome": "Piquete 2",
+      "piquete_destino_id": "11111111-1111-4111-8111-000000000006",
+      "piquete_destino_nome": "Piquete 6",
+      "altura_destino_cm": 34.0,
+      "altura_entrada_alvo_cm": 30.0,
+      "altura_origem_cm": 22.0,
+      "altura_saida_alvo_cm": 15.0,
+      "dias_previstos": 7,
+      "motivo": "O Piquete 2 chegaria a 11,6 cm antes do próximo dia de manejo (qui 01/10), abaixo da saída de 15 cm. O Piquete 6 está em 34 cm (ponto de entrada: 30 cm).",
+      "confianca": "media",
+      "motivo_confianca": "a altura de entrada do Marandu no pastejo rotacionado vem de fonte com confiança média"
+    },
+    {
+      "id": "be11b0ed-1839-5a1c-aa41-3e56bbc07fcc",
+      "data": "2026-09-28",
+      "lote_id": "22222222-2222-4222-8222-000000000002",
+      "lote_nome": "Vacas com bezerro",
+      "piquete_origem_id": "11111111-1111-4111-8111-000000000005",
+      "piquete_origem_nome": "Piquete 5",
+      "piquete_destino_id": "11111111-1111-4111-8111-000000000001",
+      "piquete_destino_nome": "Piquete 1",
+      "altura_destino_cm": 31.5,
+      "altura_entrada_alvo_cm": 30.0,
+      "altura_origem_cm": 26.0,
+      "altura_saida_alvo_cm": 15.0,
+      "dias_previstos": 3,
+      "motivo": "O Piquete 5 chegaria a 11,7 cm antes do próximo dia de manejo (qui 01/10), abaixo da saída de 15 cm. O Piquete 1 está em 31,5 cm (ponto de entrada: 30 cm).",
+      "confianca": "media",
+      "motivo_confianca": "a altura de entrada do Marandu no pastejo rotacionado vem de fonte com confiança média"
+    },
+    {
+      "id": "102b191b-0cd2-5b71-b473-f5b1d90907f3",
+      "data": "2026-10-01",
+      "lote_id": "22222222-2222-4222-8222-000000000002",
+      "lote_nome": "Vacas com bezerro",
+      "piquete_origem_id": "11111111-1111-4111-8111-000000000001",
+      "piquete_origem_nome": "Piquete 1",
+      "piquete_destino_id": "11111111-1111-4111-8111-000000000003",
+      "piquete_destino_nome": "Piquete 3",
+      "altura_destino_cm": 28.6,
+      "altura_entrada_alvo_cm": 30.0,
+      "altura_origem_cm": 21.2,
+      "altura_saida_alvo_cm": 15.0,
+      "dias_previstos": 4,
+      "motivo": "O Piquete 1 chegaria a 7,5 cm antes do próximo dia de manejo (seg 05/10), abaixo da saída de 15 cm. Nenhum piquete estará no ponto de entrada; o Piquete 3 é o mais próximo, com 28,6 cm (alvo: 30 cm).",
+      "confianca": "media",
+      "motivo_confianca": "a altura de entrada do Marandu no pastejo rotacionado vem de fonte com confiança média"
+    }
+  ],
+  "alertas": [
+    {
+      "tipo": "aguardando_parametro",
+      "data": "2026-09-28",
+      "texto": "O Piquete 8 (Mombaça) ainda não recebe recomendação: a cultivar Mombaça ainda não tem calibração no SeuGado.",
+      "confianca": "baixa",
+      "motivo_confianca": "a cultivar Mombaça ainda não tem calibração no SeuGado",
+      "piquete_id": "11111111-1111-4111-8111-000000000008",
+      "lote_id": null
+    },
+    {
+      "tipo": "continuo_acima_maxima",
+      "data": "2026-09-28",
+      "texto": "O Piquete 7 (pastejo contínuo) está em 38 cm, acima da altura máxima do Marandu (35 cm). Considere colocar mais animais nele.",
+      "confianca": "alta",
+      "motivo_confianca": "última imagem de satélite sem nuvem há 3 dias",
+      "piquete_id": "11111111-1111-4111-8111-000000000007",
+      "lote_id": null
+    }
+  ],
+  "pedidos_validacao": [
+    {
+      "piquete_id": "11111111-1111-4111-8111-000000000004",
+      "piquete_nome": "Piquete 4",
+      "motivo": "última imagem de satélite sem nuvem há 18 dias"
+    }
+  ],
+  "piquetes": [
+    {
+      "piquete_id": "11111111-1111-4111-8111-000000000001",
+      "nome": "Piquete 1",
+      "situacao": "descansando",
+      "lote_atual_nome": null,
+      "altura_hoje_cm": 31.5,
+      "altura_entrada_alvo_cm": 30.0,
+      "altura_saida_alvo_cm": 15.0,
+      "confianca": "alta",
+      "motivo_confianca": "última imagem de satélite sem nuvem há 3 dias",
+      "faltantes": []
+    },
+    {
+      "piquete_id": "11111111-1111-4111-8111-000000000002",
+      "nome": "Piquete 2",
+      "situacao": "ocupado",
+      "lote_atual_nome": "Recria",
+      "altura_hoje_cm": 22.0,
+      "altura_entrada_alvo_cm": 30.0,
+      "altura_saida_alvo_cm": 15.0,
+      "confianca": "alta",
+      "motivo_confianca": "última imagem de satélite sem nuvem há 3 dias",
+      "faltantes": []
+    },
+    {
+      "piquete_id": "11111111-1111-4111-8111-000000000003",
+      "nome": "Piquete 3",
+      "situacao": "descansando",
+      "lote_atual_nome": null,
+      "altura_hoje_cm": 27.0,
+      "altura_entrada_alvo_cm": 30.0,
+      "altura_saida_alvo_cm": 15.0,
+      "confianca": "alta",
+      "motivo_confianca": "última imagem de satélite sem nuvem há 3 dias",
+      "faltantes": []
+    },
+    {
+      "piquete_id": "11111111-1111-4111-8111-000000000004",
+      "nome": "Piquete 4",
+      "situacao": "descansando",
+      "lote_atual_nome": null,
+      "altura_hoje_cm": 21.0,
+      "altura_entrada_alvo_cm": 30.0,
+      "altura_saida_alvo_cm": 15.0,
+      "confianca": "baixa",
+      "motivo_confianca": "última imagem de satélite sem nuvem há 18 dias",
+      "faltantes": []
+    },
+    {
+      "piquete_id": "11111111-1111-4111-8111-000000000005",
+      "nome": "Piquete 5",
+      "situacao": "ocupado",
+      "lote_atual_nome": "Vacas com bezerro",
+      "altura_hoje_cm": 26.0,
+      "altura_entrada_alvo_cm": 30.0,
+      "altura_saida_alvo_cm": 15.0,
+      "confianca": "media",
+      "motivo_confianca": "última medição de altura há 20 dias",
+      "faltantes": []
+    },
+    {
+      "piquete_id": "11111111-1111-4111-8111-000000000006",
+      "nome": "Piquete 6",
+      "situacao": "descansando",
+      "lote_atual_nome": null,
+      "altura_hoje_cm": 34.0,
+      "altura_entrada_alvo_cm": 30.0,
+      "altura_saida_alvo_cm": 15.0,
+      "confianca": "alta",
+      "motivo_confianca": "última imagem de satélite sem nuvem há 3 dias",
+      "faltantes": []
+    },
+    {
+      "piquete_id": "11111111-1111-4111-8111-000000000007",
+      "nome": "Piquete 7",
+      "situacao": "descansando",
+      "lote_atual_nome": null,
+      "altura_hoje_cm": 38.0,
+      "altura_entrada_alvo_cm": null,
+      "altura_saida_alvo_cm": null,
+      "confianca": "alta",
+      "motivo_confianca": "última imagem de satélite sem nuvem há 3 dias",
+      "faltantes": []
+    },
+    {
+      "piquete_id": "11111111-1111-4111-8111-000000000008",
+      "nome": "Piquete 8",
+      "situacao": "descansando",
+      "lote_atual_nome": null,
+      "altura_hoje_cm": null,
+      "altura_entrada_alvo_cm": 85.0,
+      "altura_saida_alvo_cm": 45.0,
+      "confianca": "baixa",
+      "motivo_confianca": "a cultivar Mombaça ainda não tem calibração no SeuGado",
+      "faltantes": [
+        "densidade_kg_ha_por_cm",
+        "rue_max_g_por_mj",
+        "eficiencia_pastejo"
+      ]
+    }
+  ]
+}

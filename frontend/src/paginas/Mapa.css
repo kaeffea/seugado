@@ -1,0 +1,220 @@
+.mapa-container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 64px); /* Assuming a header exists */
+}
+
+@media (min-width: 768px) {
+  .mapa-container {
+    flex-direction: row;
+  }
+}
+
+.mapa-wrapper {
+  flex: 1;
+  height: 60vh;
+}
+
+@media (min-width: 768px) {
+  .mapa-wrapper {
+    flex: 0 0 70%;
+    height: 100%;
+  }
+}
+
+.painel-lateral {
+  flex: 1;
+  background: var(--cor-fundo);
+  border-left: 1px solid #ccc;
+  border-top: 1px solid #ccc;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+@media (min-width: 768px) {
+  .painel-lateral {
+    flex: 0 0 30%;
+    border-top: none;
+  }
+}
+
+.tooltip-piquete {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  color: var(--cor-texto);
+  font-weight: bold;
+  pointer-events: auto !important;
+  text-align: center;
+}
+
+.tooltip-detalhes {
+  display: none;
+  font-weight: normal;
+  font-size: 0.85em;
+  text-align: left;
+  margin-top: 4px;
+  border-top: 1px solid #ddd;
+  padding-top: 4px;
+}
+
+.tooltip-piquete:hover .tooltip-detalhes {
+  display: block;
+}
+
+.formulario-piquete {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formulario-piquete label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+.formulario-piquete input,
+.formulario-piquete select {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.botao-acao {
+  background: var(--cor-primaria);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.botao-acao:hover {
+  background: #1f4a27;
+}
+
+.botao-acao.secundario {
+  background: #ccc;
+  color: #333;
+}
+
+.botao-acao.secundario:hover {
+  background: #aaa;
+}
+
+.botao-acao.perigo {
+  background: var(--cor-erro);
+}
+
+.botao-acao.perigo:hover {
+  background: #8c1a12;
+}
+
+.mensagem-erro {
+  background: #fee2e2;
+  color: var(--cor-erro);
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  font-size: 0.9em;
+}
+
+.lista-piquetes {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.item-piquete {
+  border: 1px solid #ddd;
+  padding: 12px;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+}
+
+.item-piquete:hover {
+  border-color: var(--cor-primaria);
+}
+
+.item-piquete.ativo {
+  border-color: var(--cor-primaria);
+  box-shadow: 0 0 0 1px var(--cor-primaria);
+}
+
+.item-piquete h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.1em;
+}
+
+.item-piquete p {
+  margin: 2px 0;
+  font-size: 0.85em;
+  color: #555;
+}
+
+.acoes-piquete {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.legenda-mapa {
+  background: rgba(255, 255, 255, 0.9);
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  border: 1px solid #ccc;
+}
+
+.legenda-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.legenda-cor {
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(0,0,0,0.2);
+  border-radius: 2px;
+}
+
+.controles-topo {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  display: flex;
+  gap: 8px;
+}
+
+.controles-topo input {
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: 150px;
+}
+
+.controles-topo button {
+  padding: 4px 8px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.mapa-cinza { filter: grayscale(1); }
