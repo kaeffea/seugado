@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from seugado.api import (
+    rotas_cultivares,
     rotas_fazenda,
     rotas_lotes,
     rotas_piquetes,
@@ -35,6 +36,7 @@ def saude() -> dict[str, bool]:
     return {"ok": True}
 
 
+app.include_router(rotas_cultivares.router)
 app.include_router(rotas_fazenda.router)
 app.include_router(rotas_lotes.router)
 app.include_router(rotas_piquetes.router)
