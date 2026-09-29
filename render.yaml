@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: seugado-api
+    runtime: python
+    plan: free
+    buildCommand: pip install uv && uv sync --frozen --no-dev
+    startCommand: uv run uvicorn seugado.api.main:app --app-dir src --host 0.0.0.0 --port $PORT
+    healthCheckPath: /saude
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: PYTHONPATH
+        value: src
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SEUGADO_CORS_ORIGINS
+        sync: false
+      - key: SEUGADO_GEE_PROJECT
+        sync: false
+      - key: SEUGADO_GEE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_USERNAME
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false

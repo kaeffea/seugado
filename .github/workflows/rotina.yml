@@ -1,0 +1,69 @@
+name: Rotina SeuGado
+
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+    inputs:
+      fazenda_id:
+        description: "UUID da fazenda (obrigatório exceto para agenda, que processa todas)"
+        required: false
+        type: string
+      acao:
+        description: Ação da rotina
+        required: true
+        default: agenda
+        type: choice
+        options:
+          - agenda
+          - entregar
+          - diaria
+          - recalcular
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rotina-seugado
+  cancel-in-progress: false
+
+jobs:
+  rotina:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: src
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SEUGADO_GEE_PROJECT: ${{ secrets.SEUGADO_GEE_PROJECT }}
+      SEUGADO_GEE_SERVICE_ACCOUNT_JSON: ${{ secrets.SEUGADO_GEE_SERVICE_ACCOUNT_JSON }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_BOT_USERNAME: ${{ secrets.TELEGRAM_BOT_USERNAME }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+      - name: Instalar dependências
+        run: uv sync --frozen --no-dev
+      - name: Executar rotina
+        env:
+          ACAO: ${{ inputs.acao || 'agenda' }}
+          FAZENDA_ID: ${{ inputs.fazenda_id }}
+        shell: bash
+        run: |
+          case "$ACAO" in
+            agenda)
+              uv run --frozen --no-dev python -m seugado.jobs.ciclo --agenda
+              ;;
+            entregar|diaria|recalcular)
+              if [[ -z "$FAZENDA_ID" ]]; then
+                echo "::error::Informe fazenda_id para a ação $ACAO."
+                exit 1
+              fi
+              uv run --frozen --no-dev python -m seugado.jobs.ciclo --fazenda "$FAZENDA_ID" "--$ACAO"
+              ;;
+            *)
+              echo "::error::Ação inválida."
+              exit 1
+              ;;
+          esac
