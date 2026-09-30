@@ -15,7 +15,7 @@
   --raio: 16px;
   --raio-pequeno: 8px;
   --sombra: 0 2px 12px rgba(34, 38, 47, 0.06);
-  --fonte: "Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fonte: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
 
   /* menu lateral */
   --cor-menu-fundo: #2c303e;

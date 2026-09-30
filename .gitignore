@@ -11,3 +11,7 @@ seugado-*.json
 *-service-account*.json
 node_modules/
 dist/
+
+.claude/
+
+.DS_Store
