@@ -26,10 +26,6 @@
   flex: none;
 }
 
-.marca-destaque {
-  fill: var(--cor-menu-ativo-texto);
-}
-
 .menu-links {
   display: flex;
   flex-wrap: nowrap;

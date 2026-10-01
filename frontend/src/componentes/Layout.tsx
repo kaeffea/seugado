@@ -26,7 +26,7 @@ export default function Layout() {
     <div className="layout">
       <aside className="menu">
         <div className="menu-marca">
-          <Marca />
+          <Marca sobre="escuro" />
           <span>SeuGado · Admin</span>
         </div>
         <nav className="menu-links">

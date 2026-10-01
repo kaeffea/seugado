@@ -3,7 +3,7 @@
   --cor-primaria: #008734;
   --cor-primaria-escura: #006b29;
   --cor-primaria-suave: #c3e3d2;
-  --cor-fundo: #f9f9f9;
+  --cor-fundo: #e2e3db;
   --cor-superficie: #ffffff;
   --cor-texto: #22262f;
   --cor-texto-suave: #6b7280;
@@ -18,12 +18,12 @@
   --fonte: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
 
   /* menu lateral */
-  --cor-menu-fundo: #2c303e;
-  --cor-menu-texto: #e6e8ee;
-  --cor-menu-texto-suave: #9ea3ad;
-  --cor-menu-linha: #4a4f60;
-  --cor-menu-ativo-fundo: #4f7c65;
-  --cor-menu-ativo-texto: #86efac;
+  --cor-menu-fundo: #16241a;
+  --cor-menu-texto: #eef3ec;
+  --cor-menu-texto-suave: #9fb6a4;
+  --cor-menu-linha: #26402c;
+  --cor-menu-ativo-fundo: var(--cor-primaria-escura);
+  --cor-menu-ativo-texto: #ffffff;
   --largura-menu: 240px;
   --altura-topo: 0px;
 

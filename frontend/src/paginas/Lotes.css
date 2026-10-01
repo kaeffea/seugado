@@ -1,5 +1,5 @@
 .lotes-lista, .lotes-composicao { display: grid; gap: 16px; }
-.lotes-cartao { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; border: 1px solid var(--cor-borda); }
+.lotes-cartao { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; border: 1px solid var(--cor-borda); border-radius: var(--raio-pequeno); box-shadow: none; }
 .lotes-cartao > div:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .lotes-resumo { margin: 8px 0; }
 .lotes-cartao .selo { margin-top: 10px; }

@@ -1,3 +1,6 @@
+import logoEscuro from "../../assets/Logo/Logo_Dark.png";
+import logoClaro from "../../assets/Logo/Logo_Light.png";
+
 export type NomeIcone =
   | "clientes"
   | "mapa"
@@ -64,22 +67,15 @@ export function Icone({ nome }: { nome: NomeIcone }) {
   );
 }
 
-export function Marca() {
+export function Marca({ sobre = "claro" }: { sobre?: "claro" | "escuro" }) {
   return (
-    <svg
+    <img
       className="marca-logo"
-      width="32"
-      height="32"
-      viewBox="0 0 32 32"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
+      src={sobre === "escuro" ? logoEscuro : logoClaro}
+      width={32}
+      height={32}
+      alt=""
       aria-hidden="true"
-    >
-      <rect x="2" y="2" width="28" height="28" rx="8" />
-      <path d="M12 2v28" />
-      <path d="M12 13h18" />
-      <rect className="marca-destaque" x="15" y="5" width="12" height="5" rx="1.5" stroke="none" />
-    </svg>
+    />
   );
 }
