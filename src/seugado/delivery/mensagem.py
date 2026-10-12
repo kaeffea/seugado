@@ -1,12 +1,12 @@
 """Producer-facing texts and buttons: pure functions producing Telegram HTML."""
 
 import html
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import date, timedelta
 from itertools import groupby
 from uuid import UUID
 
-from seugado.contratos import DiferencaLote, Movimentacao, PassoPlano, PlanoManejo
+from seugado.contratos import Alerta, DiferencaLote, Movimentacao, PassoPlano, PlanoManejo
 from seugado.core.models import Confianca
 from seugado.delivery.canais.base import Botao
 
@@ -22,6 +22,12 @@ _RODAPE_ALTURAS = (
     "Se alguma estiver diferente do que você vê no pasto, toque no piquete e mande a altura"
     " medida com régua. Quando terminar, toque em Refazer o plano."
 )
+_RODAPE_ORDEM_UMA = (
+    "Quando fizer, toque em ✅ Fiz. Se levou para outro piquete ou em outro dia, toque em"
+    " 🔄 Fiz diferente."
+)
+_RODAPE_ORDEM_VARIAS = "Quando fizer, toque na movimentação para responder."
+_RODAPE_ORDEM_SEM_TROCA = "Para ver a semana toda, use /plano."
 
 # Short bot replies (plain text, no names inside).
 CANDIDATO_VENCIDO = "Essa atualização não vale mais."
@@ -130,16 +136,22 @@ def _montar_plano(
     return "\n\n".join(secoes)
 
 
-def texto_plano(plano: PlanoManejo, fazenda_nome: str, atualizado: bool = False) -> str:
-    """The weekly plan in one message; trailing alerts are cut to fit Telegram's limit."""
-    avisos = [f"• {_h(alerta.texto)}" for alerta in plano.alertas]
-    texto = _montar_plano(plano, fazenda_nome, atualizado, avisos)
+def _cortar_avisos(montar: Callable[[Sequence[str]], str], avisos: Sequence[str]) -> str:
+    """Drop trailing alerts until the message fits Telegram's limit, saying some were cut."""
+    texto = montar(avisos)
     mantidos = len(avisos)
     while _tamanho_telegram(texto) > LIMITE_TEXTO_TELEGRAM and mantidos > 0:
         mantidos -= 1
-        cortados = [*avisos[:mantidos], _AVISOS_OMITIDOS]
-        texto = _montar_plano(plano, fazenda_nome, atualizado, cortados)
+        texto = montar([*avisos[:mantidos], _AVISOS_OMITIDOS])
     return texto
+
+
+def texto_plano(plano: PlanoManejo, fazenda_nome: str, atualizado: bool = False) -> str:
+    """The weekly plan in one message; trailing alerts are cut to fit Telegram's limit."""
+    avisos = [f"• {_h(alerta.texto)}" for alerta in plano.alertas]
+    return _cortar_avisos(
+        lambda cortados: _montar_plano(plano, fazenda_nome, atualizado, cortados), avisos
+    )
 
 
 def botoes_plano(plano: PlanoManejo) -> list[list[Botao]]:
@@ -269,6 +281,82 @@ def texto_lembrete(pendentes: Sequence[Movimentacao]) -> str:
 def botoes_lembrete(pendentes: Sequence[Movimentacao]) -> list[list[Botao]]:
     """One "m:" button per pending movement, labelled like the reminder lines."""
     return [[Botao(_rotulo_movimentacao(mov), f"m:{mov.id}")] for mov in pendentes]
+
+
+def _pendentes_do_dia(
+    plano: PlanoManejo, dia: date, respondidas: frozenset[UUID]
+) -> list[Movimentacao]:
+    return [mov for mov in plano.movimentacoes if mov.data == dia and mov.id not in respondidas]
+
+
+def _linha_troca(mov: Movimentacao) -> str:
+    lote, destino = _h(mov.lote_nome), _h(mov.piquete_destino_nome)
+    if mov.piquete_origem_nome is None:
+        return f"• {lote} → {destino}"
+    return f"• {lote}: {_h(mov.piquete_origem_nome)} → {destino}"
+
+
+def _linha_alerta(alerta: Alerta) -> str:
+    """The alert and, when the planner gave one, the recommended action under it."""
+    linha = f"• {_h(alerta.texto)}"
+    return f"{linha}\n  👉 {_h(alerta.acao)}" if alerta.acao else linha
+
+
+def _sem_troca_hoje(plano: PlanoManejo, hoje: date, respondidas: frozenset[UUID]) -> list[str]:
+    """Sections for a day with nothing left to do: why, and the next move in the horizon."""
+    if any(mov.data == hoje for mov in plano.movimentacoes):
+        abertura = "As trocas de hoje já estão anotadas."
+    else:
+        abertura = "Sem troca de pasto hoje."
+    futuras = [mov for mov in plano.movimentacoes if mov.data > hoje and mov.id not in respondidas]
+    if not futuras:
+        fim = plano.data_inicio + timedelta(days=plano.horizonte_dias - 1)
+        return [f"{abertura}\nNenhuma outra troca prevista até {_dia_curto(fim)}."]
+    proxima = min(mov.data for mov in futuras)
+    linhas = [_linha_troca(mov) for mov in futuras if mov.data == proxima]
+    return [abertura, "\n".join([f"⏭️ <b>Próxima troca: {_dia_longo(proxima)}</b>", *linhas])]
+
+
+def texto_ordem_do_dia(
+    plano: PlanoManejo,
+    fazenda_nome: str,
+    hoje: date,
+    respondidas: frozenset[UUID] = frozenset(),
+) -> str:
+    """Only what is for today (ADR-026 §5): today's unanswered moves and today's alerts.
+
+    Without a move left for today it says so and shows the next one in the plan's horizon.
+    """
+    pendentes = _pendentes_do_dia(plano, hoje, respondidas)
+    cabecalho = f"☀️ <b>Hoje — {_h(fazenda_nome)}</b>\n{_dia_longo(hoje)}"
+    if pendentes:
+        corpo = [_bloco_movimentacao(mov) for mov in pendentes]
+        rodape = _RODAPE_ORDEM_UMA if len(pendentes) == 1 else _RODAPE_ORDEM_VARIAS
+    else:
+        corpo = _sem_troca_hoje(plano, hoje, respondidas)
+        rodape = _RODAPE_ORDEM_SEM_TROCA
+    avisos = [_linha_alerta(alerta) for alerta in plano.alertas if alerta.data == hoje]
+
+    def montar(cortados: Sequence[str]) -> str:
+        secoes = [cabecalho, *corpo]
+        if cortados:
+            secoes.append("\n".join(["⚠️ <b>Avisos de hoje</b>", *cortados]))
+        return "\n\n".join([*secoes, rodape])
+
+    return _cortar_avisos(montar, avisos)
+
+
+def botoes_ordem_do_dia(
+    plano: PlanoManejo, hoje: date, respondidas: frozenset[UUID] = frozenset()
+) -> list[list[Botao]]:
+    """One move today: answer it in one tap (ADR-004); several: one "m:" button per move."""
+    pendentes = _pendentes_do_dia(plano, hoje, respondidas)
+    if len(pendentes) == 1:
+        return botoes_movimentacao(pendentes[0])
+    return [
+        [Botao(f"{mov.lote_nome} → {mov.piquete_destino_nome}", f"m:{mov.id}")]
+        for mov in pendentes
+    ]
 
 
 def texto_vinculado(fazenda_nome: str) -> str:

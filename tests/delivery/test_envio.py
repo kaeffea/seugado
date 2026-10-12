@@ -1,5 +1,6 @@
-"""T3: sending the weekly plan and the candidate-plan notice."""
+"""T3: sending the weekly plan, the candidate-plan notice and the day's order."""
 
+import sys
 import uuid
 from dataclasses import replace
 from datetime import date
@@ -10,19 +11,27 @@ import psycopg
 import pytest
 
 from seugado.contratos import DiferencaLote, PassoPlano, PlanoManejo
-from seugado.delivery.envio import avisar_plano_candidato, enviar_lembrete, enviar_plano
+from seugado.delivery.envio import (
+    avisar_plano_candidato,
+    enviar_lembrete,
+    enviar_ordem_do_dia,
+    enviar_plano,
+)
 from seugado.delivery.mensagem import (
     botoes_candidato,
     botoes_lembrete,
+    botoes_ordem_do_dia,
     botoes_plano,
     texto_candidato,
     texto_lembrete,
+    texto_ordem_do_dia,
     texto_plano,
 )
 from tests.delivery.banco import criar_fazenda, requer_banco
-from tests.delivery.falsos import CanalFalso, Enviado, conexao_falsa
+from tests.delivery.falsos import CanalFalso, Enviado, PlanosFalsos, conexao_falsa
 
 CHAT_ID = 123456789
+SEG, QUI, DOM = date(2026, 9, 28), date(2026, 10, 1), date(2026, 10, 4)
 
 
 def _diferencas() -> tuple[DiferencaLote, ...]:
@@ -116,6 +125,62 @@ def test_enviar_lembrete(plano: PlanoManejo) -> None:
     sem_chat, _ = conexao_falsa(("Fazenda Exemplo", None))
     assert enviar_lembrete(sem_chat, plano.fazenda_id, pendentes, canal=canal) is False
     assert len(canal.enviados) == 1
+
+
+def _instalar_planos(
+    monkeypatch: pytest.MonkeyPatch, plano: PlanoManejo | None, respondidas: frozenset[uuid.UUID]
+) -> None:
+    planos = PlanosFalsos()
+    if plano is not None:
+        planos.guardar(plano, "vigente")
+    planos.respondidas = respondidas
+    monkeypatch.setitem(sys.modules, "seugado.persistencia.planos", planos.modulo())
+
+
+def test_ordem_do_dia_vem_do_plano_vigente(
+    plano: PlanoManejo, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    recria_seg = plano.movimentacoes[0]
+    respondidas = frozenset({recria_seg.id})
+    _instalar_planos(monkeypatch, plano, respondidas)
+    conn, _ = conexao_falsa(("Fazenda Exemplo", CHAT_ID))
+    canal = CanalFalso()
+    assert enviar_ordem_do_dia(conn, plano.fazenda_id, SEG, canal=canal) is True
+    assert canal.enviados == [
+        Enviado(
+            CHAT_ID,
+            texto_ordem_do_dia(plano, "Fazenda Exemplo", SEG, respondidas),
+            botoes_ordem_do_dia(plano, SEG, respondidas),
+        )
+    ]
+    assert "Recria" not in canal.enviados[0].texto  # already answered: not today's order
+
+
+@pytest.mark.parametrize("hoje", [date(2026, 9, 27), date(2026, 10, 5)])
+def test_ordem_do_dia_so_dentro_do_horizonte_do_plano(
+    plano: PlanoManejo, monkeypatch: pytest.MonkeyPatch, hoje: date
+) -> None:
+    """A plan that does not cover today has nothing to say about today."""
+    _instalar_planos(monkeypatch, plano, frozenset())
+    conn, falsa = conexao_falsa(("Fazenda Exemplo", CHAT_ID))
+    canal = CanalFalso()
+    assert enviar_ordem_do_dia(conn, plano.fazenda_id, hoje, canal=canal) is False
+    assert enviar_ordem_do_dia(conn, plano.fazenda_id, DOM, canal=canal) is True
+    assert len(canal.enviados) == 1
+    assert falsa.commits == 0
+
+
+def test_ordem_do_dia_sem_plano_ou_sem_chat_nao_envia(
+    plano: PlanoManejo, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    _instalar_planos(monkeypatch, None, frozenset())
+    conn, falsa = conexao_falsa(("Fazenda Exemplo", CHAT_ID))
+    assert enviar_ordem_do_dia(conn, plano.fazenda_id, QUI) is False
+    assert falsa.consultas == []
+    _instalar_planos(monkeypatch, plano, frozenset())
+    sem_chat, _ = conexao_falsa(("Fazenda Exemplo", None))
+    assert enviar_ordem_do_dia(sem_chat, plano.fazenda_id, QUI) is False
 
 
 @requer_banco

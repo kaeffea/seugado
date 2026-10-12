@@ -13,15 +13,18 @@ from seugado.delivery.mensagem import (
     botoes_candidato,
     botoes_lembrete,
     botoes_movimentacao,
+    botoes_ordem_do_dia,
     botoes_plano,
     texto_alturas,
     texto_candidato,
     texto_diferencas,
     texto_lembrete,
     texto_movimentacao,
+    texto_ordem_do_dia,
     texto_plano,
 )
 
+SEG, TER, QUI, SEX = date(2026, 9, 28), date(2026, 9, 29), date(2026, 10, 1), date(2026, 10, 2)
 MOV_RECRIA = "m:92e04bc9-414c-5762-908d-ea434ca7500c"
 MOV_VACAS_SEG = "m:be11b0ed-1839-5a1c-aa41-3e56bbc07fcc"
 MOV_VACAS_QUI = "m:102b191b-0cd2-5b71-b473-f5b1d90907f3"
@@ -87,6 +90,7 @@ def _todos_os_botoes(plano: PlanoManejo) -> list[Botao]:
         botoes_alturas(plano),
         botoes_lembrete(plano.movimentacoes),
         botoes_candidato(plano.id),
+        botoes_ordem_do_dia(plano, SEG),
     ]
     teclados += [botoes_movimentacao(mov) for mov in plano.movimentacoes]
     return [botao for teclado in teclados for linha in teclado for botao in linha]
@@ -283,6 +287,139 @@ def test_lembrete(plano: PlanoManejo) -> None:
     ]
 
 
+def _blocos(inicio: int, fim: int) -> list[str]:
+    """Lines inicio..fim-1 of the reference plan: the same movement blocks, word for word."""
+    return PLANO_EXEMPLO.split("\n")[inicio:fim]
+
+
+def test_ordem_do_dia_com_duas_trocas(plano: PlanoManejo) -> None:
+    avisos = _blocos(21, 23)  # both alerts are dated Monday
+    assert texto_ordem_do_dia(plano, "Fazenda Exemplo", SEG) == "\n".join(
+        [
+            "☀️ <b>Hoje — Fazenda Exemplo</b>",
+            "Segunda, 28/09",
+            "",
+            *_blocos(4, 13),  # Recria and Vacas com bezerro, as in the weekly plan
+            "",
+            "⚠️ <b>Avisos de hoje</b>",
+            *avisos,
+            "",
+            "Quando fizer, toque na movimentação para responder.",
+        ]
+    )
+    assert botoes_ordem_do_dia(plano, SEG) == [
+        [Botao("Recria → Piquete 6", MOV_RECRIA)],
+        [Botao("Vacas com bezerro → Piquete 1", MOV_VACAS_SEG)],
+    ]
+
+
+def test_ordem_do_dia_com_uma_troca_responde_num_toque(plano: PlanoManejo) -> None:
+    vacas_qui = plano.movimentacoes[2]
+    assert texto_ordem_do_dia(plano, "Fazenda Exemplo", QUI) == "\n".join(
+        [
+            "☀️ <b>Hoje — Fazenda Exemplo</b>",
+            "Quinta, 01/10",
+            "",
+            *_blocos(15, 19),
+            "",
+            "Quando fizer, toque em ✅ Fiz. Se levou para outro piquete ou em outro dia, toque em"
+            " 🔄 Fiz diferente.",
+        ]
+    )
+    assert botoes_ordem_do_dia(plano, QUI) == botoes_movimentacao(vacas_qui)
+
+
+def test_ordem_do_dia_sem_troca_adianta_a_proxima(plano: PlanoManejo) -> None:
+    assert texto_ordem_do_dia(plano, "Fazenda Exemplo", TER) == "\n".join(
+        [
+            "☀️ <b>Hoje — Fazenda Exemplo</b>",
+            "Terça, 29/09",
+            "",
+            "Sem troca de pasto hoje.",
+            "",
+            "⏭️ <b>Próxima troca: Quinta, 01/10</b>",
+            "• Vacas com bezerro: Piquete 1 → Piquete 3",
+            "",
+            "Para ver a semana toda, use /plano.",
+        ]
+    )
+    assert botoes_ordem_do_dia(plano, TER) == []
+
+
+def test_ordem_do_dia_sem_troca_ate_o_fim_do_horizonte(plano: PlanoManejo) -> None:
+    linhas = texto_ordem_do_dia(plano, "Fazenda Exemplo", SEX).split("\n")
+    assert linhas[3:5] == [
+        "Sem troca de pasto hoje.",
+        "Nenhuma outra troca prevista até dom 04/10.",
+    ]
+    assert "⏭️" not in "\n".join(linhas)
+
+
+def test_ordem_do_dia_ignora_o_que_ja_foi_respondido(plano: PlanoManejo) -> None:
+    recria_seg, vacas_seg, vacas_qui = plano.movimentacoes
+    so_recria = frozenset({recria_seg.id})
+    texto = texto_ordem_do_dia(plano, "Fazenda Exemplo", SEG, so_recria)
+    assert "Recria" not in texto
+    assert "Mover Vacas com bezerro: Piquete 5 → Piquete 1" in texto
+    assert botoes_ordem_do_dia(plano, SEG, so_recria) == botoes_movimentacao(vacas_seg)
+
+    as_duas = frozenset({recria_seg.id, vacas_seg.id})
+    linhas = texto_ordem_do_dia(plano, "Fazenda Exemplo", SEG, as_duas).split("\n")
+    assert linhas[3:7] == [
+        "As trocas de hoje já estão anotadas.",
+        "",
+        "⏭️ <b>Próxima troca: Quinta, 01/10</b>",
+        "• Vacas com bezerro: Piquete 1 → Piquete 3",
+    ]
+    assert botoes_ordem_do_dia(plano, SEG, as_duas) == []
+
+    todas = frozenset({recria_seg.id, vacas_seg.id, vacas_qui.id})
+    linhas = texto_ordem_do_dia(plano, "Fazenda Exemplo", SEG, todas).split("\n")
+    assert linhas[3:5] == [
+        "As trocas de hoje já estão anotadas.",
+        "Nenhuma outra troca prevista até dom 04/10.",
+    ]
+
+
+def test_ordem_do_dia_proxima_troca_sem_origem(plano: PlanoManejo) -> None:
+    sem_origem = replace(plano.movimentacoes[2], piquete_origem_id=None, piquete_origem_nome=None)
+    sem_pasto = replace(plano, movimentacoes=(*plano.movimentacoes[:2], sem_origem))
+    assert "• Vacas com bezerro → Piquete 3" in texto_ordem_do_dia(sem_pasto, "F", TER)
+
+
+def test_ordem_do_dia_mostra_a_acao_de_cada_aviso(plano: PlanoManejo) -> None:
+    com_acao = replace(plano.alertas[0], data=TER, texto="P1 <seco>", acao="Retirar & medir.")
+    sem_acao = replace(plano.alertas[1], data=TER, texto="Outro aviso")
+    outro_dia = replace(plano.alertas[1], data=QUI, texto="Aviso de quinta")
+    texto = texto_ordem_do_dia(
+        replace(plano, alertas=(com_acao, sem_acao, outro_dia)), "Fazenda Exemplo", TER
+    )
+    assert "\n".join(
+        [
+            "⚠️ <b>Avisos de hoje</b>",
+            "• P1 &lt;seco&gt;",
+            "  👉 Retirar &amp; medir.",
+            "• Outro aviso",
+        ]
+    ) in texto
+    assert "Aviso de quinta" not in texto
+
+
+def test_ordem_do_dia_corta_avisos_no_limite(plano: PlanoManejo) -> None:
+    modelo = replace(plano.alertas[0], acao="Fazer algo. " * 5)
+    alertas = tuple(replace(modelo, texto=f"Aviso {i:02d}: " + "x" * 110) for i in range(60))
+    texto = texto_ordem_do_dia(replace(plano, alertas=alertas), "Fazenda Exemplo", SEG)
+    assert _utf16(texto) <= LIMITE_TEXTO_TELEGRAM
+    linhas = texto.split("\n")
+    assert linhas[-3:] == [
+        "… (mais avisos omitidos)",
+        "",
+        "Quando fizer, toque na movimentação para responder.",
+    ]
+    assert "Aviso 00" in texto
+    assert "Aviso 59" not in texto
+
+
 def test_texto_e_botoes_candidato(plano: PlanoManejo) -> None:
     diferenca = DiferencaLote(uuid.uuid4(), "Recria", (), ())
     assert texto_candidato([diferenca, diferenca]) == (
@@ -307,6 +444,7 @@ def test_nenhum_texto_tem_termo_tecnico(plano: PlanoManejo) -> None:
         texto_diferencas(diferencas),
         texto_candidato(diferencas),
         texto_lembrete(plano.movimentacoes),
+        *(texto_ordem_do_dia(plano, "Fazenda Exemplo", dia) for dia in (SEG, TER, QUI, SEX)),
         *(texto_movimentacao(mov) for mov in plano.movimentacoes),
         *(botao.texto for botao in _todos_os_botoes(plano)),
     ]

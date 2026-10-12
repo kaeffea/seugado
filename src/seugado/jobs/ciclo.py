@@ -117,6 +117,8 @@ def rotina_diaria(
 
 def executar_agenda(agora_utc: datetime | None = None) -> int:
     """Roda de hora em hora para todas as fazendas. Devolve 0 se sucesso, 1 se falha."""
+    from seugado.delivery.envio import enviar_ordem_do_dia
+
     agora = agora_utc or datetime.now(UTC)
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
@@ -146,6 +148,7 @@ def executar_agenda(agora_utc: datetime | None = None) -> int:
             tz = ZoneInfo(f_row["timezone"])
             local = agora.astimezone(tz)
             hoje = local.date()
+            primeira_rotina_do_dia = f_row["ultima_rotina_diaria"] != hoje
 
             try:
                 if (
@@ -154,11 +157,13 @@ def executar_agenda(agora_utc: datetime | None = None) -> int:
                     and f_row["ultimo_envio_semanal"] != hoje
                 ):
                     entregar_plano_semanal(conn, fazenda_id, hoje)
-                elif (
-                    local.hour >= HORA_ROTINA_DIARIA
-                    and f_row["ultima_rotina_diaria"] != hoje
-                ):
+                elif local.hour >= HORA_ROTINA_DIARIA and primeira_rotina_do_dia:
                     rotina_diaria(conn, fazenda_id, hoje)
+                else:
+                    continue
+                if primeira_rotina_do_dia:
+                    # Ordem do dia: uma vez por dia, depois do primeiro recálculo (ADR-026 §5).
+                    enviar_ordem_do_dia(conn, fazenda_id, hoje)
             except Exception as e:
                 conn.rollback()
                 logger.exception("Falha na fazenda %s: %s", fazenda_id, e)
@@ -178,6 +183,7 @@ def main() -> None:
     parser.add_argument("--entregar", action="store_true", help="Força entrega semanal")
     parser.add_argument("--diaria", action="store_true", help="Força rotina diária")
     parser.add_argument("--recalcular", action="store_true", help="Recalcula e ativa")
+    parser.add_argument("--ordem", action="store_true", help="Envia a ordem do dia")
     parser.add_argument("--sem-satelite", action="store_true", help="Não baixar")
     parser.add_argument("--sem-envio", action="store_true", help="Não enviar mensagens")
     args = parser.parse_args()
@@ -212,6 +218,11 @@ def main() -> None:
                     ingerir_satelite=ingerir_satelite,
                     enviar=enviar
                 )
+            elif args.ordem:
+                from seugado.delivery.envio import enviar_ordem_do_dia
+
+                if not enviar_ordem_do_dia(conn, args.fazenda, hoje):
+                    logger.warning("Ordem do dia não enviada: sem plano para hoje ou sem Telegram.")
         finally:
             conn.close()
         sys.exit(0)
