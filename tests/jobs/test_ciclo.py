@@ -1,8 +1,9 @@
 """Testes para o ciclo."""
 
 from datetime import UTC, date, datetime
+from typing import Any
 from unittest.mock import MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -123,22 +124,26 @@ def test_executar_agenda_comportamento(mock_deps):
     ]
     
     with patch("seugado.jobs.ciclo.entregar_plano_semanal") as mock_entregar, \
-         patch("seugado.jobs.ciclo.rotina_diaria") as mock_diaria:
-         
+         patch("seugado.jobs.ciclo.rotina_diaria") as mock_diaria, \
+         patch("seugado.delivery.envio.enviar_ordem_do_dia") as mock_ordem:
+
         # Fazenda 1 falha na entrega
         mock_entregar.side_effect = Exception("Erro F1")
-        
+
         ret = executar_agenda(agora_utc=hoje_local.astimezone(UTC))
-        
+
         assert ret == 1
         mock_entregar.assert_called_once_with(mock_deps["mock_conn"], f1_id, hoje_local.date())
         # F2 tenta rodar diária apesar de F1 falhar
         mock_diaria.assert_called_once_with(mock_deps["mock_conn"], f2_id, hoje_local.date())
         mock_deps["mock_conn"].rollback.assert_called_once()
-        
+        # Só F2 recebe a ordem do dia: a entrega de F1 falhou antes
+        mock_ordem.assert_called_once_with(mock_deps["mock_conn"], f2_id, hoje_local.date())
+
         # Fazenda 1 não roda entrega se for mesmo dia
         mock_entregar.reset_mock()
         mock_diaria.reset_mock()
+        mock_ordem.reset_mock()
         mock_deps["mock_conn"].cursor.return_value.__enter__.return_value.fetchall.return_value = [
             {
                 "id": f1_id, "timezone": "America/Fortaleza", "envio_plano_dia": 0,
@@ -150,6 +155,61 @@ def test_executar_agenda_comportamento(mock_deps):
         assert ret == 0
         mock_entregar.assert_not_called()
         mock_diaria.assert_not_called()
+        mock_ordem.assert_not_called()
+
+
+def _uma_fazenda(mock_deps: dict[str, Any], **campos: object) -> UUID:
+    fazenda_id = uuid4()
+    linha = {
+        "id": fazenda_id, "timezone": "America/Fortaleza", "envio_plano_dia": 0,
+        "envio_plano_hora": 6, "ultimo_envio_semanal": date(2026, 9, 14),
+        "ultima_rotina_diaria": date(2026, 9, 20), **campos,
+    }
+    mock_deps["mock_conn"].cursor.return_value.__enter__.return_value.fetchall.return_value = [
+        linha
+    ]
+    return fazenda_id
+
+
+def test_ordem_do_dia_sai_uma_vez_por_dia(mock_deps):
+    """A ordem do dia sai depois da primeira rotina do dia, seja a diária ou a semanal."""
+    fuso = ZoneInfo("America/Fortaleza")
+    segunda = date(2026, 9, 21)
+    with patch("seugado.jobs.ciclo.entregar_plano_semanal") as mock_entregar, \
+         patch("seugado.jobs.ciclo.rotina_diaria") as mock_diaria, \
+         patch("seugado.delivery.envio.enviar_ordem_do_dia") as mock_ordem:
+        # Envio semanal às 06h: o plano da semana e, logo depois, a ordem do dia
+        fazenda_id = _uma_fazenda(mock_deps)
+        assert executar_agenda(datetime(2026, 9, 21, 6, 0, tzinfo=fuso)) == 0
+        mock_entregar.assert_called_once_with(mock_deps["mock_conn"], fazenda_id, segunda)
+        mock_ordem.assert_called_once_with(mock_deps["mock_conn"], fazenda_id, segunda)
+
+        # Envio semanal às 18h: a rotina das 06h já mandou a ordem de hoje
+        mock_entregar.reset_mock()
+        mock_ordem.reset_mock()
+        fazenda_id = _uma_fazenda(mock_deps, envio_plano_hora=18, ultima_rotina_diaria=segunda)
+        assert executar_agenda(datetime(2026, 9, 21, 18, 0, tzinfo=fuso)) == 0
+        mock_entregar.assert_called_once_with(mock_deps["mock_conn"], fazenda_id, segunda)
+        mock_ordem.assert_not_called()
+
+        # Antes das 06h não há rotina nem ordem
+        mock_entregar.reset_mock()
+        _uma_fazenda(mock_deps, envio_plano_dia=1)
+        assert executar_agenda(datetime(2026, 9, 21, 5, 0, tzinfo=fuso)) == 0
+        mock_entregar.assert_not_called()
+        mock_diaria.assert_not_called()
+        mock_ordem.assert_not_called()
+
+
+@patch("seugado.jobs.ciclo.sys.argv", ["ciclo", "--fazenda", str(uuid4()), "--ordem"])
+def test_main_cli_ordem(mock_deps):
+    """--fazenda <id> --ordem só envia a ordem do dia, sem recalcular."""
+    with patch("seugado.delivery.envio.enviar_ordem_do_dia") as mock_ordem:
+        with pytest.raises(SystemExit):
+            main()
+        mock_deps["sys_exit"].assert_called_with(0)
+        mock_ordem.assert_called_once()
+        mock_deps["calcular_plano"].assert_not_called()
 
 
 @patch(

@@ -1,6 +1,7 @@
 """Outbound messages started by the scheduled routine (jobs/ciclo.py calls these)."""
 
 from collections.abc import Sequence
+from datetime import date, timedelta
 from typing import Any, cast
 from uuid import UUID
 
@@ -12,9 +13,11 @@ from seugado.delivery.canais.telegram import canal_padrao
 from seugado.delivery.mensagem import (
     botoes_candidato,
     botoes_lembrete,
+    botoes_ordem_do_dia,
     botoes_plano,
     texto_candidato,
     texto_lembrete,
+    texto_ordem_do_dia,
     texto_plano,
 )
 
@@ -75,4 +78,37 @@ def enviar_lembrete(
     if canal is None:
         canal = canal_padrao()
     canal.enviar_texto(chat_id, texto_lembrete(pendentes), botoes_lembrete(pendentes))
+    return True
+
+
+def enviar_ordem_do_dia(
+    conn: psycopg.Connection[Any], fazenda_id: UUID, hoje: date, canal: Canal | None = None
+) -> bool:
+    """Send only what is for today in the current plan (ADR-026 §5).
+
+    False when no current plan covers today or no Telegram is linked (not an error).
+    The moves come from the current plan, so every button points at a movement the bot knows.
+    """
+    from seugado.persistencia.planos import (  # noqa: PLC0415
+        carregar_plano_atual,
+        ids_respondidos,
+    )
+
+    plano: PlanoManejo | None = carregar_plano_atual(conn, fazenda_id)
+    if plano is None:
+        return False
+    fim = plano.data_inicio + timedelta(days=plano.horizonte_dias)
+    if not plano.data_inicio <= hoje < fim:
+        return False
+    nome, chat_id = _fazenda_e_chat(conn, fazenda_id)
+    if chat_id is None:
+        return False
+    respondidas: frozenset[UUID] = ids_respondidos(conn, fazenda_id)
+    if canal is None:
+        canal = canal_padrao()
+    canal.enviar_texto(
+        chat_id,
+        texto_ordem_do_dia(plano, nome, hoje, respondidas),
+        botoes_ordem_do_dia(plano, hoje, respondidas),
+    )
     return True
