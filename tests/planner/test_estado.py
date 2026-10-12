@@ -490,7 +490,14 @@ def test_montar_estado_projetado(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(carga, "carregar_catalogo", lambda _c, _f: CATALOGO)
     monkeypatch.setattr(carga, "buscar_clima", buscar_clima)
     monkeypatch.setattr(carga, "et0_media_anual_mm_dia", lambda *_: ET0_ANUAL)
-    conn = _Conn({"estado_piquete": [(pid, LAT, -50.0)], "fazenda": [("America/Sao_Paulo",)]})
+    conn = _Conn(
+        {
+            "estado_piquete": [(pid, LAT, -50.0)],
+            "piquete_estrutura": [],
+            "lote_modulo": [],
+            "fazenda": [("America/Sao_Paulo",)],
+        }
+    )
     resultado = carga.montar_estado_projetado(conn, FAZENDA, DATA_BASE)  # type: ignore[arg-type]
     args, kwargs = chamadas["clima"]
     assert args == (LAT, -50.0, DATA_BASE - timedelta(days=3), DATA_BASE + timedelta(days=13))
@@ -499,6 +506,40 @@ def test_montar_estado_projetado(monkeypatch: pytest.MonkeyPatch) -> None:
     assert p.massa_hoje_kg_ms_ha is not None
     assert len(p.taxa_acumulo_prevista_kg_ms_ha_dia) == 14
     assert estado_para_dict(resultado)["piquetes"][0]["nome"] == "P1"
+
+
+def test_montar_estado_projetado_preenche_estrutura(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SPEC-018 R3: module/square come from piquete_estrutura, group module from lote_modulo."""
+    log = _Log()
+    p1, p2 = log.piquete("P1", MARANDU), log.piquete("P2", MARANDU)
+    for pid in (p1, p2):
+        log.altura(pid, DATA_BASE - timedelta(days=3), 30.0)
+    lote = log.lote()
+    modulo, praca, fantasma = uuid4(), uuid4(), uuid4()
+    monkeypatch.setattr(carga, "carregar_eventos", lambda _c, _f: log.eventos)
+    monkeypatch.setattr(carga, "carregar_catalogo", lambda _c, _f: CATALOGO)
+    monkeypatch.setattr(carga, "buscar_clima", lambda *a, **_k: _clima(a[2], a[3]))
+    monkeypatch.setattr(carga, "et0_media_anual_mm_dia", lambda *_: ET0_ANUAL)
+    conn = _Conn(
+        {
+            "estado_piquete": [(p1, LAT, -50.0), (p2, LAT, -50.01)],
+            # p1 has module and square; the row of a paddock not in the state is ignored
+            "piquete_estrutura": [
+                (p1, modulo, praca, -9.6, -36.0),
+                (fantasma, modulo, None, None, None),
+            ],
+            "lote_modulo": [(lote, modulo), (uuid4(), modulo)],
+            "fazenda": [("America/Sao_Paulo",)],
+        }
+    )
+    resultado = carga.montar_estado_projetado(conn, FAZENDA, DATA_BASE)  # type: ignore[arg-type]
+    por_nome = {p.nome: p for p in resultado.piquetes}
+    assert (por_nome["P1"].modulo_id, por_nome["P1"].praca_id) == (modulo, praca)
+    assert (por_nome["P1"].praca_lat, por_nome["P1"].praca_lon) == (-9.6, -36.0)
+    assert (por_nome["P2"].modulo_id, por_nome["P2"].praca_id) == (None, None)
+    assert (por_nome["P2"].praca_lat, por_nome["P2"].praca_lon) == (None, None)
+    (lote_projetado,) = resultado.lotes
+    assert lote_projetado.modulo_id == modulo
 
 
 def test_montar_estado_projetado_sem_eventos(monkeypatch: pytest.MonkeyPatch) -> None:

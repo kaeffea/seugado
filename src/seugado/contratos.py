@@ -3,7 +3,7 @@
 import types
 import typing
 from collections.abc import Mapping
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import MISSING, dataclass, fields, is_dataclass
 from datetime import date, datetime
 from enum import Enum, StrEnum
 from typing import Any, cast, get_args, get_origin, get_type_hints
@@ -70,6 +70,10 @@ class PiqueteProjetado:
     confianca: Confianca
     motivo_confianca: str
     dias_desde_imagem_limpa: int | None
+    modulo_id: UUID | None = None
+    praca_id: UUID | None = None
+    praca_lat: float | None = None
+    praca_lon: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +88,7 @@ class LoteProjetado:
     consumo_kg_ms_dia: float
     confianca_peso: Confianca
     motivo_confianca_peso: str
+    modulo_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,13 +261,13 @@ def _deserialize(t: object, v: object) -> object:
         if not isinstance(v, Mapping):
             raise ValueError(f"expected mapping for {t}, got {type(v)}")
         hints = get_type_hints(t)
-        return t(
-            **{
-                f.name: _deserialize(hints[f.name], v[f.name])
-                for f in fields(t)
-                if f.name in v or _missing(f.name)
-            }
-        )
+        valores: dict[str, object] = {}
+        for f in fields(t):
+            if f.name in v:
+                valores[f.name] = _deserialize(hints[f.name], v[f.name])
+            elif f.default is MISSING and f.default_factory is MISSING:
+                _missing(f.name)  # a key absent for a field with a default keeps the default
+        return t(**valores)
     return _parse_primitive(t, v)
 
 

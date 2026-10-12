@@ -1,5 +1,6 @@
 """Load everything projetar_estado needs from the database and the weather API (read only)."""
 
+from dataclasses import replace
 from datetime import date, timedelta
 from typing import Any
 from uuid import UUID
@@ -21,6 +22,12 @@ _SELECT_CENTROIDES = (
     " FROM estado_piquete WHERE fazenda_id = %s AND ativo"
 )
 _SELECT_TIMEZONE = "SELECT timezone FROM fazenda WHERE id = %s"
+_SELECT_ESTRUTURA_PIQUETES = (
+    "SELECT pe.piquete_id, pe.modulo_id, pe.praca_id, ST_Y(pr.ponto), ST_X(pr.ponto)"
+    " FROM piquete_estrutura pe LEFT JOIN praca pr ON pr.id = pe.praca_id"
+    " WHERE pe.fazenda_id = %s"
+)
+_SELECT_MODULO_LOTES = "SELECT lote_id, modulo_id FROM lote_modulo WHERE fazenda_id = %s"
 
 
 def _vazio(fazenda_id: UUID, data_base: date) -> EstadoProjetado:
@@ -32,6 +39,41 @@ def _vazio(fazenda_id: UUID, data_base: date) -> EstadoProjetado:
         piquetes=(),
         lotes=(),
     )
+
+
+def _com_estrutura(
+    conn: psycopg.Connection[Any], fazenda_id: UUID, estado: EstadoProjetado
+) -> EstadoProjetado:
+    """Copy of `estado` with each paddock's module/square and each group's module filled in."""
+    with conn.cursor() as cur:
+        cur.execute(_SELECT_ESTRUTURA_PIQUETES, (fazenda_id,))
+        linhas_piquetes = cur.fetchall()
+        cur.execute(_SELECT_MODULO_LOTES, (fazenda_id,))
+        linhas_lotes = cur.fetchall()
+    estrutura = {row[0]: row[1:] for row in linhas_piquetes}
+    modulo_do_lote = {row[0]: row[1] for row in linhas_lotes}
+    piquetes = []
+    for p in estado.piquetes:
+        if p.piquete_id not in estrutura:
+            piquetes.append(p)
+            continue
+        modulo_id, praca_id, lat, lon = estrutura[p.piquete_id]
+        piquetes.append(
+            replace(
+                p,
+                modulo_id=modulo_id,
+                praca_id=praca_id,
+                praca_lat=None if lat is None else float(lat),
+                praca_lon=None if lon is None else float(lon),
+            )
+        )
+    lotes = tuple(
+        replace(lote, modulo_id=modulo_do_lote[lote.lote_id])
+        if lote.lote_id in modulo_do_lote
+        else lote
+        for lote in estado.lotes
+    )
+    return replace(estado, piquetes=tuple(piquetes), lotes=lotes)
 
 
 def montar_estado_projetado(
@@ -70,7 +112,7 @@ def montar_estado_projetado(
         timezone=timezone,
     )
     et0 = et0_media_anual_mm_dia(lat_fazenda, lon_fazenda, data_base, timezone)
-    return projetar_estado(
+    projetado = projetar_estado(
         estado,
         eventos,
         catalogo,
@@ -81,3 +123,4 @@ def montar_estado_projetado(
         data_base,
         _HORIZONTE_PREVISAO_DIAS,
     )
+    return _com_estrutura(conn, fazenda_id, projetado)

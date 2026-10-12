@@ -2,7 +2,7 @@
 
 import json
 import uuid
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, fields
 from datetime import date
 from pathlib import Path
 from typing import Any, cast
@@ -11,7 +11,9 @@ import pytest
 
 from seugado.contratos import (
     DiferencaLote,
+    LoteProjetado,
     PassoPlano,
+    PiqueteProjetado,
     TipoAlerta,
     estado_de_dict,
     estado_para_dict,
@@ -27,14 +29,68 @@ def _fixture(name: str) -> dict[str, Any]:
         return cast("dict[str, Any]", json.load(f))
 
 
+_CAMPOS_ESTRUTURA = ("modulo_id", "praca_id", "praca_lat", "praca_lon")
+
+
+def _sem_estrutura(dados: dict[str, Any]) -> dict[str, Any]:
+    """The same state dict without the SPEC-018 fields (the fixture predates them)."""
+    limpo = json.loads(json.dumps(dados))
+    for item in (*limpo["piquetes"], *limpo["lotes"]):
+        for campo in _CAMPOS_ESTRUTURA:
+            item.pop(campo, None)
+    return cast("dict[str, Any]", limpo)
+
+
 def test_estado_fixture_roundtrip() -> None:
     data = _fixture("estado_projetado_exemplo.json")
     estado = estado_de_dict(data)
     assert len(estado.piquetes) == 8
     assert len(estado.lotes) == 2
-    assert estado_para_dict(estado) == data
+    assert _sem_estrutura(estado_para_dict(estado)) == data
     assert estado_de_dict(estado_para_dict(estado)) == estado
     json.dumps(estado_para_dict(estado), ensure_ascii=False)
+
+
+def test_estado_antigo_sem_estrutura_carrega_com_none() -> None:
+    """SPEC-018 R1: JSON written before the structure fields still loads, with None."""
+    estado = estado_de_dict(_fixture("estado_projetado_exemplo.json"))
+    for p in estado.piquetes:
+        assert (p.modulo_id, p.praca_id, p.praca_lat, p.praca_lon) == (None, None, None, None)
+    assert all(lote.modulo_id is None for lote in estado.lotes)
+    escrito = estado_para_dict(estado)
+    assert all(campo in escrito["piquetes"][0] for campo in _CAMPOS_ESTRUTURA)
+    assert "modulo_id" in escrito["lotes"][0]
+
+
+def test_estado_estrutura_preenchida_faz_roundtrip() -> None:
+    data = _fixture("estado_projetado_exemplo.json")
+    modulo, praca = str(uuid.uuid4()), str(uuid.uuid4())
+    data["piquetes"][0].update(
+        modulo_id=modulo, praca_id=praca, praca_lat=-9.6, praca_lon=-36.0
+    )
+    data["lotes"][0]["modulo_id"] = modulo
+    estado = estado_de_dict(data)
+    assert str(estado.piquetes[0].modulo_id) == modulo
+    assert (estado.piquetes[0].praca_lat, estado.piquetes[0].praca_lon) == (-9.6, -36.0)
+    assert str(estado.lotes[0].modulo_id) == modulo
+    assert estado_para_dict(estado)["piquetes"][0]["praca_id"] == praca
+    assert estado_de_dict(estado_para_dict(estado)) == estado
+
+
+def test_estado_chave_ausente_sem_default_continua_erro() -> None:
+    data = _fixture("estado_projetado_exemplo.json")
+    del data["piquetes"][0]["nome"]
+    with pytest.raises(ValueError, match="missing key: 'nome'"):
+        estado_de_dict(data)
+
+
+def test_campos_de_estrutura_ficam_no_fim_com_default_none() -> None:
+    piquete = [f.name for f in fields(PiqueteProjetado)]
+    assert piquete[-4:] == list(_CAMPOS_ESTRUTURA)
+    assert [f.name for f in fields(LoteProjetado)][-1] == "modulo_id"
+    for classe, nomes in ((PiqueteProjetado, _CAMPOS_ESTRUTURA), (LoteProjetado, ("modulo_id",))):
+        por_nome = {f.name: f for f in fields(classe)}
+        assert all(por_nome[n].default is None for n in nomes)
 
 
 def test_plano_fixture_roundtrip() -> None:

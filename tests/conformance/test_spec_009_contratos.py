@@ -121,6 +121,11 @@ def test_piquete_projetado_field_order():
         "confianca",
         "motivo_confianca",
         "dias_desde_imagem_limpa",
+        # appended by SPEC-018 R1, default None
+        "modulo_id",
+        "praca_id",
+        "praca_lat",
+        "praca_lon",
     )
     actual = tuple(f.name for f in fields(contratos.PiqueteProjetado))
     assert actual == expected
@@ -139,6 +144,7 @@ def test_lote_projetado_field_order():
         "consumo_kg_ms_dia",
         "confianca_peso",
         "motivo_confianca_peso",
+        "modulo_id",  # appended by SPEC-018 R1, default None
     )
     actual = tuple(f.name for f in fields(contratos.LoteProjetado))
     assert actual == expected
@@ -179,11 +185,18 @@ def test_canonical_estado_projetado_fixture_roundtrip():
     assert len(estado.piquetes) == 8
     assert len(estado.lotes) == 2
 
-    # Round trip dict
+    # Round trip dict. The fixture predates SPEC-018, which always writes the structure
+    # fields (None here); every key of the old JSON must come back unchanged.
     serialized = contratos.estado_para_dict(estado)
+    estrutura = {"modulo_id", "praca_id", "praca_lat", "praca_lon"}
+    for item in (*serialized["piquetes"], *serialized["lotes"]):
+        assert all(item[k] is None for k in estrutura & item.keys())
+        for k in estrutura:
+            item.pop(k, None)
     assert serialized == data
 
     # Round trip dataclass
+    serialized = contratos.estado_para_dict(estado)
     reconstructed = contratos.estado_de_dict(serialized)
     assert reconstructed == estado
 
