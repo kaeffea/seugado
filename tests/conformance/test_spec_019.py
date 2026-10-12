@@ -405,6 +405,72 @@ def test_oculto_3_sem_dias_cadastrados() -> None:
     assert len(do_lote) == 1 and do_lote[0].data == SEGUNDA + timedelta(days=1)
 
 
+# ---- hidden case 4: herd bigger than the team with nowhere to go (R5 amendment) ----------------
+
+
+def oculto_4() -> EstadoProjetado:
+    return est(
+        [
+            pq("A", 1.0, 14.0, 0, taxa=40.0, modulo="M1", lote="L_big"),
+            pq("C", 1.0, 20.0, 30, taxa=40.0, modulo="M1"),
+            pq("B", 1.0, 15.0, 0, taxa=40.0, modulo="M2", lote="L_small"),
+            pq("D", 1.0, 33.0, 30, taxa=40.0, modulo="M2"),
+        ],
+        [
+            lt("L_big", 80, 500.0, em="A", modulo="M1"),
+            lt("L_small", 20, 200.0, em="B", modulo="M2"),
+        ],
+    )
+
+
+def test_oculto_4_lote_grande_sem_destino_nao_trava_a_fila() -> None:
+    p = plano(oculto_4(), faz(animais=50))
+    (mov,) = p.movimentacoes
+    assert (mov.lote_nome, mov.piquete_origem_nome, mov.piquete_destino_nome) == (
+        "L_small",
+        "B",
+        "D",
+    )
+    assert mov.data == SEGUNDA
+
+    (sem_apto,) = do_tipo(p, TipoAlerta.SEM_PIQUETE_APTO)
+    assert sem_apto.lote_id == uid("lote:L_big") and sem_apto.data == SEGUNDA
+
+    abaixo = {a.texto.split(" ")[0] for a in do_tipo(p, TipoAlerta.ABAIXO_DA_SAIDA)}
+    assert abaixo == {"A", "B"}
+    assert all(a.data == SEGUNDA for a in do_tipo(p, TipoAlerta.ABAIXO_DA_SAIDA))
+
+    falta = {a.modulo_id: a for a in do_tipo(p, TipoAlerta.FALTA_DE_CAPIM)}
+    assert set(falta) == {uid("modulo:M1"), uid("modulo:M2")}
+    assert "12%" in falta[uid("modulo:M1")].texto
+    assert "29%" in falta[uid("modulo:M2")].texto
+    for ausente in (
+        TipoAlerta.CAPACIDADE_EXCEDIDA,
+        TipoAlerta.PRONTO_EM,
+        TipoAlerta.PASSANDO_DO_PONTO,
+    ):
+        assert do_tipo(p, ausente) == []
+
+
+def test_lote_grande_que_se_move_encerra_as_trocas_do_dia() -> None:
+    """The other half of the R5 amendment: once the oversize herd moves, the day is over."""
+    e = est(
+        [
+            pq("A", 1.0, 14.0, 0, taxa=40.0, lote="L_big"),
+            pq("B", 1.0, 15.0, 0, taxa=40.0, lote="L_small"),
+            pq("C", 3.0, 40.0, 30, taxa=40.0),
+            pq("D", 3.0, 38.0, 30, taxa=40.0),
+        ],
+        [lt("L_big", 80, 500.0, em="A"), lt("L_small", 20, 200.0, em="B")],
+    )
+    p = plano(e, faz(animais=50))
+    primeiro_dia = [m for m in p.movimentacoes if m.data == SEGUNDA]
+    assert [m.lote_nome for m in primeiro_dia] == ["L_big"]
+    (cap,) = do_tipo(p, TipoAlerta.CAPACIDADE_EXCEDIDA)
+    assert cap.lote_id == uid("lote:L_small") and cap.data == SEGUNDA
+    assert any(m.lote_nome == "L_small" and m.data > SEGUNDA for m in p.movimentacoes)
+
+
 # ---- properties -------------------------------------------------------------------------
 
 

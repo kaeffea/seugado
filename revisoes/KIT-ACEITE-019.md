@@ -56,3 +56,16 @@ Com `dias_preferenciais_manejo == ()`: o `sem_dia_de_manejo` da fazenda (ids Non
 - Determinismo: duas chamadas → `plano_para_dict` iguais.
 - `capacidade <= 0` → `ValueError`.
 - Todo alerta com `acao != ""`.
+
+## Caso oculto 4 — lote maior que a equipe sem destino (pós-implementação, emenda do R5)
+Segunda 12/10/2026, todos os dias de manejo, 1 funcionário × 50 animais/dia. Mesmos parâmetros
+do caso 1 (30/15 cm, 110 kg/ha/cm, ef. 0,72, descanso mínimo 21, taxa 40), todos com 1 ha.
+- Módulo M1 = {A, C}: A 14 cm com L_big (80 animais, consumo 500, `modulo_id` M1); C 20 cm, descanso 30.
+- Módulo M2 = {B, D}: B 15 cm com L_small (20 animais, consumo 200, `modulo_id` M2); D 33 cm, descanso 30.
+
+Esperado:
+- L_big vem primeiro (urgência 1), tenta sozinho (80 > 50), não acha destino (C abaixo de 27 cm)
+  → `sem_piquete_apto` de L_big em 12/10, sem gastar capacidade.
+- A fila continua: L_small B→D em 12/10. **Única** movimentação do plano.
+- `abaixo_da_saida` em 12/10 para A e B; `falta_de_capim` M1 com `12%` e M2 com `29%`.
+- Nenhum `capacidade_excedida`, `pronto_em` ou `passando_do_ponto`.

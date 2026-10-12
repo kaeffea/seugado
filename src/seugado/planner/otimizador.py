@@ -251,9 +251,8 @@ def gerar_plano(  # noqa: PLR0915 — the simulation state lives in this scope, 
                 )
                 emitidos.setdefault((TipoAlerta.CAPACIDADE_EXCEDIDA, lote.lote_id), alerta)
             elif mover(hoje, d, lote):
-                usados += tamanho
-            elif not cabe:
-                break  # a herd bigger than the team is tried alone; if it cannot move, stop
+                usados += tamanho  # an oversize herd that moved fills the day: the rest wait
+            # no destination: it spends no capacity and the walk goes on (R5 amended, R6)
 
     for d in range(HORIZONTE_DIAS):
         dia = estado.data_base + timedelta(days=d)

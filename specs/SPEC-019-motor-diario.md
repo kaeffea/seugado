@@ -112,7 +112,9 @@ Order: unplaced lotes first; then by `altura_saida_cm − altura_hoje_do_dia_cm`
 Capacity of the day, in animals: `fazenda.funcionarios_disponiveis * fazenda.animais_por_funcionario_dia`.
 Lote size = sum of `n_animais` in `composicao`. Walk the ordered list keeping `usados`:
 - if `usados + tamanho <= capacidade`: try to move it (R6);
-- elif `usados == 0`: try to move it alone (a lote is never split), then stop moving that day;
+- elif `usados == 0`: try to move it alone (a lote is never split). If it moves, the day's moves
+  end: the following lotes fall in the `else` branch below. If it finds no destination (R6), it
+  spends no capacity and the walk continues with the next lote;
 - else: do not move it; emit `capacidade_excedida` (R7). It is retried next handling day.
 `usados` grows only when a move actually happens.
 
@@ -238,6 +240,7 @@ Do not create, modify or delete anything under `tests/conformance/`.
 - [ ] A lote with `modulo_id` never receives a destination outside its `modulo`
 - [ ] No move is dated on a day outside `dias_preferenciais_manejo`
 - [ ] Moved animals per day ≤ capacity, except a single lote larger than capacity moved alone
+- [ ] A lote larger than capacity with no destination does not stop the other lotes from moving
 - [ ] No destination is non-plannable, occupied, or below the fallback height, and none has rest unmet
 - [ ] Same inputs → identical `PlanoManejo` (call twice and compare)
 - [ ] Worked example reproduced
