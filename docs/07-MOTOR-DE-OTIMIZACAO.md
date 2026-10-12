@@ -170,6 +170,11 @@ partir do piquete atual do lote. O critério (c) é a distância entrando como *
 como termo de objetivo: o guloso não tem função objetivo para ponderar (ADR-016).
 Sem lookahead. **Já é infinitamente melhor que mapa NDVI.**
 
+> **ADR-026 (12/10/2026).** Lote com módulo só escolhe destino entre os piquetes do seu módulo,
+> e `dist` passa pela praça de alimentação: pasto → praça → pasto. Sem praça cadastrada, `dist`
+> volta a ser a distância entre centroides. O motor roda e entrega **todo dia**, e emite o
+> catálogo de alertas da ADR-026 §6, cada um com ação recomendada.
+
 > **O que o guloso não faz, e é bom saber antes de prometer.** "Vale a pena esperar dois dias
 > pelo piquete vizinho ficar pronto, em vez de mandar o lote para o piquete distante hoje?" é
 > exatamente a pergunta que um algoritmo sem lookahead **não** responde. Ela só é resolvida de

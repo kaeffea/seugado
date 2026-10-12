@@ -232,6 +232,12 @@ Por que vale o esforço arquitetural:
 > `cultivar` com seed; derivadas `estado_piquete` (com geometria), `estado_lote` (com composição),
 > `leitura` (observação, sem massa) e `altura_atual`; `plano`; `telegram_conversa`; RLS em todas as
 > tabelas. `piquete_distancia` foi adiada: a distância é calculada por Haversine (ADR-024).
+>
+> **Atualizado em 12/10/2026 (ADR-026):** migração `0004` acrescenta configuração editada por
+> `UPDATE`, fora do event sourcing: `modulo (id, fazenda_id, nome)`, `praca (id, fazenda_id,
+> nome, ponto geometry(Point,4326))`, `piquete_estrutura (piquete_id, fazenda_id, modulo_id?,
+> praca_id?)` e `lote_modulo (lote_id, fazenda_id, modulo_id)`. A distância de manejo passa
+> pela praça do piquete (`planner/estrutura.py`).
 
 ```
 fazenda      (id, nome, timezone, funcionarios_disponiveis,

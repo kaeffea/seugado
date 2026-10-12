@@ -155,7 +155,7 @@ contra baseline, o que também dá material para o relatório acadêmico.
 ---
 
 ## ADR-009 — Não modelar módulo de pastejo no MVP
-**Data:** 17/09/2026 · **Status:** aceita
+**Data:** 17/09/2026 · **Status:** substituída por ADR-026
 
 **Contexto.** Na prática, fazendas organizam piquetes em módulos, e cada lote rotaciona
 dentro do seu módulo.
@@ -455,7 +455,7 @@ de fusão de lotes prevista antes do F-022.
 ---
 
 ## ADR-016 — Custo espacial no otimizador: distância entra no MVP, grafo de porteiras fica para depois
-**Data:** 18/09/2026 · **Status:** aceita
+**Data:** 18/09/2026 · **Status:** aceita (premissa da água revista pela ADR-026)
 
 **Contexto.** Toda a formulação do `07` era **espacialmente cega**: `x[l,p,d]` trata os piquetes
 como intercambiáveis e nenhuma restrição ou termo de objetivo olha onde eles ficam. O resultado
@@ -937,6 +937,103 @@ combinou. No MVP, só o Marandu tem todos os parâmetros; as outras cultivares a
 - A ADR-002 fica substituída para o MVP; o HLS deixa de ser usado.
 - Risco: a harmonização entre sensores deixa de importar, porque é um sensor só.
 - Custo: mais consultas ao Earth Engine (diárias), ainda dentro do uso não comercial.
+
+---
+
+## ADR-026 — Módulo, praça de alimentação e motor diário
+**Data:** 12/10/2026 · **Status:** aceita · **Reabre, de forma declarada:** ADR-009 (inteira),
+ADR-016 (premissa "todo piquete tem água"), ADR-024 §4 (distância entre centroides) e
+ADR-025 §4 (entrega semanal e plano `candidato`)
+
+**Contexto.** O mentor (02/10) e o zootecnista Philipe Amorim (07/10) descreveram a fazenda
+real: piquetes agrupados em **módulos**, cada lote rodando dentro do seu módulo, e o gado indo
+beber e comer cocho numa **praça de alimentação** comum, chegando por corredor. A ADR-009
+("não modelar módulo") e a premissa da ADR-016 ("todo piquete tem água, o gado vai de qualquer
+piquete a qualquer outro") previam reabertura se isso aparecesse em campo. Apareceu. O mentor
+também pediu ordem **diária** ("fazenda grande troca pasto todo dia") e o líder da equipe
+listou os alertas que o motor precisa emitir, cada um com a ação recomendada.
+
+**Decisão.**
+
+1. **Módulo é grupo de piquetes, e o lote fica preso ao módulo.** Um piquete pertence a no
+   máximo um módulo; um módulo pode ter vários lotes. O lote com módulo só recebe destino entre
+   os piquetes ativos do seu módulo. Lote sem módulo continua podendo ir a qualquer piquete
+   (comportamento atual) — fazenda sem módulo cadastrado não muda nada. Módulo, praça e os
+   vínculos são **configuração editada por `UPDATE`**, como `fazenda` e `cliente`, e **não**
+   eventos: descrevem a estrutura da fazenda, não algo que aconteceu, e assim os payloads de
+   `piquete_*` e `lote_*` (validados com `extra="forbid"`) e a dobra da ADR-018 ficam intactos.
+   Custo aceito: o histórico de mudanças de módulo não é auditável.
+2. **Praça é um ponto** (`geometry(Point, 4326)`) da fazenda, com nome. Cada piquete aponta,
+   opcionalmente, para a praça onde bebe. Praça não pertence a módulo: dois módulos podem
+   dividir uma praça. **Corredor não é desenhado** — o grafo de porteiras (ADR-016 alt. a)
+   continua fora do MVP.
+3. **Distância de manejo passa pela praça.** Seja `acesso(p)` a praça do piquete `p` ou, se ele
+   não tem praça, o próprio centroide. Então
+   `dist(o, d) = hav(centroide_o, acesso_o) + hav(acesso_o, acesso_d) + hav(acesso_d, centroide_d)`,
+   com `dist(p, p) = 0`. Mesma praça → pasto→praça + praça→pasto, como decidido. Praças
+   diferentes → soma o trecho reto entre elas. Nenhuma praça → volta exatamente à distância
+   entre centroides da ADR-024 §4. A desigualdade triangular continua valendo, logo a garantia
+   de "não cruzar rotas" da ADR-016 sobrevive. Haversine em Python, como na ADR-024.
+4. **Lotação.** `UA = peso_vivo_total_kg / 450` (ADR-014). Lotação global = UA de todos os lotes
+   ÷ área ativa da fazenda; **lotação por módulo** = UA dos lotes do módulo ÷ área dos piquetes
+   ativos do módulo. É número **exibido** ao admin, não prescrito. Lotação instantânea fica
+   fora até um cliente pedir.
+5. **Plano diário.** A rotina das 06h já recalcula todo dia (ADR-025 §4); agora ela também
+   **entrega todo dia**:
+   - A **ordem do dia** sai na primeira rodada da rotina horária em que a hora local da fazenda
+     é ≥ `envio_plano_hora` **e** o recálculo do dia já rodou. Traz só o que é de hoje:
+     movimentações e alertas do dia. Sem movimentação, diz "sem troca hoje" e adianta a próxima
+     do horizonte ("na quarta, o lote Recria sai do pasto 3").
+   - O horizonte segue de 7 dias, rolante. **Movimentação de hoje já enviada não muda por
+     recálculo automático**; só muda por ação do produtor (`/alturas`, `/mover`, "não fiz"), que
+     dispara recálculo e mensagem nova. Dias futuros são previsão e mudam em silêncio.
+   - Por isso o plano `candidato` e a pergunta "quer ver as mudanças?" (ADR-025 §4) deixam de
+     ser produzidos. Os valores do `status` ficam no banco por histórico.
+   - O envio em `envio_plano_dia` vira o **resumo da semana**, opcional.
+   - `dias_preferenciais_manejo` continua mandando em que dias pode haver troca. Fazenda que
+     troca todo dia marca os sete dias.
+6. **Catálogo de alertas do motor.** Todo alerta carrega uma **ação recomendada** em português;
+   alerta sem ação não é emitido. Nenhum alerta diz **quantos** animais pôr ou tirar, nem manda
+   comprar ou vender (`01`, Fora de escopo).
+
+   | Tipo | Dispara quando | Ação recomendada |
+   |---|---|---|
+   | `passando_do_ponto` (existe) | piquete vazio com altura hoje **ou prevista no horizonte** ≥ 1,2 × entrada, e nenhum lote o recebe no plano | entrar com um lote do módulo até a data; se nenhum pode, vale o `sobra_de_capim` |
+   | `abaixo_da_saida` (novo) | piquete ocupado com altura de hoje ≤ saída | retirar o lote hoje, para o destino do plano ou, sem destino, ver `sem_piquete_apto` |
+   | `sem_dia_de_manejo` (existe) | lote passa da saída antes do próximo dia de manejo | antecipar a troca para a data em que passa da saída |
+   | `pronto_em` (novo, informativo) | piquete vazio atinge entrada e descanso dentro do horizonte e não é destino no plano; **só o primeiro de cada módulo** | programar o lote do módulo para aquela data |
+   | `sobra_de_capim` (novo) — "animal de menos" | no módulo, oferta ÷ demanda ≥ 1,2 na média do horizonte | trazer mais animais para o módulo **ou** tirar piquetes do rodízio |
+   | `falta_de_capim` (novo) — "animal demais" | no módulo, oferta ÷ demanda ≤ 0,8 na média do horizonte | reduzir os animais do módulo **ou** juntar piquetes ao módulo |
+
+   **Oferta** do módulo = Σ piquetes ativos `taxa_acumulo_prevista × area_ha × eficiencia_pastejo`;
+   **demanda** = Σ lotes do módulo `consumo_kg_ms_dia`. Todos os insumos já existem no
+   `EstadoProjetado`. Lote sem módulo conta num "módulo fazenda" implícito. Os limiares 1,2
+   (já usado no `passando_do_ponto`), 1,2 e 0,8 são **`HIPOTESE-CALIBRAR`**, a fixar na ADR de
+   calibração de limiares, aberta com os dados da fazenda do Philipe.
+
+**Alternativas.**
+- *Módulo e vínculos como eventos* — auditoria completa, mas muda payloads validados com
+  `extra="forbid"`, a dobra e as fixtures por um dado de estrutura que quase nunca muda.
+- *Praça como polígono, ou corredor desenhado* — mais fiel, mais fricção de cadastro; o ponto
+  já corrige o erro grosso da linha reta entre centroides.
+- *Módulo obrigatório* — quebraria toda fazenda já cadastrada e os testes atuais sem ganho.
+- *Lotação numérica prescrita no alerta* — fora de escopo (`01`, prescrição quantificada).
+- *Manter o plano `candidato` com entrega diária* — o produtor seria perguntado quase todo dia.
+
+**Consequências.**
+- **Schema:** migração `0004` com `modulo`, `praca`, `piquete_estrutura` e `lote_modulo`.
+- **Specs:** SPEC-017 (banco, cadastro e API de módulo e praça) e SPEC-018 (estrutura no
+  `EstadoProjetado`, distância via praça e filtro por módulo). A tela de mapa (Ezequiel), o motor
+  diário com o catálogo de alertas (João, J3) e a ordem do dia no bot (Leo) ganham specs
+  próprias a partir desta ADR.
+- **Contratos:** `PiqueteProjetado` e `LoteProjetado` ganham campos de estrutura no fim, com
+  default `None`; o deserializador passa a aceitar chave ausente quando o campo tem default.
+  `Alerta` ganha `acao` e `modulo_id` na spec do motor, pelo mesmo mecanismo — planos antigos
+  continuam legíveis.
+- ADR-009 fica **substituída**. ADR-016 segue aceita, com a premissa da água resolvida por este
+  documento; o grafo de porteiras continua alternativa futura.
+- Risco: a linha reta praça→pasto ainda ignora cerca e corredor tortuoso. Gatilho para o grafo:
+  rota rejeitada pelo produtor na fazenda de teste.
 
 ---
 
