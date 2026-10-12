@@ -106,7 +106,11 @@ def test_plano_fixture_roundtrip() -> None:
     assert first.piquete_destino_nome == "Piquete 6"
     assert first.dias_previstos == 7
     assert first.confianca is Confianca.MEDIA
-    assert plano_para_dict(plano) == data
+    escrito = plano_para_dict(plano)
+    for alerta in escrito["alertas"]:  # SPEC-019: always written; the old fixture lacks them
+        assert alerta.pop("acao") == ""
+        assert alerta.pop("modulo_id") is None
+    assert escrito == data
     assert plano_de_dict(plano_para_dict(plano)) == plano
     json.dumps(plano_para_dict(plano), ensure_ascii=False)
 
@@ -133,8 +137,8 @@ def test_estado_rejects_bad_uuid() -> None:
         estado_de_dict(bad)
 
 
-def test_alerta_has_nine_members_and_diff_dataclasses_are_frozen() -> None:
-    assert len(TipoAlerta) == 9
+def test_alerta_has_thirteen_members_and_diff_dataclasses_are_frozen() -> None:
+    assert len(TipoAlerta) == 13  # 9 + abaixo_da_saida, pronto_em, sobra/falta_de_capim (SPEC-019)
     assert TipoAlerta.PASSANDO_DO_PONTO.value == "passando_do_ponto"
     passo = PassoPlano(data=date(2026, 9, 28), piquete_destino_nome="Piquete 1")
     diff = DiferencaLote(

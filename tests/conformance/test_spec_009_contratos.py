@@ -52,7 +52,7 @@ def test_forbidden_imports():
 
 
 def test_tipo_alerta_members():
-    """TipoAlerta has exactly 9 members and exact string values."""
+    """TipoAlerta has the 9 SPEC-009 members plus the 4 added by SPEC-019, exact string values."""
     expected = {
         "SEM_PIQUETE_APTO": "sem_piquete_apto",
         "CAPACIDADE_EXCEDIDA": "capacidade_excedida",
@@ -63,10 +63,15 @@ def test_tipo_alerta_members():
         "LOTE_SEM_PIQUETE": "lote_sem_piquete",
         "SEM_DIA_DE_MANEJO": "sem_dia_de_manejo",
         "PASSANDO_DO_PONTO": "passando_do_ponto",
+        # added by SPEC-019 R1
+        "ABAIXO_DA_SAIDA": "abaixo_da_saida",
+        "PRONTO_EM": "pronto_em",
+        "SOBRA_DE_CAPIM": "sobra_de_capim",
+        "FALTA_DE_CAPIM": "falta_de_capim",
     }
     actual = {m.name: m.value for m in contratos.TipoAlerta}
     assert actual == expected
-    assert len(contratos.TipoAlerta) == 9
+    assert len(contratos.TipoAlerta) == 13
 
 
 def test_all_dataclasses_frozen_slotted_no_methods():
@@ -221,16 +226,20 @@ def test_canonical_plano_exemplo_fixture_roundtrip():
     assert first_mov.dias_previstos == 7
     assert first_mov.confianca is Confianca.MEDIA
 
-    # Round trip dict
+    # Round trip dict. The fixture predates SPEC-019, which always writes `acao` and
+    # `modulo_id` on alerts (empty here); every key of the old JSON comes back unchanged.
     serialized = contratos.plano_para_dict(plano)
+    for alerta in serialized["alertas"]:
+        assert alerta.pop("acao") == ""
+        assert alerta.pop("modulo_id") is None
     assert serialized == data
 
     # Round trip dataclass
-    reconstructed = contratos.plano_de_dict(serialized)
+    reconstructed = contratos.plano_de_dict(contratos.plano_para_dict(plano))
     assert reconstructed == plano
 
     # Valid JSON string encoding without error
-    encoded = json.dumps(serialized, ensure_ascii=False)
+    encoded = json.dumps(contratos.plano_para_dict(plano), ensure_ascii=False)
     assert len(encoded) > 0
 
 

@@ -79,8 +79,8 @@ def test_fazenda_fields_order_and_no_manejos_por_funcionario_dia_in_src():
 
 
 def test_tipo_alerta_and_new_contracts_frozen_slotted():
-    """TipoAlerta with 9 members; PassoPlano and DiferencaLote frozen and slotted."""
-    assert len(TipoAlerta) == 9
+    """TipoAlerta with 13 members (9 + 4 from SPEC-019); PassoPlano and DiferencaLote frozen."""
+    assert len(TipoAlerta) == 13
     assert TipoAlerta.PASSANDO_DO_PONTO.value == "passando_do_ponto"
 
     for cls in (PassoPlano, DiferencaLote):

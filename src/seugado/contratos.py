@@ -30,6 +30,10 @@ class TipoAlerta(StrEnum):
     LOTE_SEM_PIQUETE = "lote_sem_piquete"
     SEM_DIA_DE_MANEJO = "sem_dia_de_manejo"
     PASSANDO_DO_PONTO = "passando_do_ponto"
+    ABAIXO_DA_SAIDA = "abaixo_da_saida"
+    PRONTO_EM = "pronto_em"
+    SOBRA_DE_CAPIM = "sobra_de_capim"
+    FALTA_DE_CAPIM = "falta_de_capim"
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +133,8 @@ class Alerta:
     motivo_confianca: str
     piquete_id: UUID | None
     lote_id: UUID | None
+    acao: str = ""
+    modulo_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
