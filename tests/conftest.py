@@ -3,6 +3,10 @@
 import os
 from pathlib import Path
 
+import pytest
+
+from seugado.sensing import clima
+
 
 def _load_env_if_present() -> None:
     if not os.environ.get("SEUGADO_TEST_DATABASE_URL"):
@@ -19,3 +23,10 @@ def _load_env_if_present() -> None:
 
 
 _load_env_if_present()
+
+
+@pytest.fixture(autouse=True)
+def _clima_sem_cache_nem_espera(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Weather cache is per-process: isolate tests from each other and never really sleep."""
+    clima._cache.clear()
+    monkeypatch.setattr(clima, "_esperar", lambda segundos: None)

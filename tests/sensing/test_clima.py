@@ -8,6 +8,7 @@ from typing import Any
 import httpx
 import pytest
 
+from seugado.sensing import clima
 from seugado.sensing.clima import (
     ClimaDia,
     buscar_clima,
@@ -120,7 +121,7 @@ def test_buscar_clima_uses_only_forecast_in_window(
     assert chamadas[0]["url"] == "https://api.open-meteo.com/v1/forecast"
     assert chamadas[0]["params"]["past_days"] == 92
     assert chamadas[0]["params"]["forecast_days"] == 16
-    assert chamadas[0]["timeout"] == 30.0
+    assert chamadas[0]["timeout"] == 20.0
     assert [c.data for c in dias] == datas
     assert [c.previsto for c in dias] == [d > HOJE for d in datas]
 
@@ -214,3 +215,144 @@ def test_et0_media_anual_rejects_sparse_series(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(httpx, "get", lambda *a, **k: RespostaFalsa(corpo))
     with pytest.raises(ValueError):
         et0_media_anual_mm_dia(LAT, LON, HOJE, TZ)
+
+
+def _http(
+    status: int, url: str, corpo: dict[str, Any] | None = None, retry_after: str | None = None
+) -> Any:
+    headers = {} if retry_after is None else {"Retry-After": retry_after}
+    return httpx.Response(
+        status, json=corpo or {}, headers=headers, request=httpx.Request("GET", url)
+    )
+
+
+def _sequencia(respostas: list[Any], chamadas: list[dict[str, Any]]) -> Any:
+    def fake(url: str, params: dict[str, Any] | None = None, **kwargs: Any) -> Any:
+        chamadas.append({"url": url, "params": params, **kwargs})
+        return respostas[len(chamadas) - 1]
+
+    return fake
+
+
+_URL_PREVISAO = "https://api.open-meteo.com/v1/forecast"
+
+
+def test_retries_429_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
+    corpo = _bloco([HOJE])
+    chamadas: list[dict[str, Any]] = []
+    esperas: list[float] = []
+    monkeypatch.setattr(clima, "_esperar", esperas.append)
+    monkeypatch.setattr(
+        httpx,
+        "get",
+        _sequencia(
+            [_http(429, _URL_PREVISAO)] * 2 + [_http(200, _URL_PREVISAO, corpo)],
+            chamadas,
+        ),
+    )
+    dias = buscar_clima(LAT, LON, HOJE, HOJE, HOJE, TZ)
+    assert [c.data for c in dias] == [HOJE]
+    assert len(chamadas) == 3
+    assert esperas == [2.0, 5.0]
+
+
+def test_retries_5xx(monkeypatch: pytest.MonkeyPatch) -> None:
+    corpo = _bloco([HOJE])
+    chamadas: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        httpx,
+        "get",
+        _sequencia([_http(503, _URL_PREVISAO), _http(200, _URL_PREVISAO, corpo)], chamadas),
+    )
+    assert len(buscar_clima(LAT, LON, HOJE, HOJE, HOJE, TZ)) == 1
+    assert len(chamadas) == 2
+
+
+def test_four_429_raise_after_four_attempts(monkeypatch: pytest.MonkeyPatch) -> None:
+    chamadas: list[dict[str, Any]] = []
+    esperas: list[float] = []
+    monkeypatch.setattr(clima, "_esperar", esperas.append)
+    monkeypatch.setattr(
+        httpx, "get", _sequencia([_http(429, _URL_PREVISAO) for _ in range(5)], chamadas)
+    )
+    with pytest.raises(httpx.HTTPStatusError) as info:
+        buscar_clima(LAT, LON, HOJE, HOJE, HOJE, TZ)
+    assert info.value.response.status_code == 429
+    assert len(chamadas) == 4
+    assert esperas == [2.0, 5.0, 10.0]
+
+
+def test_does_not_retry_other_4xx(monkeypatch: pytest.MonkeyPatch) -> None:
+    chamadas: list[dict[str, Any]] = []
+    monkeypatch.setattr(httpx, "get", _sequencia([_http(400, _URL_PREVISAO)] * 2, chamadas))
+    with pytest.raises(httpx.HTTPStatusError):
+        buscar_clima(LAT, LON, HOJE, HOJE, HOJE, TZ)
+    assert len(chamadas) == 1
+
+
+def test_retry_after_is_respected_and_capped(monkeypatch: pytest.MonkeyPatch) -> None:
+    chamadas: list[dict[str, Any]] = []
+    esperas: list[float] = []
+    monkeypatch.setattr(clima, "_esperar", esperas.append)
+    monkeypatch.setattr(
+        httpx,
+        "get",
+        _sequencia(
+            [
+                _http(429, _URL_PREVISAO, retry_after="7"),
+                _http(429, _URL_PREVISAO, retry_after="120"),
+                _http(429, _URL_PREVISAO, retry_after="logo"),
+                _http(200, _URL_PREVISAO, _bloco([HOJE])),
+            ],
+            chamadas,
+        ),
+    )
+    buscar_clima(LAT, LON, HOJE, HOJE, HOJE, TZ)
+    assert esperas == [7.0, 30.0, 10.0]
+
+
+def test_same_query_uses_cache_without_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    chamadas: list[dict[str, Any]] = []
+    corpo = _http(200, _URL_PREVISAO, _bloco([HOJE]))
+    monkeypatch.setattr(httpx, "get", _sequencia([corpo], chamadas))
+    primeira = buscar_clima(LAT, LON, HOJE, HOJE, HOJE, TZ)
+    segunda = buscar_clima(LAT + 0.001, LON - 0.001, HOJE, HOJE, HOJE, TZ)  # mesmo lugar
+    assert primeira == segunda
+    assert len(chamadas) == 1
+
+
+def test_cache_separates_place_and_day(monkeypatch: pytest.MonkeyPatch) -> None:
+    chamadas: list[dict[str, Any]] = []
+    corpo = _bloco([HOJE, HOJE + timedelta(days=1)])
+    monkeypatch.setattr(
+        httpx, "get", _sequencia([_http(200, _URL_PREVISAO, corpo) for _ in range(3)], chamadas)
+    )
+    buscar_clima(LAT, LON, HOJE, HOJE, HOJE, TZ)
+    buscar_clima(LAT + 0.5, LON, HOJE, HOJE, HOJE, TZ)
+    buscar_clima(LAT, LON, HOJE, HOJE, HOJE + timedelta(days=1), TZ)
+    assert len(chamadas) == 3
+
+
+def test_cache_expires_after_six_hours(monkeypatch: pytest.MonkeyPatch) -> None:
+    chamadas: list[dict[str, Any]] = []
+    relogio = [1000.0]
+    monkeypatch.setattr(clima, "_agora_s", lambda: relogio[0])
+    corpo = _http(200, _URL_PREVISAO, _bloco([HOJE]))
+    monkeypatch.setattr(httpx, "get", _sequencia([corpo, corpo], chamadas))
+    buscar_clima(LAT, LON, HOJE, HOJE, HOJE, TZ)
+    relogio[0] += 6 * 3600 - 1
+    buscar_clima(LAT, LON, HOJE, HOJE, HOJE, TZ)
+    assert len(chamadas) == 1
+    relogio[0] += 2
+    buscar_clima(LAT, LON, HOJE, HOJE, HOJE, TZ)
+    assert len(chamadas) == 2
+
+
+def test_failures_are_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    chamadas: list[dict[str, Any]] = []
+    respostas = [_http(500, _URL_PREVISAO) for _ in range(4)]
+    respostas.append(_http(200, _URL_PREVISAO, _bloco([HOJE])))
+    monkeypatch.setattr(httpx, "get", _sequencia(respostas, chamadas))
+    with pytest.raises(httpx.HTTPStatusError):
+        buscar_clima(LAT, LON, HOJE, HOJE, HOJE, TZ)
+    assert len(buscar_clima(LAT, LON, HOJE, HOJE, HOJE, TZ)) == 1

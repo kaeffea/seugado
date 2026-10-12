@@ -208,7 +208,7 @@ def test_http_errors_propagate(monkeypatch: pytest.MonkeyPatch) -> None:
         resp.raise_for_status.side_effect = httpx.HTTPStatusError(
             "500 Internal Server Error",
             request=MagicMock(),
-            response=MagicMock(),
+            response=httpx.Response(500),
         )
         return resp
 

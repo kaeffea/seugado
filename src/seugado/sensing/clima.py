@@ -1,9 +1,12 @@
 """Daily weather client (Open-Meteo) and solar/thermal-time formulas."""
 
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
+from email.utils import parsedate_to_datetime
 from math import acos, cos, pi, radians, sin, tan
+from threading import Lock
 from typing import Any, cast
 
 import httpx
@@ -31,6 +34,18 @@ _JANELA_ANUAL_DIAS = 365
 _MINIMO_ET0_NAO_NULO = 300
 
 _CHAVES_DIARIAS = ("time", *VARIAVEIS_DIARIAS)
+
+_TIMEOUT_S = 20.0
+_ESPERAS_S = (2.0, 5.0, 10.0)  # entre as até 4 tentativas
+_ESPERA_MAX_S = 30.0  # teto quando o servidor manda Retry-After
+_HTTP_TOO_MANY_REQUESTS = 429
+_HTTP_ERRO_SERVIDOR = 500
+_VALIDADE_CACHE_S = 6 * 3600.0
+_CASAS_COORDENADA = 2
+
+_ChaveCache = tuple[str, float, float, tuple[tuple[str, str], ...], date]
+_cache: dict[_ChaveCache, tuple[float, Mapping[str, Any]]] = {}
+_trava_cache = Lock()
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,11 +116,73 @@ def parse_resposta_open_meteo(
     return tuple(sorted(dias, key=lambda c: c.data))
 
 
-def _buscar(url: str, params: dict[str, Any]) -> Mapping[str, Any]:
-    """GET a JSON body, raising HTTP errors to the caller."""
-    resposta = httpx.get(url, params=params, timeout=30.0)
-    resposta.raise_for_status()
-    return cast("Mapping[str, Any]", resposta.json())
+def _esperar(segundos: float) -> None:
+    time.sleep(segundos)
+
+
+def _agora_s() -> float:
+    return time.monotonic()
+
+
+def _espera_retry_after(valor: str | None) -> float | None:
+    """Seconds asked for by a Retry-After header (delta-seconds or HTTP date), capped."""
+    if valor is None:
+        return None
+    try:
+        segundos = float(valor)
+    except ValueError:
+        try:
+            alvo = parsedate_to_datetime(valor)
+        except (TypeError, ValueError):
+            return None
+        if alvo.tzinfo is None:
+            alvo = alvo.replace(tzinfo=UTC)
+        segundos = (alvo - datetime.now(UTC)).total_seconds()
+    return min(max(segundos, 0.0), _ESPERA_MAX_S)
+
+
+def _repetivel(erro: httpx.HTTPStatusError) -> bool:
+    status = erro.response.status_code
+    return status == _HTTP_TOO_MANY_REQUESTS or status >= _HTTP_ERRO_SERVIDOR
+
+
+def _baixar(url: str, params: dict[str, Any]) -> Mapping[str, Any]:
+    """GET a JSON body, retrying 429 and 5xx up to 4 times; the last error propagates."""
+    tentativas = len(_ESPERAS_S) + 1
+    for tentativa in range(tentativas):
+        resposta = httpx.get(url, params=params, timeout=_TIMEOUT_S)
+        try:
+            resposta.raise_for_status()
+        except httpx.HTTPStatusError as erro:
+            if not _repetivel(erro) or tentativa == tentativas - 1:
+                raise
+            pedida = _espera_retry_after(erro.response.headers.get("Retry-After"))
+            _esperar(_ESPERAS_S[tentativa] if pedida is None else pedida)
+        else:
+            return cast("Mapping[str, Any]", resposta.json())
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
+def _buscar(url: str, params: dict[str, Any], hoje: date) -> Mapping[str, Any]:
+    """Cached _baixar: same place (2 decimals) + params + day is fetched once per 6 hours."""
+    chave: _ChaveCache = (
+        url,
+        round(params["latitude"], _CASAS_COORDENADA),
+        round(params["longitude"], _CASAS_COORDENADA),
+        tuple(sorted((k, str(v)) for k, v in params.items() if k not in ("latitude", "longitude"))),
+        hoje,
+    )
+    with _trava_cache:
+        guardado = _cache.get(chave)
+    if guardado is not None and _agora_s() < guardado[0]:
+        return guardado[1]
+    corpo = _baixar(url, params)
+    agora = _agora_s()
+    with _trava_cache:
+        for k in [k for k, (validade, _) in _cache.items() if validade <= agora]:
+            del _cache[k]
+        _cache[chave] = (agora + _VALIDADE_CACHE_S, corpo)
+    return corpo
 
 
 def buscar_clima(  # noqa: PLR0913, PLR0917 — arity is the R4 contract
@@ -132,6 +209,7 @@ def buscar_clima(  # noqa: PLR0913, PLR0917 — arity is the R4 contract
                 "daily": ",".join(VARIAVEIS_DIARIAS),
                 "timezone": timezone,
             },
+            hoje,
         )
         for clima in parse_resposta_open_meteo(corpo, hoje):
             por_data[clima.data] = clima
@@ -146,6 +224,7 @@ def buscar_clima(  # noqa: PLR0913, PLR0917 — arity is the R4 contract
                 "daily": ",".join(VARIAVEIS_DIARIAS),
                 "timezone": timezone,
             },
+            hoje,
         )
         inicio = max(data_inicio, hoje - timedelta(days=_PASSADO_PREVISAO_DIAS))
         for clima in parse_resposta_open_meteo(corpo, hoje):
@@ -168,6 +247,7 @@ def et0_media_anual_mm_dia(lat: float, lon: float, hoje: date, timezone: str) ->
             "daily": "et0_fao_evapotranspiration",
             "timezone": timezone,
         },
+        hoje,
     )
     valores = [
         float(v) for v in corpo["daily"]["et0_fao_evapotranspiration"] if v is not None
