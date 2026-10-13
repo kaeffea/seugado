@@ -25,6 +25,31 @@ export function piquetesDisponiveis(piquetes: Piquete[], lote: Lote | null): Piq
   return piquetes.filter(p => p.lote_atual_id === null || p.id === lote?.piquete_atual_id);
 }
 
+// 1 UA = 450 kg de peso vivo (ADR-014): o mesmo divisor da lotação por módulo no backend.
+export const KG_POR_UA = 450;
+
+// peso_vivo_total_kg já soma quantidade × peso médio, com o peso da tabela quando falta o informado.
+export function uaDoLote(lote: Pick<Lote, "peso_vivo_total_kg">): number {
+  return lote.peso_vivo_total_kg / KG_POR_UA;
+}
+
+export interface Lotacao { cabecas: number; ua: number; areaHa: number; uaPorHa: number | null; }
+
+// Lotação global (ADR-026 §4): UA de todos os lotes ÷ área dos piquetes ativos.
+export function lotacaoGlobal(
+  lotes: Pick<Lote, "n_animais_total" | "peso_vivo_total_kg">[],
+  piquetes: Pick<Piquete, "area_ha">[],
+): Lotacao {
+  const cabecas = lotes.reduce((soma, lote) => soma + lote.n_animais_total, 0);
+  const ua = lotes.reduce((soma, lote) => soma + uaDoLote(lote), 0);
+  const areaHa = piquetes.reduce((soma, piquete) => soma + piquete.area_ha, 0);
+  return { cabecas, ua, areaHa, uaPorHa: areaHa > 0 ? ua / areaHa : null };
+}
+
+export function decimal(valor: number, casas: number): string {
+  return valor.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
+}
+
 export function pesoParaEdicao(item: ComposicaoItem): string {
   return item.origem_peso === "ua_tabela" || item.peso_medio_kg === null ? "" : String(item.peso_medio_kg);
 }
