@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { useFazenda } from "../lib/fazenda";
 import type { Categoria, ComposicaoItem, Fazenda, Lote, Piquete } from "../lib/tipos";
 import { mensagemDeErro } from "../componentes/ui/erros";
-import { dataCurta, hojeNaFazenda, piquetesDisponiveis, pesoParaEdicao } from "./dadosManejo";
+import { dataCurta, decimal, hojeNaFazenda, KG_POR_UA, lotacaoGlobal, piquetesDisponiveis, pesoParaEdicao, uaDoLote } from "./dadosManejo";
 import "./Lotes.css";
 
 const CATEGORIAS: Categoria[] = ["bezerro", "bezerra", "novilho", "novilha", "vaca", "boi", "touro"];
@@ -111,6 +111,24 @@ function FormularioLote({ fazenda, piquetes, lote, aoSalvar, aoCancelar }: {
   );
 }
 
+function FaixaTotais({ lotes, piquetes }: { lotes: Lote[]; piquetes: Piquete[] }) {
+  const { cabecas, ua, areaHa, uaPorHa } = lotacaoGlobal(lotes, piquetes);
+  return (
+    <section className="cartao lotes-totais" aria-label="Totais da fazenda">
+      <dl>
+        <div><dt>Total de cabeças</dt><dd>{cabecas.toLocaleString("pt-BR")}</dd></div>
+        <div><dt>Total em UA</dt><dd>{decimal(ua, 1)}</dd></div>
+        <div>
+          <dt>Lotação global</dt>
+          <dd>{uaPorHa === null ? "—" : `${decimal(uaPorHa, 2)} UA/ha`}</dd>
+          <dd className="lotes-totais-nota">{areaHa > 0 ? `em ${areaHa.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ha de piquetes ativos` : "sem área de piquete ativo"}</dd>
+        </div>
+      </dl>
+      <p className="campo-dica">1 UA = {KG_POR_UA} kg de peso vivo.</p>
+    </section>
+  );
+}
+
 function LotesDaFazenda({ fazenda }: { fazenda: Fazenda }) {
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [piquetes, setPiquetes] = useState<Piquete[]>([]);
@@ -153,6 +171,7 @@ function LotesDaFazenda({ fazenda }: { fazenda: Fazenda }) {
       {erro ? <div className="aviso-erro" role="alert">{erro} <button className="botao botao-secundario" disabled={carregando || dissolvendo} onClick={recarregar}>Tentar novamente</button></div> : null}
       {carregando ? <p role="status">Carregando lotes e piquetes…</p> : null}
       {!carregando && !erro && piquetes.length === 0 ? <p className="aviso-info">Cadastre os piquetes no Mapa antes dos lotes. <Link to="/mapa">Abrir Mapa</Link></p> : null}
+      {!erro && lotes.length > 0 ? <FaixaTotais lotes={lotes} piquetes={piquetes} /> : null}
       {editor !== null ? <FormularioLote key={editor === "novo" ? "novo" : editor.id} fazenda={fazenda} piquetes={piquetes} lote={editor === "novo" ? null : editor} aoCancelar={() => setEditor(null)} aoSalvar={() => { setEditor(null); recarregar(); }} /> : null}
       {!carregando && !erro && lotes.length === 0 && piquetes.length > 0 ? <p className="cartao cartao-subtitulo">Nenhum lote cadastrado. Crie um lote para informar sua composição e onde ele está.</p> : null}
       <div className="lotes-lista" aria-busy={carregando}>
@@ -164,6 +183,7 @@ function LotesDaFazenda({ fazenda }: { fazenda: Fazenda }) {
               <p className="cartao-subtitulo">{lote.composicao.map(item => `${item.n_animais} × ${item.categoria}`).join(" · ")}</p>
               {lote.indissoluvel ? <span className="selo selo-media">Indissolúvel</span> : null}
             </div>
+            <dl className="lotes-ua"><dt>UA</dt><dd>{decimal(uaDoLote(lote), 1)}</dd></dl>
             <div className="lotes-acoes">
               {confirmacao === lote.id ? <>
                 <p>Dissolver o lote “{lote.nome}”?</p>

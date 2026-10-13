@@ -17,9 +17,21 @@
 .lotes-dissolver { color: var(--cor-erro); }
 .lotes-pagina a { color: var(--cor-primaria); }
 .lotes-formulario { border: 1px solid var(--cor-primaria-suave); }
+.lotes-totais { border: 1px solid var(--cor-borda); }
+.lotes-totais dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0; }
+.lotes-totais dl > div + div { border-left: 1px solid var(--cor-borda); padding-left: 16px; }
+.lotes-totais dt, .lotes-ua dt { color: var(--cor-texto-suave); font-size: 0.8rem; }
+.lotes-totais dd, .lotes-ua dd { margin: 0; font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.lotes-totais .lotes-totais-nota { color: var(--cor-texto-suave); font-size: 0.8rem; font-weight: 400; }
+.lotes-totais .campo-dica { margin: 12px 0 0; }
+.lotes-ua { min-width: 80px; margin: 0; text-align: right; }
+.lotes-ua dd { font-size: 1.25rem; }
 @media (max-width: 1050px) { .lotes-linha { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 540px) {
   .lotes-linha, .lotes-localizacao { grid-template-columns: minmax(0, 1fr); }
   .lotes-linha { padding-bottom: 16px; border-bottom: 1px solid var(--cor-borda); }
   .lotes-cartao > div:first-child { flex-basis: 100%; }
+  .lotes-totais dl { grid-template-columns: minmax(0, 1fr); }
+  .lotes-totais dl > div + div { border-left: 0; padding-left: 0; border-top: 1px solid var(--cor-borda); padding-top: 12px; }
+  .lotes-ua { text-align: left; }
 }
